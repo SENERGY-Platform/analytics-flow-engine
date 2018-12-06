@@ -52,12 +52,12 @@ func (r Rancher) getServicesByPrefix(prefix string) (service_collection ServiceC
 	return
 }
 
-func (r Rancher) CreateOperator(pipelineId string, operator operator_api.Operator, input lib.Operator, outputTopic string, flowId string) string {
+func (r Rancher) CreateOperator(pipelineId string, operator operator_api.Operator, input lib.Operator, id int, outputTopic string, flowId string) string {
 	env := map[string]string{
 		"ZK_QUORUM":             r.zookeeper,
-		"CONFIG_APPLICATION_ID": "analytics-"+ pipelineId  + "-" + strconv.Itoa(input.Id),
+		"CONFIG_APPLICATION_ID": "analytics-"+ pipelineId  + "-" + input.Id,
 		"PIPELINE_ID": pipelineId,
-		"OPERATOR_ID": strconv.Itoa(input.Id),
+		"OPERATOR_ID": input.Id,
 		"WINDOW_TIME": "120",
 	}
 
@@ -72,6 +72,7 @@ func (r Rancher) CreateOperator(pipelineId string, operator operator_api.Operato
 
 	labels := map[string]string{
 		"flow_id":                                  flowId,
+		"operator_id": input.Id,
 		"service_type":                             "analytics-service",
 		"io.rancher.container.pull_image":          "always",
 		"io.rancher.scheduler.affinity:host_label": "role=worker",
@@ -80,12 +81,12 @@ func (r Rancher) CreateOperator(pipelineId string, operator operator_api.Operato
 
 	reqBody := &Request{
 		Type:          "service",
-		Name:          pipelineId + "-" + strconv.Itoa(input.Id) + "-" + operator.Name,
+		Name:          "v2-" + pipelineId + "-" + strconv.Itoa(id)+"-" + input.Name,
 		StackId:       r.stackId,
 		Scale:         1,
 		StartOnCreate: true,
 		LaunchConfig: LaunchConfig{
-			ImageUuid:   "docker:" + operator.Image,
+			ImageUuid:   "docker:" + input.ImageId,
 			Environment: env,
 			Labels:      labels,
 		},
@@ -93,7 +94,7 @@ func (r Rancher) CreateOperator(pipelineId string, operator operator_api.Operato
 	fmt.Println(reqBody)
 	resp, body, e := request.Post(r.url + "services").Send(reqBody).End()
 	if resp.StatusCode != http.StatusCreated {
-		fmt.Println("Something went wrong", e)
+		fmt.Println("Could not create Operator", body)
 	}
 	if len(e) > 0 {
 		fmt.Println("Something went wrong", e)
@@ -120,8 +121,8 @@ func (r Rancher) GetAnalyticsPipelineStatus(flow_id string) string {
 	return lib.PIPELINE_MISSING
 }
 
-func (r Rancher) DeleteAnalyticsPipeline(flow_id string) {
-	services, _ := r.getServicesByPrefix(flow_id)
+func (r Rancher) DeleteAnalyticsPipeline(flowId string) {
+	services, _ := r.getServicesByPrefix("v2-"+flowId)
 	for _, element := range services.Data {
 		if element.Labels["service_type"] == "analytics-service" {
 			println("Deleting Service:" + element.Id)

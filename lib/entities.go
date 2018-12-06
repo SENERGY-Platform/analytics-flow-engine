@@ -28,7 +28,7 @@ type Pipeline struct {
 }
 
 type Operator struct {
-	Id          int    `json:"Id,omitempty"`
+	Id          string    `json:"Id,omitempty"`
 	Name        string `json:"Name,omitempty"`
 	ImageId     string `json:"ImageId,omitempty"`
 	InputTopics []InputTopic
@@ -52,13 +52,13 @@ type PipelineRequest struct {
 }
 
 type PipelineNode struct {
-	NodeId int                      `json:"nodeId, omitempty"`
-	Inputs map[string]PipelineInput `json:"inputs,omitempty"`
+	NodeId string                      `json:"nodeId, omitempty"`
+	Inputs [] PipelineInput `json:"inputs,omitempty"`
 }
 
 type PipelineInput struct {
 	DeviceId  string          `json:"deviceId,omitempty"`
-	TopicName string          `json:"name,omitempty"`
+	TopicName string          `json:"topicName,omitempty"`
 	Values    []PipelineValue `json:"values,omitempty"`
 }
 

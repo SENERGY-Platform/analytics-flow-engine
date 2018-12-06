@@ -33,7 +33,7 @@ func NewParsingApi(url string) *ParsingApi {
 
 func (a ParsingApi) GetPipeline(id string, userId string) (p Pipeline, err error) {
 	request := gorequest.New()
-	_ , body, e := request.Get(a.url + "pipe/" + id ).Set("X-UserId", userId).End()
+	_ , body, e := request.Get(a.url + "/flow/" + id ).Set("X-UserId", userId).End()
 	//if resp.StatusCode != http.StatusOK{
 	//	fmt.Println("Something went wrong", e)
 	//	err  = errors.New("Could not get pipeline from service")

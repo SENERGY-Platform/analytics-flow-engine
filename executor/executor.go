@@ -51,6 +51,8 @@ func (f *FlowExecutor) StartPipeline(pipelineRequest lib.PipelineRequest, userId
 		tmpPipeline.Operators = append(tmpPipeline.Operators, op)
 	}
 
+	fmt.Println(tmpPipeline)
+
 	//Add starting operators
 	for _, operator := range tmpPipeline.Operators {
 		for _, node := range pipelineRequest.Nodes {
@@ -66,6 +68,9 @@ func (f *FlowExecutor) StartPipeline(pipelineRequest lib.PipelineRequest, userId
 		}
 		pipeline.Operators = append(pipeline.Operators, operator)
 	}
+
+	fmt.Println(pipeline)
+
 	pipeline.Id, _ = registerPipeline(&pipeline, userId)
 	f.startOperators(pipeline, pipelineRequest.Id)
 	return pipeline
@@ -78,10 +83,14 @@ func (f *FlowExecutor) startOperators(pipeline lib.Pipeline, flowId string) {
 
 		var outputTopic = f.getOperatorOutputTopic(operator.Name)
 
+		fmt.Println(operator)
+
+
 		f.driver.CreateOperator(
 			pipeline.Id.String(),
 			operatorData,
 			operator,
+			operatorId+1,
 			outputTopic,
 			flowId,
 		)

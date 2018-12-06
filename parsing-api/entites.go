@@ -19,7 +19,7 @@ package parsing_api
 type Pipeline map[string] Operator
 
 type Operator struct {
-	Id int `json:"id,omitempty"`
+	Id string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
 	ImageId string `json:"ImageId,omitempty"`
 	InputTopics map [string] InputTopic

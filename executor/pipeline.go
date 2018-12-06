@@ -32,7 +32,7 @@ type PipelineResponse struct {
 func registerPipeline (pipeline *lib.Pipeline, userId string) (id uuid.UUID, err error){
 	var pipelineServiceUrl = lib.GetEnv("PIPELINE_API_ENDPOINT", "")
 	request := gorequest.New()
-	_ , body , e := request.Post(pipelineServiceUrl + "pipeline").Set("X-UserId", userId).Send(pipeline).End()
+	_ , body , e := request.Post(pipelineServiceUrl + "/pipeline").Set("X-UserId", userId).Send(pipeline).End()
 	//if resp.StatusCode != http.StatusOK{
 	//	fmt.Println("Something went wrong", e)
 	//	err  = errors.New("Could not get pipeline from service")
@@ -54,7 +54,7 @@ func registerPipeline (pipeline *lib.Pipeline, userId string) (id uuid.UUID, err
 func deletePipeline(id string, userId string)  (err error) {
 	var pipelineServiceUrl = lib.GetEnv("PIPELINE_API_ENDPOINT", "")
 	request := gorequest.New()
-	_ , _ , e := request.Delete(pipelineServiceUrl + "pipeline/"+id).Set("X-UserId", userId).End()
+	_ , _ , e := request.Delete(pipelineServiceUrl + "/pipeline/"+id).Set("X-UserId", userId).End()
 	if len(e) > 0 {
 		fmt.Println("Something went wrong", e)
 		err  = errors.New("Could not get pipeline from service")
