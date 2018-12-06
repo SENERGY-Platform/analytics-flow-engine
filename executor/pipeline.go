@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"strconv"
+
 	"github.com/parnurzeal/gorequest"
 	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
@@ -55,7 +57,11 @@ func registerPipeline(pipeline *lib.Pipeline, userId string) (id uuid.UUID, err 
 func deletePipeline(id string, userId string) (err error) {
 	var pipelineServiceUrl = lib.GetEnv("PIPELINE_API_ENDPOINT", "")
 	request := gorequest.New()
-	_, _, e := request.Delete(pipelineServiceUrl+"/pipeline/"+id).Set("X-UserId", userId).End()
+	resp, _, e := request.Delete(pipelineServiceUrl+"/pipeline/"+id).Set("X-UserId", userId).End()
+	if resp.StatusCode != 200 {
+		fmt.Println("Could not access pipeline registry: "+strconv.Itoa(resp.StatusCode), resp.Body)
+		err = errors.New("Could not access pipeline registry")
+	}
 	if len(e) > 0 {
 		fmt.Println("Something went wrong", e)
 		err = errors.New("Could not get pipeline from service")

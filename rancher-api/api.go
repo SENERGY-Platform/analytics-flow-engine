@@ -46,10 +46,10 @@ func (r Rancher) GetEnvData() map[string]interface{} {
 	return lib.ToJson(body)
 }
 
-func (r Rancher) getServicesByPrefix(prefix string) (service_collection ServiceCollection, err error) {
+func (r Rancher) getServicesByPrefix(prefix string) (serviceCollection ServiceCollection, err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
 	_, body, _ := request.Get(r.url + "services/?name_prefix=" + prefix).End()
-	err = json.Unmarshal([]byte(body), &service_collection)
+	err = json.Unmarshal([]byte(body), &serviceCollection)
 	return
 }
 
@@ -124,6 +124,10 @@ func (r Rancher) GetAnalyticsPipelineStatus(flow_id string) string {
 
 func (r Rancher) DeleteAnalyticsPipeline(flowId string) {
 	services, _ := r.getServicesByPrefix("v2-" + flowId)
+	// Enable removal of v1 pipelines
+	if len(services.Data) < 1 {
+		services, _ = r.getServicesByPrefix(flowId)
+	}
 	for _, element := range services.Data {
 		if element.Labels["service_type"] == "analytics-service" {
 			println("Deleting Service:" + element.Id)
