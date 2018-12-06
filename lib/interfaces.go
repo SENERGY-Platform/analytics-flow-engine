@@ -22,9 +22,9 @@ import (
 )
 
 type Driver interface {
-	GetEnvData() map[string] interface{}
+	GetEnvData() map[string]interface{}
 	CreateOperator(pipelineId string, operator operator_api.Operator, inputs Operator, id int, outputTopic string, flowId string) string
-	DeleteOperator(id string) map[string] interface {}
+	DeleteOperator(id string) map[string]interface{}
 	DeleteAnalyticsPipeline(flowId string)
 	GetAnalyticsPipelineStatus(flowId string) string
 }
@@ -36,4 +36,3 @@ type OperatorApiService interface {
 type ParsingApiService interface {
 	GetPipeline(id string, userId string) (p parsing_api.Pipeline, err error)
 }
-

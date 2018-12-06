@@ -23,8 +23,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/parnurzeal/gorequest"
 	"strconv"
+
+	"github.com/parnurzeal/gorequest"
 )
 
 type Rancher struct {
@@ -55,10 +56,10 @@ func (r Rancher) getServicesByPrefix(prefix string) (service_collection ServiceC
 func (r Rancher) CreateOperator(pipelineId string, operator operator_api.Operator, input lib.Operator, id int, outputTopic string, flowId string) string {
 	env := map[string]string{
 		"ZK_QUORUM":             r.zookeeper,
-		"CONFIG_APPLICATION_ID": "analytics-"+ pipelineId  + "-" + input.Id,
-		"PIPELINE_ID": pipelineId,
-		"OPERATOR_ID": input.Id,
-		"WINDOW_TIME": "120",
+		"CONFIG_APPLICATION_ID": "analytics-" + pipelineId + "-" + input.Id,
+		"PIPELINE_ID":           pipelineId,
+		"OPERATOR_ID":           input.Id,
+		"WINDOW_TIME":           "120",
 	}
 
 	config, _ := json.Marshal(input.InputTopics)
@@ -71,17 +72,17 @@ func (r Rancher) CreateOperator(pipelineId string, operator operator_api.Operato
 	}
 
 	labels := map[string]string{
-		"flow_id":                                  flowId,
-		"operator_id": input.Id,
-		"service_type":                             "analytics-service",
-		"io.rancher.container.pull_image":          "always",
+		"flow_id":                         flowId,
+		"operator_id":                     input.Id,
+		"service_type":                    "analytics-service",
+		"io.rancher.container.pull_image": "always",
 		"io.rancher.scheduler.affinity:host_label": "role=worker",
 	}
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
 
 	reqBody := &Request{
 		Type:          "service",
-		Name:          "v2-" + pipelineId + "-" + strconv.Itoa(id)+"-" + input.Name,
+		Name:          "v2-" + pipelineId + "-" + strconv.Itoa(id) + "-" + input.Name,
 		StackId:       r.stackId,
 		Scale:         1,
 		StartOnCreate: true,
@@ -122,7 +123,7 @@ func (r Rancher) GetAnalyticsPipelineStatus(flow_id string) string {
 }
 
 func (r Rancher) DeleteAnalyticsPipeline(flowId string) {
-	services, _ := r.getServicesByPrefix("v2-"+flowId)
+	services, _ := r.getServicesByPrefix("v2-" + flowId)
 	for _, element := range services.Data {
 		if element.Labels["service_type"] == "analytics-service" {
 			println("Deleting Service:" + element.Id)

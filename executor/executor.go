@@ -58,7 +58,7 @@ func (f *FlowExecutor) StartPipeline(pipelineRequest lib.PipelineRequest, userId
 		for _, node := range pipelineRequest.Nodes {
 			if operator.Id == node.NodeId {
 				for _, input := range node.Inputs {
-					t := lib.InputTopic{Name: input.TopicName, FilterType: "DeviceId" ,FilterValue: input.DeviceId}
+					t := lib.InputTopic{Name: input.TopicName, FilterType: "DeviceId", FilterValue: input.DeviceId}
 					for _, value := range input.Values {
 						t.Mappings = append(t.Mappings, lib.Mapping{value.Name, value.Path})
 					}
@@ -84,7 +84,6 @@ func (f *FlowExecutor) startOperators(pipeline lib.Pipeline, flowId string) {
 		var outputTopic = f.getOperatorOutputTopic(operator.Name)
 
 		fmt.Println(operator)
-
 
 		f.driver.CreateOperator(
 			pipeline.Id.String(),
