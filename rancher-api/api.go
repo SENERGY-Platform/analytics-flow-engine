@@ -61,7 +61,7 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, id int, o
 		"WINDOW_TIME":           "120",
 	}
 
-	config, _ := json.Marshal(input.InputTopics)
+	config, _ := json.Marshal(lib.OperatorRequestConfig{Config: input.Config, InputTopics: input.InputTopics})
 	env["CONFIG"] = string(config)
 
 	env["DEVICE_ID_PATH"] = "device_id"

@@ -56,12 +56,21 @@ func (f *FlowExecutor) StartPipeline(pipelineRequest lib.PipelineRequest, userId
 	for _, operator := range tmpPipeline.Operators {
 		for _, node := range pipelineRequest.Nodes {
 			if operator.Id == node.NodeId {
-				for _, input := range node.Inputs {
-					t := lib.InputTopic{Name: input.TopicName, FilterType: "DeviceId", FilterValue: input.DeviceId}
-					for _, value := range input.Values {
-						t.Mappings = append(t.Mappings, lib.Mapping{value.Name, value.Path})
+				if len(node.Inputs) > 0 {
+					for _, input := range node.Inputs {
+						t := lib.InputTopic{Name: input.TopicName, FilterType: "DeviceId", FilterValue: input.DeviceId}
+						for _, value := range input.Values {
+							t.Mappings = append(t.Mappings, lib.Mapping{value.Name, value.Path})
+						}
+						operator.InputTopics = append(operator.InputTopics, t)
 					}
-					operator.InputTopics = append(operator.InputTopics, t)
+				}
+
+				if len(node.Config) > 0 {
+					for _, config := range node.Config {
+						c := lib.OperatorConfig{Name: config.Name, Value: config.Value}
+						operator.Config = append(operator.Config, c)
+					}
 				}
 			}
 		}

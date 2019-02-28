@@ -23,22 +23,33 @@ type Response struct {
 }
 
 type Pipeline struct {
-	Id uuid.UUID
+	Id        uuid.UUID
 	Operators []Operator `json:"operators,omitempty"`
 }
 
 type Operator struct {
-	Id          string    `json:"Id,omitempty"`
-	Name        string `json:"Name,omitempty"`
-	ImageId     string `json:"ImageId,omitempty"`
+	Id          string           `json:"Id,omitempty"`
+	Name        string           `json:"Name,omitempty"`
+	ImageId     string           `json:"ImageId,omitempty"`
+	Config      []OperatorConfig `json:"config,omitempty"`
 	InputTopics []InputTopic
 }
 
+type OperatorRequestConfig struct {
+	Config      []OperatorConfig `json:"config,omitempty"`
+	InputTopics []InputTopic     `json:"inputTopics,omitempty"`
+}
+
+type OperatorConfig struct {
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
+}
+
 type InputTopic struct {
-	Name     string
-	FilterType string
+	Name        string
+	FilterType  string
 	FilterValue string
-	Mappings []Mapping
+	Mappings    []Mapping
 }
 
 type Mapping struct {
@@ -52,8 +63,14 @@ type PipelineRequest struct {
 }
 
 type PipelineNode struct {
-	NodeId string                      `json:"nodeId, omitempty"`
-	Inputs [] PipelineInput `json:"inputs,omitempty"`
+	NodeId string           `json:"nodeId, omitempty"`
+	Inputs []PipelineInput  `json:"inputs,omitempty"`
+	Config []PipelineConfig `json:"config,omitempty"`
+}
+
+type PipelineConfig struct {
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 type PipelineInput struct {
