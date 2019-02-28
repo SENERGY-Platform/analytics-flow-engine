@@ -28,21 +28,16 @@ type Pipeline struct {
 }
 
 type Operator struct {
-	Id          string           `json:"Id,omitempty"`
-	Name        string           `json:"Name,omitempty"`
-	ImageId     string           `json:"ImageId,omitempty"`
-	Config      []OperatorConfig `json:"config,omitempty"`
+	Id          string            `json:"Id,omitempty"`
+	Name        string            `json:"Name,omitempty"`
+	ImageId     string            `json:"ImageId,omitempty"`
+	Config      map[string]string `json:"config,omitempty"`
 	InputTopics []InputTopic
 }
 
 type OperatorRequestConfig struct {
-	Config      []OperatorConfig `json:"config,omitempty"`
-	InputTopics []InputTopic     `json:"inputTopics,omitempty"`
-}
-
-type OperatorConfig struct {
-	Name  string `json:"name,omitempty"`
-	Value string `json:"value,omitempty"`
+	Config      map[string]string `json:"config,omitempty"`
+	InputTopics []InputTopic      `json:"inputTopics,omitempty"`
 }
 
 type InputTopic struct {

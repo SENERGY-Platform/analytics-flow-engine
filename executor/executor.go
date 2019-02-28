@@ -67,10 +67,11 @@ func (f *FlowExecutor) StartPipeline(pipelineRequest lib.PipelineRequest, userId
 				}
 
 				if len(node.Config) > 0 {
+					m := make(map[string]string)
 					for _, config := range node.Config {
-						c := lib.OperatorConfig{Name: config.Name, Value: config.Value}
-						operator.Config = append(operator.Config, c)
+						m[config.Name] = config.Value
 					}
+					operator.Config = m
 				}
 			}
 		}
