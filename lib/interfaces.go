@@ -17,7 +17,6 @@
 package lib
 
 import (
-	"analytics-flow-engine/operator-api"
 	"analytics-flow-engine/parsing-api"
 )
 
@@ -27,10 +26,6 @@ type Driver interface {
 	DeleteOperator(id string) map[string]interface{}
 	DeleteAnalyticsPipeline(flowId string)
 	GetAnalyticsPipelineStatus(flowId string) string
-}
-
-type OperatorApiService interface {
-	GetOperator(id string) (op operator_api.Operator, err error)
 }
 
 type ParsingApiService interface {
