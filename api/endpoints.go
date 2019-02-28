@@ -17,24 +17,24 @@
 package api
 
 import (
-	"net/http"
-	"encoding/json"
-	"github.com/gorilla/mux"
 	"analytics-flow-engine/executor"
 	"analytics-flow-engine/lib"
+	"encoding/json"
 	"fmt"
+	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
 type Endpoint struct {
-	driver lib.Driver
-	operatorApiService lib.OperatorApiService
+	driver          lib.Driver
 	executorService *executor.FlowExecutor
-	parsingService lib.ParsingApiService
+	parsingService  lib.ParsingApiService
 }
 
-func NewEndpoint(driver lib.Driver, operatorApiService lib.OperatorApiService, parsingService lib.ParsingApiService) *Endpoint{
-	ret := executor.NewFlowExecutor(driver, operatorApiService, parsingService)
-	return &Endpoint{driver, operatorApiService, ret, parsingService}
+func NewEndpoint(driver lib.Driver, parsingService lib.ParsingApiService) *Endpoint {
+	ret := executor.NewFlowExecutor(driver, parsingService)
+	return &Endpoint{driver, ret, parsingService}
 }
 
 func (e *Endpoint) getRootEndpoint(w http.ResponseWriter, req *http.Request) {
@@ -43,7 +43,7 @@ func (e *Endpoint) getRootEndpoint(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(lib.Response{"OK"})
 }
 
-func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request){
+func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	ret := e.executorService.GetPipelineStatus(vars["id"])
 	w.Header().Set("Content-Type", "application/json")
@@ -51,7 +51,7 @@ func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request){
 	json.NewEncoder(w).Encode(lib.Response{ret})
 }
 
-func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request){
+func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
 	//vars := mux.Vars(req)
 	decoder := json.NewDecoder(req.Body)
 	var pipe_req lib.PipelineRequest
@@ -60,21 +60,21 @@ func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request){
 		fmt.Println(err)
 	}
 	defer req.Body.Close()
-	ret := executor.NewFlowExecutor(e.driver, e.operatorApiService, e.parsingService).StartPipeline(pipe_req, e.getUserId(req))
+	ret := executor.NewFlowExecutor(e.driver, e.parsingService).StartPipeline(pipe_req, e.getUserId(req))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(ret)
 }
 
-func (e *Endpoint) deletePipeline(w http.ResponseWriter, req *http.Request){
+func (e *Endpoint) deletePipeline(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
-	ret := executor.NewFlowExecutor(e.driver, e.operatorApiService, e.parsingService).DeletePipeline(vars["id"], e.getUserId(req))
+	ret := executor.NewFlowExecutor(e.driver, e.parsingService).DeletePipeline(vars["id"], e.getUserId(req))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	json.NewEncoder(w).Encode(lib.Response{ret})
 }
 
-func (e *Endpoint) getUserId(req *http.Request) (userId string){
+func (e *Endpoint) getUserId(req *http.Request) (userId string) {
 	userId = req.Header.Get("X-UserId")
 	if userId == "" {
 		userId = "admin"

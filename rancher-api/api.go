@@ -18,7 +18,6 @@ package rancher_api
 
 import (
 	"analytics-flow-engine/lib"
-	"analytics-flow-engine/operator-api"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -53,7 +52,7 @@ func (r Rancher) getServicesByPrefix(prefix string) (serviceCollection ServiceCo
 	return
 }
 
-func (r Rancher) CreateOperator(pipelineId string, operator operator_api.Operator, input lib.Operator, id int, outputTopic string, flowId string) string {
+func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, id int, outputTopic string, flowId string) string {
 	env := map[string]string{
 		"ZK_QUORUM":             r.zookeeper,
 		"CONFIG_APPLICATION_ID": "analytics-" + pipelineId + "-" + input.Id,

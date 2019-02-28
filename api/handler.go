@@ -18,27 +18,24 @@ package api
 
 import (
 	"analytics-flow-engine/lib"
+	"analytics-flow-engine/parsing-api"
+	"analytics-flow-engine/rancher-api"
 	"fmt"
-	"github.com/gorilla/mux"
 	"log"
 	"net/http"
-	"analytics-flow-engine/rancher-api"
-	"analytics-flow-engine/operator-api"
+
+	"github.com/gorilla/mux"
 	"github.com/rs/cors"
-	"analytics-flow-engine/parsing-api"
 )
 
-func CreateServer(){
+func CreateServer() {
 	r := rancher_api.NewRancher(
 		lib.GetEnv("RANCHER_ENDPOINT", ""),
 		lib.GetEnv("RANCHER_ACCESS_KEY", ""),
 		lib.GetEnv("RANCHER_SECRET_KEY", ""),
 		lib.GetEnv("RANCHER_STACK_ID", ""),
 		lib.GetEnv("ZOOKEEPER", ""),
-		)
-	o := operator_api.NewOperatorApi(
-		lib.GetEnv("OPERATOR_API_ENDPOINT", ""),
-		)
+	)
 	p := parsing_api.NewParsingApi(
 		lib.GetEnv("PARSER_API_ENDPOINT", ""),
 	)
@@ -46,7 +43,7 @@ func CreateServer(){
 	fmt.Print("Starting Server at port " + port + "\n")
 	router := mux.NewRouter()
 
-	e := NewEndpoint(r, o, p)
+	e := NewEndpoint(r, p)
 	router.HandleFunc("/", e.getRootEndpoint).Methods("GET")
 	router.HandleFunc("/pipeline/{id}", e.getPipelineStatus).Methods("GET")
 	router.HandleFunc("/pipeline", e.startPipeline).Methods("POST")
@@ -59,5 +56,5 @@ func CreateServer(){
 		})
 	handler := c.Handler(router)
 	logger := lib.NewLogger(handler, "CALL")
-	log.Fatal(http.ListenAndServe(":"+ port, logger))
+	log.Fatal(http.ListenAndServe(":"+port, logger))
 }

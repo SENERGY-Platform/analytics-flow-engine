@@ -24,12 +24,11 @@ import (
 
 type FlowExecutor struct {
 	driver         lib.Driver
-	operator_api   lib.OperatorApiService
 	parsingService lib.ParsingApiService
 }
 
-func NewFlowExecutor(driver lib.Driver, operator_api lib.OperatorApiService, parsingService lib.ParsingApiService) *FlowExecutor {
-	return &FlowExecutor{driver, operator_api, parsingService}
+func NewFlowExecutor(driver lib.Driver, parsingService lib.ParsingApiService) *FlowExecutor {
+	return &FlowExecutor{driver, parsingService}
 }
 
 // Starts a pipeline.s
@@ -78,7 +77,6 @@ func (f *FlowExecutor) StartPipeline(pipelineRequest lib.PipelineRequest, userId
 
 func (f *FlowExecutor) startOperators(pipeline lib.Pipeline, flowId string) {
 	for operatorId, operator := range pipeline.Operators {
-		operatorData, _ := f.operator_api.GetOperator(operator.ImageId)
 		fmt.Println(strconv.Itoa(operatorId) + ": Starting Operator:" + operator.Name)
 
 		var outputTopic = f.getOperatorOutputTopic(operator.Name)
@@ -87,7 +85,6 @@ func (f *FlowExecutor) startOperators(pipeline lib.Pipeline, flowId string) {
 
 		f.driver.CreateOperator(
 			pipeline.Id.String(),
-			operatorData,
 			operator,
 			operatorId+1,
 			outputTopic,
