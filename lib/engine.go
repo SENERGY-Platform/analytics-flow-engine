@@ -49,8 +49,6 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 		tmpPipeline.Operators = append(tmpPipeline.Operators, op)
 	}
 
-	fmt.Println(tmpPipeline)
-
 	//Add starting operators
 	for _, operator := range tmpPipeline.Operators {
 		for _, node := range pipelineRequest.Nodes {
@@ -76,8 +74,6 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 		}
 		pipeline.Operators = append(pipeline.Operators, operator)
 	}
-
-	fmt.Println(pipeline)
 
 	pipeline.Id, _ = registerPipeline(&pipeline, userId)
 	f.startOperators(pipeline, pipelineRequest.Id)
