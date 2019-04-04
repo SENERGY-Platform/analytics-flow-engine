@@ -109,8 +109,8 @@ func (r Rancher) DeleteOperator(service_id string) map[string]interface{} {
 	return lib.ToJson(body)
 }
 
-func (r Rancher) GetAnalyticsPipelineStatus(flow_id string) string {
-	services, _ := r.getServicesByPrefix(flow_id)
+func (r Rancher) GetAnalyticsPipelineStatus(pipelineId string) string {
+	services, _ := r.getServicesByPrefix(pipelineId)
 	service_count := len(services.Data)
 	switch {
 	case service_count <= 0:
@@ -121,11 +121,11 @@ func (r Rancher) GetAnalyticsPipelineStatus(flow_id string) string {
 	return lib.PIPELINE_MISSING
 }
 
-func (r Rancher) DeleteAnalyticsPipeline(flowId string) {
-	services, _ := r.getServicesByPrefix("v2-" + flowId)
+func (r Rancher) DeleteAnalyticsPipeline(pipelineId string) {
+	services, _ := r.getServicesByPrefix("v2-" + pipelineId)
 	// Enable removal of v1 pipelines
 	if len(services.Data) < 1 {
-		services, _ = r.getServicesByPrefix(flowId)
+		services, _ = r.getServicesByPrefix(pipelineId)
 	}
 	for _, element := range services.Data {
 		if element.Labels["service_type"] == "analytics-service" {

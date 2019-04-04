@@ -24,8 +24,8 @@ type Driver interface {
 	GetEnvData() map[string]interface{}
 	CreateOperator(pipelineId string, inputs Operator, id int, outputTopic string, flowId string) string
 	DeleteOperator(id string) map[string]interface{}
-	DeleteAnalyticsPipeline(flowId string)
-	GetAnalyticsPipelineStatus(flowId string) string
+	DeleteAnalyticsPipeline(pipelineId string)
+	GetAnalyticsPipelineStatus(pipelineId string) string
 }
 
 type ParsingApiService interface {
