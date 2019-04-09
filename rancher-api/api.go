@@ -22,8 +22,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"strconv"
-
 	"github.com/parnurzeal/gorequest"
 )
 
@@ -52,7 +50,7 @@ func (r Rancher) getServicesByPrefix(prefix string) (serviceCollection ServiceCo
 	return
 }
 
-func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, id int, outputTopic string, flowId string) string {
+func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, outputTopic string, flowId string) string {
 	env := map[string]string{
 		"ZK_QUORUM":             r.zookeeper,
 		"CONFIG_APPLICATION_ID": "analytics-" + pipelineId + "-" + input.Id,
@@ -81,7 +79,7 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, id int, o
 
 	reqBody := &Request{
 		Type:          "service",
-		Name:          "v2-" + pipelineId + "-" + strconv.Itoa(id) + "-" + input.Name,
+		Name:          r.GetOperatorName(pipelineId, input),
 		StackId:       r.stackId,
 		Scale:         1,
 		StartOnCreate: true,
@@ -133,4 +131,8 @@ func (r Rancher) DeleteAnalyticsPipeline(pipelineId string) {
 			r.DeleteOperator(element.Id)
 		}
 	}
+}
+
+func (r Rancher) GetOperatorName(pipelineId string, operator lib.Operator) string {
+	return "v2-" + pipelineId + "-" + operator.Id + "-" + operator.Name
 }

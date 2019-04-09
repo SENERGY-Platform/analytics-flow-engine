@@ -24,26 +24,43 @@ import (
 	"log"
 	"net/http"
 
+	"analytics-flow-engine/rancher2"
+
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 )
 
 func CreateServer() {
-	r := rancher_api.NewRancher(
-		lib.GetEnv("RANCHER_ENDPOINT", ""),
-		lib.GetEnv("RANCHER_ACCESS_KEY", ""),
-		lib.GetEnv("RANCHER_SECRET_KEY", ""),
-		lib.GetEnv("RANCHER_STACK_ID", ""),
-		lib.GetEnv("ZOOKEEPER", ""),
-	)
-	p := parsing_api.NewParsingApi(
+	var driver lib.Driver
+	switch selectedDriver := lib.GetEnv("DRIVER", "rancher"); selectedDriver {
+	case "rancher":
+		driver = rancher_api.NewRancher(
+			lib.GetEnv("RANCHER_ENDPOINT", ""),
+			lib.GetEnv("RANCHER_ACCESS_KEY", ""),
+			lib.GetEnv("RANCHER_SECRET_KEY", ""),
+			lib.GetEnv("RANCHER_STACK_ID", ""),
+			lib.GetEnv("ZOOKEEPER", ""),
+		)
+	case "rancher2":
+		driver = rancher2.NewRancher2(
+			lib.GetEnv("RANCHER2_ENDPOINT", ""),
+			lib.GetEnv("RANCHER2_ACCESS_KEY", ""),
+			lib.GetEnv("RANCHER2_SECRET_KEY", ""),
+			lib.GetEnv("RANCHER2_STACK_ID", ""),
+			lib.GetEnv("ZOOKEEPER", ""),
+		)
+	default:
+		fmt.Println("No driver selected")
+	}
+
+	parser := parsing_api.NewParsingApi(
 		lib.GetEnv("PARSER_API_ENDPOINT", ""),
 	)
 	port := lib.GetEnv("API_PORT", "8000")
 	fmt.Print("Starting Server at port " + port + "\n")
 	router := mux.NewRouter()
 
-	e := NewEndpoint(r, p)
+	e := NewEndpoint(driver, parser)
 	router.HandleFunc("/", e.getRootEndpoint).Methods("GET")
 	router.HandleFunc("/pipeline/{id}", e.getPipelineStatus).Methods("GET")
 	router.HandleFunc("/pipeline", e.startPipeline).Methods("POST")

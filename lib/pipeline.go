@@ -53,6 +53,24 @@ func registerPipeline(pipeline *Pipeline, userId string) (id uuid.UUID, err erro
 	return
 }
 
+func getPipeline(id string, userId string) (pipe Pipeline, err error) {
+	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
+	request := gorequest.New()
+	_, body, e := request.Get(pipelineServiceUrl+"/pipeline/"+id).Set("X-UserId", userId).End()
+	if len(e) > 0 {
+		fmt.Println("Something went wrong", err)
+		err = errors.New("Could not get pipeline from service")
+		return
+	}
+	err = json.Unmarshal([]byte(body), &pipe)
+	if err != nil {
+		fmt.Println("Something went wrong", e)
+		err = errors.New("Could not parse pipeline")
+		return
+	}
+	return
+}
+
 func deletePipeline(id string, userId string) (err error) {
 	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
 	request := gorequest.New()

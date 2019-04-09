@@ -22,10 +22,11 @@ import (
 
 type Driver interface {
 	GetEnvData() map[string]interface{}
-	CreateOperator(pipelineId string, inputs Operator, id int, outputTopic string, flowId string) string
+	CreateOperator(pipelineId string, input Operator, outputTopic string, flowId string) string
 	DeleteOperator(id string) map[string]interface{}
 	DeleteAnalyticsPipeline(pipelineId string)
 	GetAnalyticsPipelineStatus(pipelineId string) string
+	GetOperatorName(pipelineId string, operator Operator) string
 }
 
 type ParsingApiService interface {

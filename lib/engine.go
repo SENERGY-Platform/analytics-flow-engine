@@ -81,17 +81,14 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 }
 
 func (f *FlowEngine) startOperators(pipeline Pipeline, flowId string) {
-	for operatorId, operator := range pipeline.Operators {
-		fmt.Println(strconv.Itoa(operatorId) + ": Starting Operator:" + operator.Name)
+	for key, operator := range pipeline.Operators {
+		fmt.Println(strconv.Itoa(key) + ": Starting Operator:" + operator.Id + "-" + operator.Name)
 
 		var outputTopic = f.getOperatorOutputTopic(operator.Name)
-
-		fmt.Println(operator)
 
 		f.driver.CreateOperator(
 			pipeline.Id.String(),
 			operator,
-			operatorId+1,
 			outputTopic,
 			flowId,
 		)
@@ -113,7 +110,22 @@ func (f *FlowEngine) GetPipelineStatus(id string) string {
 
 func (f *FlowEngine) DeletePipeline(id string, userId string) string {
 	println("Deleting Pipeline:" + id)
-	f.driver.DeleteAnalyticsPipeline(id)
-	deletePipeline(id, userId)
+	switch selectedDriver := GetEnv("DRIVER", "rancher"); selectedDriver {
+	case "rancher":
+		f.driver.DeleteAnalyticsPipeline(id)
+		deletePipeline(id, userId)
+	case "rancher2":
+		f.deleteRancher2Pipeline(id, userId)
+		deletePipeline(id, userId)
+	default:
+		fmt.Println("No driver selected")
+	}
 	return "done"
+}
+
+func (f *FlowEngine) deleteRancher2Pipeline(id string, userId string) {
+	var pipeline, _ = getPipeline(id, userId)
+	for _, operator := range pipeline.Operators {
+		f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator))
+	}
 }
