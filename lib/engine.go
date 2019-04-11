@@ -80,6 +80,20 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	return pipeline
 }
 
+func (f *FlowEngine) DeletePipeline(id string, userId string) string {
+	println("Deleting Pipeline:" + id)
+	var pipeline, _ = getPipeline(id, userId)
+	for _, operator := range pipeline.Operators {
+		f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator))
+	}
+	deletePipeline(id, userId)
+	return "done"
+}
+
+func (f *FlowEngine) GetPipelineStatus(id string) string {
+	return PIPELINE_RUNNING
+}
+
 func (f *FlowEngine) startOperators(pipeline Pipeline, flowId string) {
 	for key, operator := range pipeline.Operators {
 		fmt.Println(strconv.Itoa(key) + ": Starting Operator:" + operator.Id + "-" + operator.Name)
@@ -98,18 +112,4 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, flowId string) {
 func (f *FlowEngine) getOperatorOutputTopic(name string) (op_name string) {
 	op_name = "analytics-" + name
 	return
-}
-
-func (f *FlowEngine) GetPipelineStatus(id string) string {
-	return PIPELINE_RUNNING
-}
-
-func (f *FlowEngine) DeletePipeline(id string, userId string) string {
-	println("Deleting Pipeline:" + id)
-	var pipeline, _ = getPipeline(id, userId)
-	for _, operator := range pipeline.Operators {
-		f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator))
-	}
-	deletePipeline(id, userId)
-	return "done"
 }
