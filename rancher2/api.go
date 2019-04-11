@@ -40,10 +40,6 @@ func NewRancher2(url string, accessKey string, secretKey string, stackId string,
 	return &Rancher2{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r *Rancher2) GetEnvData() map[string]interface{} {
-	return nil
-}
-
 func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outputTopic string, flowId string) string {
 	fmt.Println("Rancher2 Create " + pipelineId)
 	env := map[string]string{

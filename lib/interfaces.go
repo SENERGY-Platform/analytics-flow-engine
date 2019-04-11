@@ -21,7 +21,6 @@ import (
 )
 
 type Driver interface {
-	GetEnvData() map[string]interface{}
 	CreateOperator(pipelineId string, input Operator, outputTopic string, flowId string) string
 	DeleteOperator(id string) map[string]interface{}
 	DeleteAnalyticsPipeline(pipelineId string)

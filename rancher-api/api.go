@@ -37,12 +37,6 @@ func NewRancher(url string, accessKey string, secretKey string, stackId string, 
 	return &Rancher{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r Rancher) GetEnvData() map[string]interface{} {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	_, body, _ := request.Get(r.url).End()
-	return lib.ToJson(body)
-}
-
 func (r Rancher) getServicesByPrefix(prefix string) (serviceCollection ServiceCollection, err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
 	_, body, _ := request.Get(r.url + "services/?name_prefix=" + prefix).End()
