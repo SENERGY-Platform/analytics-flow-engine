@@ -92,14 +92,6 @@ func (r *Rancher2) DeleteOperator(operatorId string) map[string]interface{} {
 	return lib.ToJson(body)
 }
 
-func (r *Rancher2) GetAnalyticsPipelineStatus(pipelineId string) string {
-	return ""
-}
-
-func (r *Rancher2) DeleteAnalyticsPipeline(pipelineId string) {
-	fmt.Println(r.DeleteOperator(""))
-}
-
 func (r *Rancher2) GetOperatorName(pipelineId string, operator lib.Operator) string {
 	return "operator-" + operator.Id
 }

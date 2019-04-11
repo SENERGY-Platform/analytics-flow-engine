@@ -101,31 +101,15 @@ func (f *FlowEngine) getOperatorOutputTopic(name string) (op_name string) {
 }
 
 func (f *FlowEngine) GetPipelineStatus(id string) string {
-	if f.driver.GetAnalyticsPipelineStatus(id) == PIPELINE_RUNNING {
-		return PIPELINE_RUNNING
-	}
-	return PIPELINE_MISSING
-
+	return PIPELINE_RUNNING
 }
 
 func (f *FlowEngine) DeletePipeline(id string, userId string) string {
 	println("Deleting Pipeline:" + id)
-	switch selectedDriver := GetEnv("DRIVER", "rancher"); selectedDriver {
-	case "rancher":
-		f.driver.DeleteAnalyticsPipeline(id)
-		deletePipeline(id, userId)
-	case "rancher2":
-		f.deleteRancher2Pipeline(id, userId)
-		deletePipeline(id, userId)
-	default:
-		fmt.Println("No driver selected")
-	}
-	return "done"
-}
-
-func (f *FlowEngine) deleteRancher2Pipeline(id string, userId string) {
 	var pipeline, _ = getPipeline(id, userId)
 	for _, operator := range pipeline.Operators {
 		f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator))
 	}
+	deletePipeline(id, userId)
+	return "done"
 }

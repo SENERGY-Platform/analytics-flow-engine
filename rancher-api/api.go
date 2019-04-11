@@ -37,13 +37,6 @@ func NewRancher(url string, accessKey string, secretKey string, stackId string, 
 	return &Rancher{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r Rancher) getServicesByPrefix(prefix string) (serviceCollection ServiceCollection, err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	_, body, _ := request.Get(r.url + "services/?name_prefix=" + prefix).End()
-	err = json.Unmarshal([]byte(body), &serviceCollection)
-	return
-}
-
 func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, outputTopic string, flowId string) string {
 	env := map[string]string{
 		"ZK_QUORUM":             r.zookeeper,
@@ -95,38 +88,22 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, outputTop
 	return data["id"].(string)
 }
 
-func (r Rancher) DeleteOperator(service_id string) map[string]interface{} {
+func (r Rancher) DeleteOperator(operatorName string) map[string]interface{} {
+	service, _ := r.getServiceByName(operatorName)
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	_, body, _ := request.Delete(r.url + "services/" + service_id).End()
+	_, body, _ := request.Delete(r.url + "services/" + service.Id).End()
 	return lib.ToJson(body)
-}
-
-func (r Rancher) GetAnalyticsPipelineStatus(pipelineId string) string {
-	services, _ := r.getServicesByPrefix(pipelineId)
-	service_count := len(services.Data)
-	switch {
-	case service_count <= 0:
-		return lib.PIPELINE_MISSING
-	case service_count > 0:
-		return lib.PIPELINE_RUNNING
-	}
-	return lib.PIPELINE_MISSING
-}
-
-func (r Rancher) DeleteAnalyticsPipeline(pipelineId string) {
-	services, _ := r.getServicesByPrefix("v2-" + pipelineId)
-	// Enable removal of v1 pipelines
-	if len(services.Data) < 1 {
-		services, _ = r.getServicesByPrefix(pipelineId)
-	}
-	for _, element := range services.Data {
-		if element.Labels["service_type"] == "analytics-service" {
-			println("Deleting Service:" + element.Id)
-			r.DeleteOperator(element.Id)
-		}
-	}
 }
 
 func (r Rancher) GetOperatorName(pipelineId string, operator lib.Operator) string {
 	return "v2-" + pipelineId + "-" + operator.Id[0:8]
+}
+
+func (r Rancher) getServiceByName(name string) (service Service, err error) {
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
+	_, body, _ := request.Get(r.url + "services/?name=" + name).End()
+	var serviceCollection = ServiceCollection{}
+	err = json.Unmarshal([]byte(body), &serviceCollection)
+	service = serviceCollection.Data[0]
+	return
 }

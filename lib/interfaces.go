@@ -23,8 +23,6 @@ import (
 type Driver interface {
 	CreateOperator(pipelineId string, input Operator, outputTopic string, flowId string) string
 	DeleteOperator(id string) map[string]interface{}
-	DeleteAnalyticsPipeline(pipelineId string)
-	GetAnalyticsPipelineStatus(pipelineId string) string
 	GetOperatorName(pipelineId string, operator Operator) string
 }
 
