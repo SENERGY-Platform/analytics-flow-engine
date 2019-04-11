@@ -134,5 +134,5 @@ func (r Rancher) DeleteAnalyticsPipeline(pipelineId string) {
 }
 
 func (r Rancher) GetOperatorName(pipelineId string, operator lib.Operator) string {
-	return "v2-" + pipelineId + "-" + operator.Id + "-" + operator.Name
+	return "v2-" + pipelineId + "-" + operator.Id[0:8]
 }
