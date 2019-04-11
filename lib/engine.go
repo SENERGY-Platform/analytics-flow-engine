@@ -91,6 +91,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string) string {
 }
 
 func (f *FlowEngine) GetPipelineStatus(id string) string {
+	//TODO: Implement method
 	return PIPELINE_RUNNING
 }
 
