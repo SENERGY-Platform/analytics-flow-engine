@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/parnurzeal/gorequest"
 )
@@ -37,13 +38,13 @@ func NewRancher(url string, accessKey string, secretKey string, stackId string, 
 	return &Rancher{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, outputTopic string, flowId string) string {
+func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, outputTopic string, pipeConfig lib.PipelineConfig) string {
 	env := map[string]string{
 		"ZK_QUORUM":             r.zookeeper,
 		"CONFIG_APPLICATION_ID": "analytics-" + pipelineId + "-" + input.Id,
 		"PIPELINE_ID":           pipelineId,
 		"OPERATOR_ID":           input.Id,
-		"WINDOW_TIME":           "120",
+		"WINDOW_TIME":           strconv.Itoa(pipeConfig.WindowTime),
 	}
 
 	config, _ := json.Marshal(lib.OperatorRequestConfig{Config: input.Config, InputTopics: input.InputTopics})
@@ -56,7 +57,7 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, outputTop
 	}
 
 	labels := map[string]string{
-		"flow_id":                         flowId,
+		"flow_id":                         pipeConfig.FlowId,
 		"operator_id":                     input.Id,
 		"service_type":                    "analytics-service",
 		"io.rancher.container.pull_image": "always",

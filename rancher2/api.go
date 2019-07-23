@@ -20,6 +20,7 @@ import (
 	"analytics-flow-engine/lib"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"crypto/tls"
 
@@ -40,14 +41,14 @@ func NewRancher2(url string, accessKey string, secretKey string, stackId string,
 	return &Rancher2{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outputTopic string, flowId string) string {
+func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outputTopic string, pipeConfig lib.PipelineConfig) string {
 	fmt.Println("Rancher2 Create " + pipelineId)
 	env := map[string]string{
 		"ZK_QUORUM":             r.zookeeper,
 		"CONFIG_APPLICATION_ID": "analytics-" + pipelineId + "-" + operator.Id,
 		"PIPELINE_ID":           pipelineId,
 		"OPERATOR_ID":           operator.Id,
-		"WINDOW_TIME":           "120",
+		"WINDOW_TIME":           strconv.Itoa(pipeConfig.WindowTime),
 	}
 	config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
 	env["CONFIG"] = string(config)
@@ -66,7 +67,7 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outp
 			Name:        r.GetOperatorName(pipelineId, operator),
 			Environment: env,
 		}},
-		Labels:   map[string]string{"op": operator.Id, "flowId": flowId, "pipeId": pipelineId},
+		Labels:   map[string]string{"op": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId},
 		Selector: Selector{MatchLabels: map[string]string{"op": operator.Id}},
 	}
 	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads").Send(reqBody).End()

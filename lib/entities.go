@@ -53,28 +53,34 @@ type Mapping struct {
 }
 
 type PipelineRequest struct {
-	Id    string         `json:"id,omitempty"`
-	Nodes []PipelineNode `json:"nodes,omitempty"`
+	Id         string         `json:"id,omitempty"`
+	WindowTime int            `json:"windowTime,omitempty"`
+	Nodes      []PipelineNode `json:"nodes,omitempty"`
 }
 
 type PipelineNode struct {
-	NodeId string           `json:"nodeId, omitempty"`
-	Inputs []PipelineInput  `json:"inputs,omitempty"`
-	Config []PipelineConfig `json:"config,omitempty"`
+	NodeId string       `json:"nodeId, omitempty"`
+	Inputs []NodeInput  `json:"inputs,omitempty"`
+	Config []NodeConfig `json:"config,omitempty"`
 }
 
-type PipelineConfig struct {
+type NodeConfig struct {
 	Name  string `json:"name,omitempty"`
 	Value string `json:"value,omitempty"`
 }
 
-type PipelineInput struct {
-	DeviceId  string          `json:"deviceId,omitempty"`
-	TopicName string          `json:"topicName,omitempty"`
-	Values    []PipelineValue `json:"values,omitempty"`
+type NodeInput struct {
+	DeviceId  string      `json:"deviceId,omitempty"`
+	TopicName string      `json:"topicName,omitempty"`
+	Values    []NodeValue `json:"values,omitempty"`
 }
 
-type PipelineValue struct {
+type NodeValue struct {
 	Name string `json:"name,omitempty"`
 	Path string `json:"path,omitempty"`
+}
+
+type PipelineConfig struct {
+	WindowTime int
+	FlowId     string
 }
