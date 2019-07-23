@@ -19,6 +19,7 @@ package rancher_api
 import (
 	"analytics-flow-engine/lib"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -77,7 +78,6 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, outputTop
 			Labels:      labels,
 		},
 	}
-	fmt.Println(reqBody)
 	resp, body, e := request.Post(r.url + "services").Send(reqBody).End()
 	if resp.StatusCode != http.StatusCreated {
 		fmt.Println("Could not create Operator", body)
@@ -102,7 +102,11 @@ func (r Rancher) GetOperatorName(pipelineId string, operator lib.Operator) strin
 
 func (r Rancher) getServiceByName(name string) (service Service, err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	_, body, _ := request.Get(r.url + "services/?name=" + name).End()
+	resp, body, errs := request.Get(r.url + "services/?name=" + name).End()
+	if len(errs) > 0 || resp.StatusCode != 200 {
+		err = errors.New("could not access service name")
+		return
+	}
 	var serviceCollection = ServiceCollection{}
 	err = json.Unmarshal([]byte(body), &serviceCollection)
 	service = serviceCollection.Data[0]

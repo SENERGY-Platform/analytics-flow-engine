@@ -98,16 +98,14 @@ func (f *FlowEngine) GetPipelineStatus(id string) string {
 func (f *FlowEngine) startOperators(pipeline Pipeline, flowId string, windowTime int) {
 	for key, operator := range pipeline.Operators {
 		fmt.Println(strconv.Itoa(key) + ": Starting Operator:" + operator.Id + "-" + operator.Name)
-
 		var pipeConfig = PipelineConfig{WindowTime: windowTime, FlowId: flowId}
-		//var outputTopic = f.getOperatorOutputTopic(operator.Name)
-		fmt.Println(pipeConfig)
-		/*f.driver.CreateOperator(
+		var outputTopic = f.getOperatorOutputTopic(operator.Name)
+		f.driver.CreateOperator(
 			pipeline.Id.String(),
 			operator,
 			outputTopic,
 			pipeConfig,
-		)*/
+		)
 	}
 }
 
