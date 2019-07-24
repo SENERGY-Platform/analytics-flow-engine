@@ -31,6 +31,7 @@ type Operator struct {
 	Id          string            `json:"id,omitempty"`
 	Name        string            `json:"name,omitempty"`
 	ImageId     string            `json:"imageId,omitempty"`
+	OperatorId  string            `json:"operatorId,omitempty"`
 	Config      map[string]string `json:"config,omitempty"`
 	InputTopics []InputTopic
 }

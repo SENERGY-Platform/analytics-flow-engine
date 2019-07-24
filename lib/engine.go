@@ -38,7 +38,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	//Convert parsing Schema to internal Schema
 	var tmpPipeline Pipeline
 	for _, operator := range parsedPipeline {
-		op := Operator{Id: operator.Id, Name: operator.Name, ImageId: operator.ImageId}
+		op := Operator{Id: operator.Id, Name: operator.Name, ImageId: operator.ImageId, OperatorId: operator.OperatorId}
 		for topicName, topic := range operator.InputTopics {
 			top := InputTopic{Name: topicName, FilterType: topic.FilterType, FilterValue: topic.FilterValue}
 			for _, mapping := range topic.Mappings {
