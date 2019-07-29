@@ -89,11 +89,17 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, outputTop
 	return data["id"].(string)
 }
 
-func (r Rancher) DeleteOperator(operatorName string) map[string]interface{} {
-	service, _ := r.getServiceByName(operatorName)
+func (r Rancher) DeleteOperator(operatorName string) (err error) {
+	service, err := r.getServiceByName(operatorName)
+	if err != nil {
+		return
+	}
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	_, body, _ := request.Delete(r.url + "services/" + service.Id).End()
-	return lib.ToJson(body)
+	resp, body, _ := request.Delete(r.url + "services/" + service.Id).End()
+	if resp.StatusCode != http.StatusOK {
+		err = errors.New("could not delete operator: " + body)
+	}
+	return
 }
 
 func (r Rancher) GetOperatorName(pipelineId string, operator lib.Operator) string {
@@ -103,12 +109,16 @@ func (r Rancher) GetOperatorName(pipelineId string, operator lib.Operator) strin
 func (r Rancher) getServiceByName(name string) (service Service, err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
 	resp, body, errs := request.Get(r.url + "services/?name=" + name).End()
-	if len(errs) > 0 || resp.StatusCode != 200 {
+	if len(errs) > 0 || resp.StatusCode != http.StatusOK {
 		err = errors.New("could not access service name")
 		return
 	}
 	var serviceCollection = ServiceCollection{}
 	err = json.Unmarshal([]byte(body), &serviceCollection)
+	if len(serviceCollection.Data) < 1 {
+		err = errors.New("could not find corresponding service")
+		return
+	}
 	service = serviceCollection.Data[0]
 	return
 }

@@ -76,12 +76,12 @@ func deletePipeline(id string, userId string) (err error) {
 	request := gorequest.New()
 	resp, _, e := request.Delete(pipelineServiceUrl+"/pipeline/"+id).Set("X-UserId", userId).End()
 	if resp.StatusCode != 200 {
-		fmt.Println("Could not access pipeline registry: "+strconv.Itoa(resp.StatusCode), resp.Body)
-		err = errors.New("Could not access pipeline registry")
+		fmt.Println("could not access pipeline registry: "+strconv.Itoa(resp.StatusCode), resp.Body)
+		err = errors.New("could not access pipeline registry")
 	}
 	if len(e) > 0 {
-		fmt.Println("Something went wrong", e)
-		err = errors.New("Could not get pipeline from service")
+		fmt.Println("something went wrong", e)
+		err = errors.New("could not get pipeline from service")
 		return
 	}
 	return

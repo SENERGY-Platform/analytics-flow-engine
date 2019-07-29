@@ -18,6 +18,7 @@ package rancher2
 
 import (
 	"analytics-flow-engine/lib"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -80,17 +81,19 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outp
 	return ""
 }
 
-func (r *Rancher2) DeleteOperator(operatorId string) map[string]interface{} {
+func (r *Rancher2) DeleteOperator(operatorId string) (err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + operatorId).End()
 	if resp.StatusCode != http.StatusNoContent {
-		fmt.Println("Could not delete Operator", body)
+		err = errors.New("could not delete operator: " + body)
+		return
 	}
 	if len(e) > 0 {
-		fmt.Println("Something went wrong", e)
+		err = errors.New("something went wrong")
+		return
 	}
-	return lib.ToJson(body)
+	return
 }
 
 func (r *Rancher2) GetOperatorName(pipelineId string, operator lib.Operator) string {

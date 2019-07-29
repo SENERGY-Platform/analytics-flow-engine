@@ -22,7 +22,7 @@ import (
 
 type Driver interface {
 	CreateOperator(pipelineId string, input Operator, outputTopic string, pipelineConfig PipelineConfig) string
-	DeleteOperator(id string) map[string]interface{}
+	DeleteOperator(id string) error
 	GetOperatorName(pipelineId string, operator Operator) string
 }
 

@@ -84,9 +84,15 @@ func (f *FlowEngine) DeletePipeline(id string, userId string) string {
 	println("Deleting Pipeline:" + id)
 	var pipeline, _ = getPipeline(id, userId)
 	for _, operator := range pipeline.Operators {
-		f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator))
+		err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator))
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
-	deletePipeline(id, userId)
+	err := deletePipeline(id, userId)
+	if err != nil {
+		fmt.Println(err)
+	}
 	return "done"
 }
 
