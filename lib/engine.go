@@ -74,6 +74,8 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 		}
 		pipeline.Operators = append(pipeline.Operators, operator)
 	}
+	pipeline.Name = pipelineRequest.Name
+	pipeline.Description = pipelineRequest.Description
 
 	pipeline.Id, _ = registerPipeline(&pipeline, userId)
 	f.startOperators(pipeline, pipelineRequest.Id, pipelineRequest.WindowTime)

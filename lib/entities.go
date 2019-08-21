@@ -23,8 +23,10 @@ type Response struct {
 }
 
 type Pipeline struct {
-	Id        uuid.UUID  `json:"id,omitempty"`
-	Operators []Operator `json:"operators,omitempty"`
+	Id          uuid.UUID  `json:"id,omitempty"`
+	Name        string     `json:"name,omitempty"`
+	Description string     `json:"description,omitempty"`
+	Operators   []Operator `json:"operators,omitempty"`
 }
 
 type Operator struct {
@@ -54,9 +56,11 @@ type Mapping struct {
 }
 
 type PipelineRequest struct {
-	Id         string         `json:"id,omitempty"`
-	WindowTime int            `json:"windowTime,omitempty"`
-	Nodes      []PipelineNode `json:"nodes,omitempty"`
+	Id          string         `json:"id,omitempty"`
+	Name        string         `json:"name,omitempty"`
+	Description string         `json:"description,omitempty"`
+	WindowTime  int            `json:"windowTime,omitempty"`
+	Nodes       []PipelineNode `json:"nodes,omitempty"`
 }
 
 type PipelineNode struct {
