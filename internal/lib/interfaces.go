@@ -14,28 +14,18 @@
  * limitations under the License.
  */
 
-package main
+package lib
 
 import (
-	"analytics-flow-engine/api"
-	"analytics-flow-engine/lib"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
-
-	"github.com/joho/godotenv"
+	"analytics-flow-engine/internal/parsing-api"
 )
 
-func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Print("Error loading .env file")
-	}
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	lib.ConnectMQTTBroker()
-	defer lib.CloseMQTTConnection()
-	api.CreateServer()
-	<-c
+type Driver interface {
+	CreateOperator(pipelineId string, input Operator, outputTopic string, pipelineConfig PipelineConfig) string
+	DeleteOperator(id string) error
+	GetOperatorName(pipelineId string, operator Operator) string
+}
+
+type ParsingApiService interface {
+	GetPipeline(id string, userId string) (p parsing_api.Pipeline, err error)
 }

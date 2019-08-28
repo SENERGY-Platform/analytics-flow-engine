@@ -30,7 +30,7 @@ func NewFlowEngine(driver Driver, parsingService ParsingApiService) *FlowEngine 
 	return &FlowEngine{driver, parsingService}
 }
 
-// Starts a pipeline.s
+// Starts a pipeline
 func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string) (pipeline Pipeline) {
 	//Get parsed pipeline
 	parsedPipeline, _ := f.parsingService.GetPipeline(pipelineRequest.Id, userId)
@@ -86,7 +86,6 @@ func (f *FlowEngine) DeletePipeline(id string, userId string) string {
 	println("Deleting Pipeline:" + id)
 	var pipeline, _ = getPipeline(id, userId)
 	for _, operator := range pipeline.Operators {
-		fmt.Println(operator)
 		switch operator.DeploymentType {
 		case "cloud":
 			err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator))

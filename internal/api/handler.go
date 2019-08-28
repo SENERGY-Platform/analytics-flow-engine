@@ -17,14 +17,14 @@
 package api
 
 import (
-	"analytics-flow-engine/lib"
-	"analytics-flow-engine/parsing-api"
-	"analytics-flow-engine/rancher-api"
+	"analytics-flow-engine/internal/lib"
+	"analytics-flow-engine/internal/parsing-api"
+	"analytics-flow-engine/internal/rancher-api"
 	"fmt"
 	"log"
 	"net/http"
 
-	"analytics-flow-engine/rancher2"
+	"analytics-flow-engine/internal/rancher2"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"

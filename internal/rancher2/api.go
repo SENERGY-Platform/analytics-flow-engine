@@ -17,7 +17,7 @@
 package rancher2
 
 import (
-	"analytics-flow-engine/lib"
+	"analytics-flow-engine/internal/lib"
 	"errors"
 	"fmt"
 	"net/http"

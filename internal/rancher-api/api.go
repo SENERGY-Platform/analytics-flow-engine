@@ -17,7 +17,7 @@
 package rancher_api
 
 import (
-	"analytics-flow-engine/lib"
+	"analytics-flow-engine/internal/lib"
 	"encoding/json"
 	"errors"
 	"fmt"
