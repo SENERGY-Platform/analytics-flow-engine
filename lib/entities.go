@@ -30,12 +30,13 @@ type Pipeline struct {
 }
 
 type Operator struct {
-	Id          string            `json:"id,omitempty"`
-	Name        string            `json:"name,omitempty"`
-	ImageId     string            `json:"imageId,omitempty"`
-	OperatorId  string            `json:"operatorId,omitempty"`
-	Config      map[string]string `json:"config,omitempty"`
-	InputTopics []InputTopic
+	Id             string            `json:"id,omitempty"`
+	Name           string            `json:"name,omitempty"`
+	ImageId        string            `json:"imageId,omitempty"`
+	DeploymentType string            `json:"deploymentType,omitempty"`
+	OperatorId     string            `json:"operatorId,omitempty"`
+	Config         map[string]string `json:"config,omitempty"`
+	InputTopics    []InputTopic
 }
 
 type OperatorRequestConfig struct {
@@ -88,4 +89,16 @@ type NodeValue struct {
 type PipelineConfig struct {
 	WindowTime int
 	FlowId     string
+}
+
+type ControlCommand struct {
+	Command string      `json:"command,omitempty"`
+	Data    OperatorJob `json:"data,omitempty"`
+}
+
+type OperatorJob struct {
+	PipelineId string     `json:"pipelineId,omitempty"`
+	OperatorId string     `json:"operatorId,omitempty"`
+	ImageId    string     `json:"imageId,omitempty"`
+	Config     []struct{} `json:"config,omitempty"`
 }

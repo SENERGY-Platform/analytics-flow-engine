@@ -19,11 +19,12 @@ package parsing_api
 type Pipeline map[string]Operator
 
 type Operator struct {
-	Id          string `json:"id,omitempty"`
-	Name        string `json:"name,omitempty"`
-	OperatorId  string `json:"operatorId,omitempty"`
-	ImageId     string `json:"ImageId,omitempty"`
-	InputTopics map[string]InputTopic
+	Id             string `json:"id,omitempty"`
+	Name           string `json:"name,omitempty"`
+	OperatorId     string `json:"operatorId,omitempty"`
+	DeploymentType string `json:"deploymentType,omitempty"`
+	ImageId        string `json:"ImageId,omitempty"`
+	InputTopics    map[string]InputTopic
 }
 
 type InputTopic struct {

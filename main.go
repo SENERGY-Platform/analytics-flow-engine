@@ -18,8 +18,13 @@ package main
 
 import (
 	"analytics-flow-engine/api"
-	"github.com/joho/godotenv"
+	"analytics-flow-engine/lib"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -27,5 +32,10 @@ func main() {
 	if err != nil {
 		log.Print("Error loading .env file")
 	}
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	lib.ConnectMQTTBroker()
+	defer lib.CloseMQTTConnection()
 	api.CreateServer()
+	<-c
 }
