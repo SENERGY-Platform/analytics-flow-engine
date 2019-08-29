@@ -27,7 +27,7 @@ func processMessage(message MQTT.Message) {
 }
 
 func startOperator(pipelineId string, input Operator, outputTopic string, pipelineConfig PipelineConfig) {
-	command := &ControlCommand{"startOperator", OperatorJob{PipelineId: pipelineId, OperatorId: input.OperatorId, ImageId: input.ImageId}}
+	command := &ControlCommand{"startOperator", OperatorJob{PipelineId: pipelineId, OperatorId: input.OperatorId, ImageId: input.ImageId, InputTopics: input.InputTopics}}
 	out, err := json.Marshal(command)
 	if err != nil {
 		panic(err)

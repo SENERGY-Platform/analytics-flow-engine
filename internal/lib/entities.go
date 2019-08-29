@@ -97,8 +97,9 @@ type ControlCommand struct {
 }
 
 type OperatorJob struct {
-	PipelineId string     `json:"pipelineId,omitempty"`
-	OperatorId string     `json:"operatorId,omitempty"`
-	ImageId    string     `json:"imageId,omitempty"`
-	Config     []struct{} `json:"config,omitempty"`
+	PipelineId  string       `json:"pipelineId,omitempty"`
+	OperatorId  string       `json:"operatorId,omitempty"`
+	ImageId     string       `json:"imageId,omitempty"`
+	InputTopics []InputTopic `json:"inputTopics,omitempty"`
+	Config      []struct{}   `json:"config,omitempty"`
 }
