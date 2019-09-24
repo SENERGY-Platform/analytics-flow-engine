@@ -120,8 +120,8 @@ func (f *FlowEngine) GetPipelineStatus(id string) string {
 func (f *FlowEngine) startOperators(pipeline Pipeline, flowId string, windowTime int) {
 	for key, operator := range pipeline.Operators {
 		fmt.Println(strconv.Itoa(key) + ": Starting Operator:" + operator.Id + "-" + operator.Name)
-		var pipeConfig = PipelineConfig{WindowTime: windowTime, FlowId: flowId}
 		var outputTopic = f.getOperatorOutputTopic(operator.Name)
+		var pipeConfig = PipelineConfig{WindowTime: windowTime, FlowId: flowId, OutputTopic: outputTopic, PipelineId: pipeline.Id.String()}
 		switch operator.DeploymentType {
 		case "cloud":
 			f.driver.CreateOperator(
@@ -133,9 +133,7 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, flowId string, windowTime
 			break
 		case "local":
 			fmt.Println("start local Operator: " + operator.Name)
-			startOperator(pipeline.Id.String(),
-				operator,
-				outputTopic,
+			startOperator(operator,
 				pipeConfig)
 			break
 		default:
