@@ -67,7 +67,7 @@ func ConnectMQTTBroker() {
 
 	client = MQTT.NewClient(connOpts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		panic(token.Error())
+		fmt.Printf("local deployment not working: %s\n", token.Error())
 	} else {
 		fmt.Printf("Connected to %s\n", *server)
 	}
