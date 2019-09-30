@@ -97,5 +97,5 @@ func (r *Rancher2) DeleteOperator(operatorId string) (err error) {
 }
 
 func (r *Rancher2) GetOperatorName(pipelineId string, operator lib.Operator) string {
-	return "operator-" + operator.Id
+	return "operator-" + pipelineId + "-" + operator.Id[0:8]
 }
