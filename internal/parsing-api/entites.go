@@ -16,7 +16,11 @@
 
 package parsing_api
 
-type Pipeline map[string]Operator
+type Pipeline struct {
+	FlowId    string              `json:"flowId,omitempty"`
+	Image     string              `json:"image,omitempty"`
+	Operators map[string]Operator `json:"operators,omitempty"`
+}
 
 type Operator struct {
 	Id             string `json:"id,omitempty"`

@@ -34,10 +34,12 @@ func NewFlowEngine(driver Driver, parsingService ParsingApiService) *FlowEngine 
 func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string) (pipeline Pipeline) {
 	//Get parsed pipeline
 	parsedPipeline, _ := f.parsingService.GetPipeline(pipelineRequest.Id, userId)
+	pipeline.FlowId = parsedPipeline.FlowId
+	pipeline.Image = parsedPipeline.Image
 
 	//Convert parsing Schema to internal Schema
 	var tmpPipeline Pipeline
-	for _, operator := range parsedPipeline {
+	for _, operator := range parsedPipeline.Operators {
 		op := Operator{Id: operator.Id, Name: operator.Name, ImageId: operator.ImageId, OperatorId: operator.OperatorId, DeploymentType: operator.DeploymentType}
 		for topicName, topic := range operator.InputTopics {
 			top := InputTopic{Name: topicName, FilterType: topic.FilterType, FilterValue: topic.FilterValue}

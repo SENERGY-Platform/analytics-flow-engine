@@ -24,8 +24,10 @@ type Response struct {
 
 type Pipeline struct {
 	Id          uuid.UUID  `json:"id,omitempty"`
+	FlowId      string     `json:"flowId,omitempty"`
 	Name        string     `json:"name,omitempty"`
 	Description string     `json:"description,omitempty"`
+	Image       string     `json:"image,omitempty"`
 	Operators   []Operator `json:"operators,omitempty"`
 }
 
