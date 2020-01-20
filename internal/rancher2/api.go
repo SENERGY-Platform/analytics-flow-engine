@@ -64,9 +64,10 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outp
 		Name:        r.GetOperatorName(pipelineId, operator),
 		NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
 		Containers: []Container{{
-			Image:       operator.ImageId,
-			Name:        r.GetOperatorName(pipelineId, operator),
-			Environment: env,
+			Image:           operator.ImageId,
+			Name:            r.GetOperatorName(pipelineId, operator),
+			Environment:     env,
+			ImagePullPolicy: "Always",
 		}},
 		Labels:   map[string]string{"op": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId},
 		Selector: Selector{MatchLabels: map[string]string{"op": operator.Id}},

@@ -25,9 +25,10 @@ type Request struct {
 }
 
 type Container struct {
-	Image       string            `json:"image,omitempty"`
-	Name        string            `json:"name,omitempty"`
-	Environment map[string]string `json:"environment,omitempty"`
+	Image           string            `json:"image,omitempty"`
+	Name            string            `json:"name,omitempty"`
+	Environment     map[string]string `json:"environment,omitempty"`
+	ImagePullPolicy string            `json:"imagePullPolicy,omitempty"`
 }
 
 type Selector struct {
