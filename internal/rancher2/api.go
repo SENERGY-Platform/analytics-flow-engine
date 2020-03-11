@@ -69,8 +69,9 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outp
 			Environment:     env,
 			ImagePullPolicy: "Always",
 		}},
-		Labels:   map[string]string{"op": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId},
-		Selector: Selector{MatchLabels: map[string]string{"op": operator.Id}},
+		Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
+		Labels:     map[string]string{"op": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId},
+		Selector:   Selector{MatchLabels: map[string]string{"op": operator.Id}},
 	}
 	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads").Send(reqBody).End()
 	if resp.StatusCode != http.StatusCreated {
