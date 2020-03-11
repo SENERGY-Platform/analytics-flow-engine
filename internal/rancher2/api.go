@@ -28,18 +28,28 @@ import (
 	"encoding/json"
 
 	"github.com/parnurzeal/gorequest"
+
+	"net/url"
 )
 
 type Rancher2 struct {
-	url       string
-	accessKey string
-	secretKey string
-	stackId   string
-	zookeeper string
+	url             string
+	accessKey       string
+	secretKey       string
+	stackId         string
+	zookeeper       string
+	influxUrl       string
+	influxUser      string
+	influxPw        string
+	metricsInterval string
 }
 
 func NewRancher2(url string, accessKey string, secretKey string, stackId string, zookeeper string) *Rancher2 {
-	return &Rancher2{url, accessKey, secretKey, stackId, zookeeper}
+	return &Rancher2{url, accessKey, secretKey, stackId, zookeeper,
+		lib.GetEnv("METRICS_URL", "http://localhost:8086"),
+		lib.GetEnv("METRICS_USER", ""),
+		lib.GetEnv("METRICS_PASSWORD", ""),
+		lib.GetEnv("METRICS_INTERVAL", "")}
 }
 
 func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outputTopic string, pipeConfig lib.PipelineConfig) string {
@@ -50,6 +60,10 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outp
 		"PIPELINE_ID":           pipelineId,
 		"OPERATOR_ID":           operator.Id,
 		"WINDOW_TIME":           strconv.Itoa(pipeConfig.WindowTime),
+		"METRICS_URL":           r.influxUrl,
+		"METRICS_USER":          r.influxUser,
+		"METRICS_PASSWORD":      r.influxPw,
+		"METRICS_INTERVAL":      r.metricsInterval,
 	}
 	config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
 	env["CONFIG"] = string(config)
@@ -80,16 +94,36 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outp
 	if len(e) > 0 {
 		fmt.Println("Something went wrong", e)
 	}
+
+	// Create influx db
+	influxRequest := gorequest.New().SetBasicAuth(r.influxUser, r.influxPw).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	influxResp, influxBody, e := influxRequest.Post(r.influxUrl + "/query?q=" + url.QueryEscape("CREATE DATABASE \""+operator.Id+"\"")).End()
+	if influxResp.StatusCode != http.StatusOK {
+		fmt.Println("Could not create influx db", influxBody)
+	}
+	if len(e) > 0 {
+		fmt.Println("Something went wrong", e)
+	}
 	return ""
 }
 
-func (r *Rancher2) DeleteOperator(operatorId string) (err error) {
+func (r *Rancher2) DeleteOperator(operatorId string, operator lib.Operator) (err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + operatorId).End()
 	if resp.StatusCode != http.StatusNoContent {
 		err = errors.New("could not delete operator: " + body)
 		return
+	}
+	if len(e) > 0 {
+		err = errors.New("something went wrong")
+		return
+	}
+
+	influxRequest := gorequest.New().SetBasicAuth(r.influxUser, r.influxPw).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	influxResp, influxBody, e := influxRequest.Post(r.influxUrl + "/query?q=" + url.QueryEscape("DROP DATABASE \""+operator.Id+"\"")).End()
+	if influxResp.StatusCode != http.StatusOK {
+		fmt.Println("Could not delete influx db", influxBody)
 	}
 	if len(e) > 0 {
 		err = errors.New("something went wrong")

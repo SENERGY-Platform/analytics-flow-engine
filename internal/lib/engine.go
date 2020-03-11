@@ -90,7 +90,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string) string {
 	for _, operator := range pipeline.Operators {
 		switch operator.DeploymentType {
 		case "cloud":
-			err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator))
+			err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator), operator)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -101,7 +101,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string) string {
 				operator)
 			break
 		default:
-			err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator))
+			err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator), operator)
 			if err != nil {
 				fmt.Println(err)
 			}
