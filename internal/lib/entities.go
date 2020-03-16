@@ -63,6 +63,7 @@ type PipelineRequest struct {
 	Name        string         `json:"name,omitempty"`
 	Description string         `json:"description,omitempty"`
 	WindowTime  int            `json:"windowTime,omitempty"`
+	Metrics     bool           `json:"metrics,omitempty"`
 	Nodes       []PipelineNode `json:"nodes,omitempty"`
 }
 
