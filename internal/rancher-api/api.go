@@ -18,7 +18,6 @@ package rancher_api
 
 import (
 	"analytics-flow-engine/internal/lib"
-	"analytics-flow-engine/internal/metrics-api"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,8 +39,7 @@ func NewRancher(url string, accessKey string, secretKey string, stackId string, 
 	return &Rancher{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, outputTopic string, pipeConfig lib.PipelineConfig,
-	useMetrics bool, metricsConfig metrics_api.MetricsConfig) string {
+func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, outputTopic string, pipeConfig lib.PipelineConfig) string {
 	env := map[string]string{
 		"ZK_QUORUM":             r.zookeeper,
 		"CONFIG_APPLICATION_ID": "analytics-" + pipelineId + "-" + input.Id,
@@ -68,45 +66,32 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, outputTop
 	}
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
 
-	reqBody := &Request{}
-	if useMetrics {
-		env["METRICS_URL"] = metricsConfig.Url
-		env["METRICS_USER"] = metricsConfig.Username
-		env["METRICS_PASSWORD"] = metricsConfig.Password
-		env["METRICS_INTERVAL"] = metricsConfig.Interval
-
-		reqBody = &Request{
-			Type:          "service",
-			Name:          r.GetOperatorName(pipelineId, input),
-			StackId:       r.stackId,
-			Scale:         1,
-			StartOnCreate: true,
-			LaunchConfig: LaunchConfig{
-				ImageUuid:   "docker:" + input.ImageId,
-				Environment: env,
-				Labels:      labels,
-				Command: []string{
-					"java",
-					"-javaagent:jmxtrans-agent.jar=" + metricsConfig.XmlUrl,
-					"-jar",
-					"/usr/src/app/target/operator-" + input.Name + "-jar-with-dependencies.jar",
-				},
-			},
-		}
-	} else {
-		reqBody = &Request{
-			Type:          "service",
-			Name:          r.GetOperatorName(pipelineId, input),
-			StackId:       r.stackId,
-			Scale:         1,
-			StartOnCreate: true,
-			LaunchConfig: LaunchConfig{
-				ImageUuid:   "docker:" + input.ImageId,
-				Environment: env,
-				Labels:      labels,
-			},
-		}
+	reqBody := &Request{
+		Type:          "service",
+		Name:          r.GetOperatorName(pipelineId, input),
+		StackId:       r.stackId,
+		Scale:         1,
+		StartOnCreate: true,
+		LaunchConfig: LaunchConfig{
+			ImageUuid:   "docker:" + input.ImageId,
+			Environment: env,
+			Labels:      labels,
+		},
 	}
+	if pipeConfig.Metrics.Enabled {
+		env["METRICS_URL"] = pipeConfig.Metrics.Url
+		env["METRICS_USER"] = pipeConfig.Metrics.Username
+		env["METRICS_PASSWORD"] = pipeConfig.Metrics.Password
+		env["METRICS_INTERVAL"] = pipeConfig.Metrics.Interval
+		reqBody.LaunchConfig.Command = []string{
+			"java",
+			"-javaagent:jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
+			"-jar",
+			"/usr/src/app/target/operator-" + input.Name + "-jar-with-dependencies.jar",
+		}
+
+	}
+
 	resp, body, e := request.Post(r.url + "services").Send(reqBody).End()
 	if resp.StatusCode != http.StatusCreated {
 		fmt.Println("Could not create Operator", body)

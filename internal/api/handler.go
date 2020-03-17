@@ -18,6 +18,7 @@ package api
 
 import (
 	"analytics-flow-engine/internal/lib"
+	metrics_api "analytics-flow-engine/internal/metrics-api"
 	"analytics-flow-engine/internal/parsing-api"
 	"analytics-flow-engine/internal/rancher-api"
 	"fmt"
@@ -56,11 +57,12 @@ func CreateServer() {
 	parser := parsing_api.NewParsingApi(
 		lib.GetEnv("PARSER_API_ENDPOINT", ""),
 	)
+	metrics := metrics_api.NewMetricsApi(lib.GetEnv("METRICS_API_ENDPOINT", "http://localhost:5000"))
 	port := lib.GetEnv("API_PORT", "8000")
 	fmt.Print("Starting Server at port " + port + "\n")
 	router := mux.NewRouter()
 
-	e := NewEndpoint(driver, parser)
+	e := NewEndpoint(driver, parser, metrics)
 	router.HandleFunc("/", e.getRootEndpoint).Methods("GET")
 	router.HandleFunc("/pipeline/{id}", e.getPipelineStatus).Methods("GET")
 	router.HandleFunc("/pipeline", e.startPipeline).Methods("POST")

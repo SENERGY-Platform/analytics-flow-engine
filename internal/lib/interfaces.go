@@ -22,12 +22,16 @@ import (
 )
 
 type Driver interface {
-	CreateOperator(pipelineId string, input Operator, outputTopic string, pipelineConfig PipelineConfig,
-		useMetrics bool, metricsConfig metrics_api.MetricsConfig) string
+	CreateOperator(pipelineId string, input Operator, outputTopic string, pipelineConfig PipelineConfig) string
 	DeleteOperator(id string) error
 	GetOperatorName(pipelineId string, operator Operator) string
 }
 
 type ParsingApiService interface {
 	GetPipeline(id string, userId string) (p parsing_api.Pipeline, err error)
+}
+
+type MetricsApiService interface {
+	RegisterPipeline(id string) metrics_api.MetricsConfig
+	UnregisterPipeline(id string) bool
 }

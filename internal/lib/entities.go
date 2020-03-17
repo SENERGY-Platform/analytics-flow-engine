@@ -23,11 +23,12 @@ type Response struct {
 }
 
 type Pipeline struct {
-	Id          uuid.UUID  `json:"id,omitempty"`
-	FlowId      string     `json:"flowId,omitempty"`
-	Name        string     `json:"name,omitempty"`
-	Description string     `json:"description,omitempty"`
-	Image       string     `json:"image,omitempty"`
+	Id          uuid.UUID `json:"id,omitempty"`
+	FlowId      string    `json:"flowId,omitempty"`
+	Name        string    `json:"name,omitempty"`
+	Description string    `json:"description,omitempty"`
+	Image       string    `json:"image,omitempty"`
+	Metrics     Metrics
 	Operators   []Operator `json:"operators,omitempty"`
 }
 
@@ -56,6 +57,16 @@ type InputTopic struct {
 type Mapping struct {
 	Dest   string `json:"dest,omitempty"`
 	Source string `json:"source,omitempty"`
+}
+
+type Metrics struct {
+	Enabled  bool
+	Database string `json:"database,omitempty"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	Url      string `json:"url,omitempty"`
+	Interval string `json:"interval,omitempty"`
+	XmlUrl   string `json:"xmlurl,omitempty"`
 }
 
 type PipelineRequest struct {
@@ -91,6 +102,7 @@ type NodeValue struct {
 
 type PipelineConfig struct {
 	WindowTime  int
+	Metrics     Metrics
 	FlowId      string
 	OutputTopic string
 	PipelineId  string

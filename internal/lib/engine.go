@@ -17,7 +17,6 @@
 package lib
 
 import (
-	"analytics-flow-engine/internal/metrics-api"
 	"fmt"
 	"strconv"
 )
@@ -25,10 +24,11 @@ import (
 type FlowEngine struct {
 	driver         Driver
 	parsingService ParsingApiService
+	metricsService MetricsApiService
 }
 
-func NewFlowEngine(driver Driver, parsingService ParsingApiService) *FlowEngine {
-	return &FlowEngine{driver, parsingService}
+func NewFlowEngine(driver Driver, parsingService ParsingApiService, metricsService MetricsApiService) *FlowEngine {
+	return &FlowEngine{driver, parsingService, metricsService}
 }
 
 // Starts a pipeline
@@ -82,15 +82,19 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 
 	pipeline.Id, _ = registerPipeline(&pipeline, userId)
 
-	if pipelineRequest.Metrics {
-		fmt.Println("Metrics to be used for this pipeline")
-		metricsConfig := metrics_api.NewMetricsApi(GetEnv("METRICS_URL", "http://localhost:5000")).RegisterPipeline(pipeline.Id.String())
-		fmt.Println("MetricsConfig from metrics-api:", metricsConfig)
-		f.startOperatorsWithMetrics(pipeline, pipelineRequest.Id, pipelineRequest.WindowTime, true,
-			metricsConfig)
-	} else {
-		f.startOperators(pipeline, pipelineRequest.Id, pipelineRequest.WindowTime)
+	pipeline.Metrics.Enabled = pipelineRequest.Metrics
+	if pipeline.Metrics.Enabled {
+		metricsConfig := f.metricsService.RegisterPipeline(pipeline.Id.String())
+		pipeline.Metrics.Database = metricsConfig.Database
+		pipeline.Metrics.Username = metricsConfig.Username
+		pipeline.Metrics.Password = metricsConfig.Password
+		pipeline.Metrics.Url = metricsConfig.Url
+		pipeline.Metrics.Interval = metricsConfig.Interval
+		pipeline.Metrics.XmlUrl = metricsConfig.XmlUrl
 	}
+
+	f.startOperators(pipeline, pipelineRequest.Id, pipelineRequest.WindowTime)
+
 	return pipeline
 }
 
@@ -121,7 +125,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string) string {
 	if err != nil {
 		fmt.Println(err)
 	}
-	metrics_api.NewMetricsApi(GetEnv("METRICS_URL", "http://localhost:5000")).UnregisterPipeline(pipeline.Id.String())
+	f.metricsService.UnregisterPipeline(pipeline.Id.String())
 	return "done"
 }
 
@@ -131,15 +135,10 @@ func (f *FlowEngine) GetPipelineStatus(id string) string {
 }
 
 func (f *FlowEngine) startOperators(pipeline Pipeline, flowId string, windowTime int) {
-	metricsConfig := metrics_api.MetricsConfig{}
-	f.startOperatorsWithMetrics(pipeline, flowId, windowTime, false, metricsConfig)
-}
-
-func (f *FlowEngine) startOperatorsWithMetrics(pipeline Pipeline, flowId string, windowTime int, useMetrics bool, metricsConfig metrics_api.MetricsConfig) {
 	for key, operator := range pipeline.Operators {
 		fmt.Println(strconv.Itoa(key) + ": Starting Operator:" + operator.Id + "-" + operator.Name)
 		var outputTopic = f.getOperatorOutputTopic(operator.Name)
-		var pipeConfig = PipelineConfig{WindowTime: windowTime, FlowId: flowId, OutputTopic: outputTopic, PipelineId: pipeline.Id.String()}
+		var pipeConfig = PipelineConfig{WindowTime: windowTime, FlowId: flowId, OutputTopic: outputTopic, PipelineId: pipeline.Id.String(), Metrics: pipeline.Metrics}
 		switch operator.DeploymentType {
 		case "cloud":
 			f.driver.CreateOperator(
@@ -147,8 +146,6 @@ func (f *FlowEngine) startOperatorsWithMetrics(pipeline Pipeline, flowId string,
 				operator,
 				outputTopic,
 				pipeConfig,
-				useMetrics,
-				metricsConfig,
 			)
 			break
 		case "local":
@@ -162,8 +159,6 @@ func (f *FlowEngine) startOperatorsWithMetrics(pipeline Pipeline, flowId string,
 				operator,
 				outputTopic,
 				pipeConfig,
-				useMetrics,
-				metricsConfig,
 			)
 		}
 	}

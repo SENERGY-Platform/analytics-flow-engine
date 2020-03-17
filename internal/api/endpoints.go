@@ -29,11 +29,12 @@ type Endpoint struct {
 	driver         lib.Driver
 	engine         *lib.FlowEngine
 	parsingService lib.ParsingApiService
+	metricService  lib.MetricsApiService
 }
 
-func NewEndpoint(driver lib.Driver, parsingService lib.ParsingApiService) *Endpoint {
-	ret := lib.NewFlowEngine(driver, parsingService)
-	return &Endpoint{driver, ret, parsingService}
+func NewEndpoint(driver lib.Driver, parsingService lib.ParsingApiService, metricsService lib.MetricsApiService) *Endpoint {
+	ret := lib.NewFlowEngine(driver, parsingService, metricsService)
+	return &Endpoint{driver, ret, parsingService, metricsService}
 }
 
 func (e *Endpoint) getRootEndpoint(w http.ResponseWriter, req *http.Request) {
@@ -51,7 +52,6 @@ func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request) {
 }
 
 func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
-	//vars := mux.Vars(req)
 	decoder := json.NewDecoder(req.Body)
 	var pipe_req lib.PipelineRequest
 	err := decoder.Decode(&pipe_req)
@@ -59,7 +59,7 @@ func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
 		fmt.Println(err)
 	}
 	defer req.Body.Close()
-	ret := lib.NewFlowEngine(e.driver, e.parsingService).StartPipeline(pipe_req, e.getUserId(req))
+	ret := e.engine.StartPipeline(pipe_req, e.getUserId(req))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(ret)
@@ -67,7 +67,7 @@ func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
 
 func (e *Endpoint) deletePipeline(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
-	ret := lib.NewFlowEngine(e.driver, e.parsingService).DeletePipeline(vars["id"], e.getUserId(req))
+	ret := e.engine.DeletePipeline(vars["id"], e.getUserId(req))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	json.NewEncoder(w).Encode(lib.Response{ret})

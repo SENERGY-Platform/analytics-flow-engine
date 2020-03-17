@@ -18,7 +18,6 @@ package rancher2
 
 import (
 	"analytics-flow-engine/internal/lib"
-	"analytics-flow-engine/internal/metrics-api"
 	"errors"
 	"fmt"
 	"net/http"
@@ -43,8 +42,7 @@ func NewRancher2(url string, accessKey string, secretKey string, stackId string,
 	return &Rancher2{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outputTopic string, pipeConfig lib.PipelineConfig,
-	useMetrics bool, metricsConfig metrics_api.MetricsConfig) string {
+func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outputTopic string, pipeConfig lib.PipelineConfig) string {
 	fmt.Println("Rancher2 Create " + pipelineId)
 	env := map[string]string{
 		"ZK_QUORUM":             r.zookeeper,
@@ -62,46 +60,36 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outp
 		env["OUTPUT"] = outputTopic
 	}
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
-	reqBody := &Request{}
-	if useMetrics {
-		env["METRICS_URL"] = metricsConfig.Url
-		env["METRICS_USER"] = metricsConfig.Username
-		env["METRICS_PASSWORD"] = metricsConfig.Password
-		env["METRICS_INTERVAL"] = metricsConfig.Interval
-
-		reqBody = &Request{
-			Name:        r.GetOperatorName(pipelineId, operator),
-			NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
-			Containers: []Container{{
-				Image:           operator.ImageId,
-				Name:            r.GetOperatorName(pipelineId, operator),
-				Environment:     env,
-				ImagePullPolicy: "Always",
-				Command: []string{
-					"java",
-					"-javaagent:jmxtrans-agent.jar=" + metricsConfig.XmlUrl,
-					"-jar",
-					"/usr/src/app/target/operator-" + operator.Name + "-jar-with-dependencies.jar",
-				},
-			}},
-			Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
-			Labels:     map[string]string{"op": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId},
-			Selector:   Selector{MatchLabels: map[string]string{"op": operator.Id}},
-		}
-	} else {
-		reqBody = &Request{
-			Name:        r.GetOperatorName(pipelineId, operator),
-			NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
-			Containers: []Container{{
-				Image:           operator.ImageId,
-				Name:            r.GetOperatorName(pipelineId, operator),
-				Environment:     env,
-				ImagePullPolicy: "Always",
-			}},
-			Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
-			Labels:     map[string]string{"op": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId},
-			Selector:   Selector{MatchLabels: map[string]string{"op": operator.Id}},
-		}
+	reqBody := &Request{
+		Name:        r.GetOperatorName(pipelineId, operator),
+		NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
+		Containers: []Container{{
+			Image:           operator.ImageId,
+			Name:            r.GetOperatorName(pipelineId, operator),
+			Environment:     env,
+			ImagePullPolicy: "Always",
+		}},
+		Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
+		Labels:     map[string]string{"op": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId},
+		Selector:   Selector{MatchLabels: map[string]string{"op": operator.Id}},
+	}
+	if pipeConfig.Metrics.Enabled {
+		env["METRICS_URL"] = pipeConfig.Metrics.Url
+		env["METRICS_USER"] = pipeConfig.Metrics.Username
+		env["METRICS_PASSWORD"] = pipeConfig.Metrics.Password
+		env["METRICS_INTERVAL"] = pipeConfig.Metrics.Interval
+		reqBody.Containers = []Container{{
+			Image:           operator.ImageId,
+			Name:            r.GetOperatorName(pipelineId, operator),
+			Environment:     env,
+			ImagePullPolicy: "Always",
+			Command: []string{
+				"java",
+				"-javaagent:jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
+				"-jar",
+				"/usr/src/app/target/operator-" + operator.Name + "-jar-with-dependencies.jar",
+			},
+		}}
 	}
 	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads").Send(reqBody).End()
 	if resp.StatusCode != http.StatusCreated {
