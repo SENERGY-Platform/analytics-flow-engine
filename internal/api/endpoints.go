@@ -76,7 +76,7 @@ func (e *Endpoint) deletePipeline(w http.ResponseWriter, req *http.Request) {
 func (e *Endpoint) getUserId(req *http.Request) (userId string) {
 	userId = req.Header.Get("X-UserId")
 	if userId == "" {
-		userId = "admin"
+		userId = lib.GetEnv("USER_ID", "admin")
 	}
 	fmt.Println("UserID: " + userId)
 	return
