@@ -17,6 +17,7 @@
 package lib
 
 import (
+	"analytics-flow-engine/internal/metrics-api"
 	"fmt"
 	"strconv"
 )
@@ -80,7 +81,16 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	pipeline.Description = pipelineRequest.Description
 
 	pipeline.Id, _ = registerPipeline(&pipeline, userId)
-	f.startOperators(pipeline, pipelineRequest.Id, pipelineRequest.WindowTime)
+
+	if pipelineRequest.Metrics {
+		fmt.Println("Metrics to be used for this pipeline")
+		metricsConfig := metrics_api.NewMetricsApi(GetEnv("METRICS_URL", "http://localhost:5000")).RegisterPipeline(pipeline.Id.String())
+		fmt.Println("MetricsConfig from metrics-api:", metricsConfig)
+		f.startOperatorsWithMetrics(pipeline, pipelineRequest.Id, pipelineRequest.WindowTime, true,
+			metricsConfig)
+	} else {
+		f.startOperators(pipeline, pipelineRequest.Id, pipelineRequest.WindowTime)
+	}
 	return pipeline
 }
 
@@ -111,6 +121,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string) string {
 	if err != nil {
 		fmt.Println(err)
 	}
+	metrics_api.NewMetricsApi(GetEnv("METRICS_URL", "http://localhost:5000")).UnregisterPipeline(pipeline.Id.String())
 	return "done"
 }
 
@@ -120,6 +131,11 @@ func (f *FlowEngine) GetPipelineStatus(id string) string {
 }
 
 func (f *FlowEngine) startOperators(pipeline Pipeline, flowId string, windowTime int) {
+	metricsConfig := metrics_api.MetricsConfig{}
+	f.startOperatorsWithMetrics(pipeline, flowId, windowTime, false, metricsConfig)
+}
+
+func (f *FlowEngine) startOperatorsWithMetrics(pipeline Pipeline, flowId string, windowTime int, useMetrics bool, metricsConfig metrics_api.MetricsConfig) {
 	for key, operator := range pipeline.Operators {
 		fmt.Println(strconv.Itoa(key) + ": Starting Operator:" + operator.Id + "-" + operator.Name)
 		var outputTopic = f.getOperatorOutputTopic(operator.Name)
@@ -131,6 +147,8 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, flowId string, windowTime
 				operator,
 				outputTopic,
 				pipeConfig,
+				useMetrics,
+				metricsConfig,
 			)
 			break
 		case "local":
@@ -144,6 +162,8 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, flowId string, windowTime
 				operator,
 				outputTopic,
 				pipeConfig,
+				useMetrics,
+				metricsConfig,
 			)
 		}
 	}

@@ -17,18 +17,19 @@
 package rancher_api
 
 type Request struct {
-	Type    string `json:"type,omitempty"`
-	Name    string `json:"name,omitempty"`
-	StackId string `json:"stackId,omitempty"`
-	Scale 	int `json:"scale,omitempty"`
-	StartOnCreate bool `json:"startOnCreate,omitempty"`
-	LaunchConfig `json:"launchConfig,omitempty"`
+	Type          string `json:"type,omitempty"`
+	Name          string `json:"name,omitempty"`
+	StackId       string `json:"stackId,omitempty"`
+	Scale         int    `json:"scale,omitempty"`
+	StartOnCreate bool   `json:"startOnCreate,omitempty"`
+	LaunchConfig  `json:"launchConfig,omitempty"`
 }
 
 type LaunchConfig struct {
-	ImageUuid string `json:"imageUuid,omitempty"`
-	Environment map[string] string `json:"environment"`
-	Labels map[string] string `json:"labels"`
+	ImageUuid   string            `json:"imageUuid,omitempty"`
+	Environment map[string]string `json:"environment"`
+	Labels      map[string]string `json:"labels"`
+	Command     []string          `json:"command,omitempty"`
 }
 
 type ServiceCollection struct {
@@ -36,6 +37,6 @@ type ServiceCollection struct {
 }
 
 type Service struct {
-	Id string `json:"id"`
+	Id           string `json:"id"`
 	LaunchConfig `json:"launchConfig,omitempty"`
 }

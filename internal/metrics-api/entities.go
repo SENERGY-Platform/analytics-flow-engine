@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 InfAI (CC SES)
+ * Copyright 2020 InfAI (CC SES)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,13 @@
  * limitations under the License.
  */
 
-package lib
+package metrics_api
 
-import (
-	"analytics-flow-engine/internal/metrics-api"
-	"analytics-flow-engine/internal/parsing-api"
-)
-
-type Driver interface {
-	CreateOperator(pipelineId string, input Operator, outputTopic string, pipelineConfig PipelineConfig,
-		useMetrics bool, metricsConfig metrics_api.MetricsConfig) string
-	DeleteOperator(id string) error
-	GetOperatorName(pipelineId string, operator Operator) string
-}
-
-type ParsingApiService interface {
-	GetPipeline(id string, userId string) (p parsing_api.Pipeline, err error)
+type MetricsConfig struct {
+	Database string `json:"database,omitempty"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	Url      string `json:"url,omitempty"`
+	Interval string `json:"interval,omitempty"`
+	XmlUrl   string `json:"xmlurl,omitempty"`
 }

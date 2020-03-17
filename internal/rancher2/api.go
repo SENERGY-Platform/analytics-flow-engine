@@ -18,6 +18,7 @@ package rancher2
 
 import (
 	"analytics-flow-engine/internal/lib"
+	"analytics-flow-engine/internal/metrics-api"
 	"errors"
 	"fmt"
 	"net/http"
@@ -28,31 +29,22 @@ import (
 	"encoding/json"
 
 	"github.com/parnurzeal/gorequest"
-
-	"net/url"
 )
 
 type Rancher2 struct {
-	url             string
-	accessKey       string
-	secretKey       string
-	stackId         string
-	zookeeper       string
-	influxUrl       string
-	influxUser      string
-	influxPw        string
-	metricsInterval string
+	url       string
+	accessKey string
+	secretKey string
+	stackId   string
+	zookeeper string
 }
 
 func NewRancher2(url string, accessKey string, secretKey string, stackId string, zookeeper string) *Rancher2 {
-	return &Rancher2{url, accessKey, secretKey, stackId, zookeeper,
-		lib.GetEnv("METRICS_URL", "http://localhost:8086"),
-		lib.GetEnv("METRICS_USER", ""),
-		lib.GetEnv("METRICS_PASSWORD", ""),
-		lib.GetEnv("METRICS_INTERVAL", "")}
+	return &Rancher2{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outputTopic string, pipeConfig lib.PipelineConfig) string {
+func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outputTopic string, pipeConfig lib.PipelineConfig,
+	useMetrics bool, metricsConfig metrics_api.MetricsConfig) string {
 	fmt.Println("Rancher2 Create " + pipelineId)
 	env := map[string]string{
 		"ZK_QUORUM":             r.zookeeper,
@@ -60,10 +52,6 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outp
 		"PIPELINE_ID":           pipelineId,
 		"OPERATOR_ID":           operator.Id,
 		"WINDOW_TIME":           strconv.Itoa(pipeConfig.WindowTime),
-		"METRICS_URL":           r.influxUrl,
-		"METRICS_USER":          r.influxUser,
-		"METRICS_PASSWORD":      r.influxPw,
-		"METRICS_INTERVAL":      r.metricsInterval,
 	}
 	config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
 	env["CONFIG"] = string(config)
@@ -74,18 +62,46 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outp
 		env["OUTPUT"] = outputTopic
 	}
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
-	reqBody := &Request{
-		Name:        r.GetOperatorName(pipelineId, operator),
-		NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
-		Containers: []Container{{
-			Image:           operator.ImageId,
-			Name:            r.GetOperatorName(pipelineId, operator),
-			Environment:     env,
-			ImagePullPolicy: "Always",
-		}},
-		Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
-		Labels:     map[string]string{"op": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId},
-		Selector:   Selector{MatchLabels: map[string]string{"op": operator.Id}},
+	reqBody := &Request{}
+	if useMetrics {
+		env["METRICS_URL"] = metricsConfig.Url
+		env["METRICS_USER"] = metricsConfig.Username
+		env["METRICS_PASSWORD"] = metricsConfig.Password
+		env["METRICS_INTERVAL"] = metricsConfig.Interval
+
+		reqBody = &Request{
+			Name:        r.GetOperatorName(pipelineId, operator),
+			NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
+			Containers: []Container{{
+				Image:           operator.ImageId,
+				Name:            r.GetOperatorName(pipelineId, operator),
+				Environment:     env,
+				ImagePullPolicy: "Always",
+				Command: []string{
+					"java",
+					"-javaagent:jmxtrans-agent.jar=" + metricsConfig.XmlUrl,
+					"-jar",
+					"/usr/src/app/target/operator-" + operator.Name + "-jar-with-dependencies.jar",
+				},
+			}},
+			Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
+			Labels:     map[string]string{"op": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId},
+			Selector:   Selector{MatchLabels: map[string]string{"op": operator.Id}},
+		}
+	} else {
+		reqBody = &Request{
+			Name:        r.GetOperatorName(pipelineId, operator),
+			NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
+			Containers: []Container{{
+				Image:           operator.ImageId,
+				Name:            r.GetOperatorName(pipelineId, operator),
+				Environment:     env,
+				ImagePullPolicy: "Always",
+			}},
+			Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
+			Labels:     map[string]string{"op": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId},
+			Selector:   Selector{MatchLabels: map[string]string{"op": operator.Id}},
+		}
 	}
 	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads").Send(reqBody).End()
 	if resp.StatusCode != http.StatusCreated {
@@ -94,36 +110,16 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outp
 	if len(e) > 0 {
 		fmt.Println("Something went wrong", e)
 	}
-
-	// Create influx db
-	influxRequest := gorequest.New().SetBasicAuth(r.influxUser, r.influxPw).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
-	influxResp, influxBody, e := influxRequest.Post(r.influxUrl + "/query?q=" + url.QueryEscape("CREATE DATABASE \""+operator.Id+"\"")).End()
-	if influxResp.StatusCode != http.StatusOK {
-		fmt.Println("Could not create influx db", influxBody)
-	}
-	if len(e) > 0 {
-		fmt.Println("Something went wrong", e)
-	}
 	return ""
 }
 
-func (r *Rancher2) DeleteOperator(operatorId string, operator lib.Operator) (err error) {
+func (r *Rancher2) DeleteOperator(operatorId string) (err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + operatorId).End()
 	if resp.StatusCode != http.StatusNoContent {
 		err = errors.New("could not delete operator: " + body)
 		return
-	}
-	if len(e) > 0 {
-		err = errors.New("something went wrong")
-		return
-	}
-
-	influxRequest := gorequest.New().SetBasicAuth(r.influxUser, r.influxPw).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
-	influxResp, influxBody, e := influxRequest.Post(r.influxUrl + "/query?q=" + url.QueryEscape("DROP DATABASE \""+operator.Id+"\"")).End()
-	if influxResp.StatusCode != http.StatusOK {
-		fmt.Println("Could not delete influx db", influxBody)
 	}
 	if len(e) > 0 {
 		err = errors.New("something went wrong")

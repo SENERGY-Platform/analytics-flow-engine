@@ -30,6 +30,7 @@ type Container struct {
 	Name            string            `json:"name,omitempty"`
 	Environment     map[string]string `json:"environment,omitempty"`
 	ImagePullPolicy string            `json:"imagePullPolicy,omitempty"`
+	Command         []string          `json:"name,omitempty"`
 }
 
 type Selector struct {
