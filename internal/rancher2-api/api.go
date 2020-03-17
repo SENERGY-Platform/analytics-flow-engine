@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package rancher2
+package rancher2_api
 
 import (
 	"analytics-flow-engine/internal/lib"

@@ -21,11 +21,10 @@ import (
 	metrics_api "analytics-flow-engine/internal/metrics-api"
 	"analytics-flow-engine/internal/parsing-api"
 	"analytics-flow-engine/internal/rancher-api"
+	rancher2_api "analytics-flow-engine/internal/rancher2-api"
 	"fmt"
 	"log"
 	"net/http"
-
-	"analytics-flow-engine/internal/rancher2"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
@@ -43,7 +42,7 @@ func CreateServer() {
 			lib.GetEnv("ZOOKEEPER", ""),
 		)
 	case "rancher2":
-		driver = rancher2.NewRancher2(
+		driver = rancher2_api.NewRancher2(
 			lib.GetEnv("RANCHER2_ENDPOINT", ""),
 			lib.GetEnv("RANCHER2_ACCESS_KEY", ""),
 			lib.GetEnv("RANCHER2_SECRET_KEY", ""),

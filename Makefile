@@ -1,5 +1,5 @@
 export GO111MODULE=on
-BINARY_NAME=analytics-serving
+BINARY_NAME=flow-engine
 
 all: deps build
 install:

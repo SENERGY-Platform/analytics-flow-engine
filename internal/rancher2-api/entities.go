@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package rancher2
+package rancher2_api
 
 type Request struct {
 	Name        string            `json:"name,omitempty"`
