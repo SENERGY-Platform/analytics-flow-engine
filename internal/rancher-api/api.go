@@ -39,22 +39,21 @@ func NewRancher(url string, accessKey string, secretKey string, stackId string, 
 	return &Rancher{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, outputTopic string, pipeConfig lib.PipelineConfig) string {
+func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, pipeConfig lib.PipelineConfig) string {
+	config, _ := json.Marshal(lib.OperatorRequestConfig{Config: input.Config, InputTopics: input.InputTopics})
 	env := map[string]string{
-		"ZK_QUORUM":             r.zookeeper,
-		"CONFIG_APPLICATION_ID": "analytics-" + pipelineId + "-" + input.Id,
-		"PIPELINE_ID":           pipelineId,
-		"OPERATOR_ID":           input.Id,
-		"WINDOW_TIME":           strconv.Itoa(pipeConfig.WindowTime),
+		"ZK_QUORUM":                         r.zookeeper,
+		"CONFIG_APPLICATION_ID":             "analytics-" + pipelineId + "-" + input.Id,
+		"PIPELINE_ID":                       pipelineId,
+		"OPERATOR_ID":                       input.Id,
+		"WINDOW_TIME":                       strconv.Itoa(pipeConfig.WindowTime),
+		"CONFIG":                            string(config),
+		"DEVICE_ID_PATH":                    "device_id",
+		"CONSUMER_AUTO_OFFSET_RESET_CONFIG": pipeConfig.ConsumerOffset,
 	}
 
-	config, _ := json.Marshal(lib.OperatorRequestConfig{Config: input.Config, InputTopics: input.InputTopics})
-	env["CONFIG"] = string(config)
-
-	env["DEVICE_ID_PATH"] = "device_id"
-
-	if outputTopic != "" {
-		env["OUTPUT"] = outputTopic
+	if pipeConfig.OutputTopic != "" {
+		env["OUTPUT"] = pipeConfig.OutputTopic
 	}
 
 	labels := map[string]string{

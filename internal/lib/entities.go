@@ -70,12 +70,13 @@ type Metrics struct {
 }
 
 type PipelineRequest struct {
-	Id          string         `json:"id,omitempty"`
-	Name        string         `json:"name,omitempty"`
-	Description string         `json:"description,omitempty"`
-	WindowTime  int            `json:"windowTime,omitempty"`
-	Metrics     bool           `json:"metrics,omitempty"`
-	Nodes       []PipelineNode `json:"nodes,omitempty"`
+	Id                 string         `json:"id,omitempty"`
+	Name               string         `json:"name,omitempty"`
+	Description        string         `json:"description,omitempty"`
+	WindowTime         int            `json:"windowTime,omitempty"`
+	ConsumeAllMessages bool           `json:"consumeAllMessages,omitempty"`
+	Metrics            bool           `json:"metrics,omitempty"`
+	Nodes              []PipelineNode `json:"nodes,omitempty"`
 }
 
 type PipelineNode struct {
@@ -101,11 +102,12 @@ type NodeValue struct {
 }
 
 type PipelineConfig struct {
-	WindowTime  int
-	Metrics     Metrics
-	FlowId      string
-	OutputTopic string
-	PipelineId  string
+	WindowTime     int
+	Metrics        Metrics
+	ConsumerOffset string
+	FlowId         string
+	OutputTopic    string
+	PipelineId     string
 }
 
 type ControlCommand struct {

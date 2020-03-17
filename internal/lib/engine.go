@@ -93,7 +93,18 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 		pipeline.Metrics.XmlUrl = metricsConfig.XmlUrl
 	}
 
-	f.startOperators(pipeline, pipelineRequest.Id, pipelineRequest.WindowTime)
+	var pipeConfig = PipelineConfig{
+		WindowTime:     pipelineRequest.WindowTime,
+		FlowId:         pipelineRequest.Id,
+		ConsumerOffset: "latest",
+		PipelineId:     pipeline.Id.String(),
+		Metrics:        pipeline.Metrics,
+	}
+	if pipelineRequest.ConsumeAllMessages {
+		pipeConfig.ConsumerOffset = "earliest"
+	}
+
+	f.startOperators(pipeline, pipeConfig)
 
 	return pipeline
 }
@@ -134,17 +145,15 @@ func (f *FlowEngine) GetPipelineStatus(id string) string {
 	return PIPELINE_RUNNING
 }
 
-func (f *FlowEngine) startOperators(pipeline Pipeline, flowId string, windowTime int) {
+func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig) {
 	for key, operator := range pipeline.Operators {
 		fmt.Println(strconv.Itoa(key) + ": Starting Operator:" + operator.Id + "-" + operator.Name)
-		var outputTopic = f.getOperatorOutputTopic(operator.Name)
-		var pipeConfig = PipelineConfig{WindowTime: windowTime, FlowId: flowId, OutputTopic: outputTopic, PipelineId: pipeline.Id.String(), Metrics: pipeline.Metrics}
+		pipeConfig.OutputTopic = f.getOperatorOutputTopic(operator.Name)
 		switch operator.DeploymentType {
 		case "cloud":
 			f.driver.CreateOperator(
 				pipeline.Id.String(),
 				operator,
-				outputTopic,
 				pipeConfig,
 			)
 			break
@@ -157,7 +166,6 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, flowId string, windowTime
 			f.driver.CreateOperator(
 				pipeline.Id.String(),
 				operator,
-				outputTopic,
 				pipeConfig,
 			)
 		}

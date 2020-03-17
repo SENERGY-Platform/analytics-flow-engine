@@ -42,23 +42,24 @@ func NewRancher2(url string, accessKey string, secretKey string, stackId string,
 	return &Rancher2{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, outputTopic string, pipeConfig lib.PipelineConfig) string {
+func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipeConfig lib.PipelineConfig) string {
 	fmt.Println("Rancher2 Create " + pipelineId)
-	env := map[string]string{
-		"ZK_QUORUM":             r.zookeeper,
-		"CONFIG_APPLICATION_ID": "analytics-" + pipelineId + "-" + operator.Id,
-		"PIPELINE_ID":           pipelineId,
-		"OPERATOR_ID":           operator.Id,
-		"WINDOW_TIME":           strconv.Itoa(pipeConfig.WindowTime),
-	}
 	config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
-	env["CONFIG"] = string(config)
-
-	env["DEVICE_ID_PATH"] = "device_id"
-
-	if outputTopic != "" {
-		env["OUTPUT"] = outputTopic
+	env := map[string]string{
+		"ZK_QUORUM":                         r.zookeeper,
+		"CONFIG_APPLICATION_ID":             "analytics-" + pipelineId + "-" + operator.Id,
+		"PIPELINE_ID":                       pipelineId,
+		"OPERATOR_ID":                       operator.Id,
+		"WINDOW_TIME":                       strconv.Itoa(pipeConfig.WindowTime),
+		"CONFIG":                            string(config),
+		"DEVICE_ID_PATH":                    "device_id",
+		"CONSUMER_AUTO_OFFSET_RESET_CONFIG": pipeConfig.ConsumerOffset,
 	}
+
+	if pipeConfig.OutputTopic != "" {
+		env["OUTPUT"] = pipeConfig.OutputTopic
+	}
+
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	reqBody := &Request{
 		Name:        r.GetOperatorName(pipelineId, operator),
