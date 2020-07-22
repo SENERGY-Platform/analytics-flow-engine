@@ -42,8 +42,8 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	var tmpPipeline Pipeline
 	for _, operator := range parsedPipeline.Operators {
 		op := Operator{Id: operator.Id, Name: operator.Name, ImageId: operator.ImageId, OperatorId: operator.OperatorId, DeploymentType: operator.DeploymentType}
-		for topicName, topic := range operator.InputTopics {
-			top := InputTopic{Name: topicName, FilterType: topic.FilterType, FilterValue: topic.FilterValue}
+		for _, topic := range operator.InputTopics {
+			top := InputTopic{Name: topic.TopicName, FilterType: topic.FilterType, FilterValue: topic.FilterValue}
 			for _, mapping := range topic.Mappings {
 				top.Mappings = append(top.Mappings, Mapping{mapping.Dest, mapping.Source})
 			}
