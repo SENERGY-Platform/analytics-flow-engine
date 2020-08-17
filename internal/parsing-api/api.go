@@ -18,7 +18,8 @@ package parsing_api
 
 import (
 	"encoding/json"
-	"fmt"
+	"net/http"
+	"strconv"
 
 	"github.com/parnurzeal/gorequest"
 	"github.com/pkg/errors"
@@ -32,17 +33,16 @@ func NewParsingApi(url string) *ParsingApi {
 	return &ParsingApi{url}
 }
 
-func (a ParsingApi) GetPipeline(id string, userId string) (p Pipeline, err error) {
+func (a ParsingApi) GetPipeline(id string, userId string, authorization string) (p Pipeline, err error) {
 	request := gorequest.New()
-	_, body, e := request.Get(a.url+"/flow/"+id).Set("X-UserId", userId).End()
-	//if resp.StatusCode != http.StatusOK{
-	//	fmt.Println("Something went wrong", e)
-	//	err  = errors.New("Could not get pipeline from service")
-	//	return
-	//}
+	request.Get(a.url+"/flow/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
+	resp, body, e := request.End()
+	if resp.StatusCode != http.StatusOK {
+		err = errors.New("could not get pipeline from parsing service: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		return
+	}
 	if len(e) > 0 {
-		fmt.Println("Something went wrong", e)
-		err = errors.New("Could not get pipeline from service")
+		err = errors.New("could not get pipeline from parsing service: an error occurred")
 		return
 	}
 	err = json.Unmarshal([]byte(body), &p)

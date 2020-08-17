@@ -18,70 +18,72 @@ package lib
 
 import (
 	"encoding/json"
-	"fmt"
+	uuid "github.com/satori/go.uuid"
+	"net/http"
 
 	"strconv"
 
 	"github.com/parnurzeal/gorequest"
 	"github.com/pkg/errors"
-	"github.com/satori/go.uuid"
 )
 
 type PipelineResponse struct {
 	Id uuid.UUID `json:"id,omitempty"`
 }
 
-func registerPipeline(pipeline *Pipeline, userId string) (id uuid.UUID, err error) {
+func registerPipeline(pipeline *Pipeline, userId string, authorization string) (id uuid.UUID, err error) {
 	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
 	request := gorequest.New()
-	_, body, e := request.Post(pipelineServiceUrl+"/pipeline").Set("X-UserId", userId).Send(pipeline).End()
-	//if resp.StatusCode != http.StatusOK{
-	//	fmt.Println("Something went wrong", e)
-	//	err  = errors.New("Could not get pipeline from service")
-	//	return
-	//}
+	request.Post(pipelineServiceUrl+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization).Send(pipeline)
+	resp, body, e := request.End()
+	if resp.StatusCode != http.StatusOK {
+		err = errors.New("could not register pipeline at pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		return
+	}
 	if len(e) > 0 {
-		fmt.Println("Something went wrong", e)
-		err = errors.New("Could not get pipeline from service")
+		err = errors.New("could not register pipeline at pipeline registry: an error occurred")
 		return
 	}
 	var res PipelineResponse
-	if err := json.Unmarshal([]byte(body), &res); err != nil {
-		panic(err)
+	if err = json.Unmarshal([]byte(body), &res); err != nil {
+		err = errors.New("could not parse pipeline response: " + err.Error())
+		return
 	}
 	id = res.Id
 	return
 }
 
-func getPipeline(id string, userId string) (pipe Pipeline, err error) {
+func getPipeline(id string, userId string, authorization string) (pipe Pipeline, err error) {
 	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
 	request := gorequest.New()
-	_, body, e := request.Get(pipelineServiceUrl+"/pipeline/"+id).Set("X-UserId", userId).End()
+	request.Get(pipelineServiceUrl+"/pipeline/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
+	resp, body, e := request.End()
+
+	if resp.StatusCode != 200 {
+		err = errors.New("could not get pipeline from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
+	}
 	if len(e) > 0 {
-		fmt.Println("Something went wrong", err)
-		err = errors.New("Could not get pipeline from service")
+		err = errors.New("could not get pipeline from pipeline registry: an error occurred")
 		return
 	}
 	err = json.Unmarshal([]byte(body), &pipe)
 	if err != nil {
-		fmt.Println("Something went wrong", e)
-		err = errors.New("Could not parse pipeline")
+		err = errors.New("could not parse pipeline: " + err.Error())
 		return
 	}
 	return
 }
 
-func deletePipeline(id string, userId string) (err error) {
+func deletePipeline(id string, userId string, authorization string) (err error) {
 	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
 	request := gorequest.New()
-	resp, _, e := request.Delete(pipelineServiceUrl+"/pipeline/"+id).Set("X-UserId", userId).End()
+	request.Delete(pipelineServiceUrl+"/pipeline/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
+	resp, body, e := request.End()
 	if resp.StatusCode != 200 {
-		fmt.Println("could not access pipeline registry: "+strconv.Itoa(resp.StatusCode), resp.Body)
-		err = errors.New("could not access pipeline registry")
+		err = errors.New("could not delete pipeline from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
 	}
 	if len(e) > 0 {
-		fmt.Println("something went wrong", e)
-		err = errors.New("could not get pipeline from service")
+		err = errors.New("could not delete pipeline from pipeline registry: an error occurred")
 		return
 	}
 	return

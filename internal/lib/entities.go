@@ -16,7 +16,7 @@
 
 package lib
 
-import "github.com/satori/go.uuid"
+import uuid "github.com/satori/go.uuid"
 
 type Response struct {
 	Message string `json:"message,omitempty"`
@@ -125,4 +125,13 @@ type FogConfig struct {
 	PipelineId  string `json:"pipelineId,omitempty"`
 	OutputTopic string `json:"outputTopic,omitempty"`
 	OperatorId  string `json:"operatorId,omitempty"`
+}
+
+type Claims struct {
+	Sub         string              `json:"sub,omitempty"`
+	RealmAccess map[string][]string `json:"realm_access,omitempty"`
+}
+
+func (c Claims) Valid() error {
+	return nil
 }

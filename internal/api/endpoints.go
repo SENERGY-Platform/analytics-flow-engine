@@ -20,6 +20,7 @@ import (
 	"analytics-flow-engine/internal/lib"
 	"encoding/json"
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -59,7 +60,7 @@ func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
 		fmt.Println(err)
 	}
 	defer req.Body.Close()
-	ret := e.engine.StartPipeline(pipe_req, e.getUserId(req))
+	ret := e.engine.StartPipeline(pipe_req, e.getUserId(req), req.Header.Get("Authorization"))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(ret)
@@ -67,7 +68,7 @@ func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
 
 func (e *Endpoint) deletePipeline(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
-	ret := e.engine.DeletePipeline(vars["id"], e.getUserId(req))
+	ret := e.engine.DeletePipeline(vars["id"], e.getUserId(req), req.Header.Get("Authorization"))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	json.NewEncoder(w).Encode(lib.Response{ret})
@@ -76,8 +77,18 @@ func (e *Endpoint) deletePipeline(w http.ResponseWriter, req *http.Request) {
 func (e *Endpoint) getUserId(req *http.Request) (userId string) {
 	userId = req.Header.Get("X-UserId")
 	if userId == "" {
-		userId = lib.GetEnv("USER_ID", "admin")
+		if userId == "" && req.Header.Get("Authorization") != "" {
+			_, claims := parseJWTToken(req.Header.Get("Authorization")[7:])
+			userId = claims.Sub
+			if userId == "" {
+				userId = "dummy"
+			}
+		}
 	}
-	fmt.Println("UserID: " + userId)
+	return
+}
+
+func parseJWTToken(encodedToken string) (token *jwt.Token, claims lib.Claims) {
+	token, _ = jwt.ParseWithClaims(encodedToken, &claims, nil)
 	return
 }

@@ -32,9 +32,12 @@ func NewFlowEngine(driver Driver, parsingService ParsingApiService, metricsServi
 }
 
 // Starts a pipeline
-func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string) (pipeline Pipeline) {
+func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, authorization string) (pipeline Pipeline) {
 	//Get parsed pipeline
-	parsedPipeline, _ := f.parsingService.GetPipeline(pipelineRequest.Id, userId)
+	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.Id, userId, authorization)
+	if err != nil {
+		fmt.Println(err)
+	}
 	pipeline.FlowId = parsedPipeline.FlowId
 	pipeline.Image = parsedPipeline.Image
 
@@ -80,11 +83,14 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
 
-	pipeline.Id, _ = registerPipeline(&pipeline, userId)
+	pipeline.Id, _ = registerPipeline(&pipeline, userId, authorization)
 
 	pipeline.Metrics.Enabled = pipelineRequest.Metrics
 	if pipeline.Metrics.Enabled {
-		metricsConfig := f.metricsService.RegisterPipeline(pipeline.Id.String())
+		metricsConfig, err := f.metricsService.RegisterPipeline(pipeline.Id.String())
+		if err != nil {
+			fmt.Println(err)
+		}
 		pipeline.Metrics.Database = metricsConfig.Database
 		pipeline.Metrics.Username = metricsConfig.Username
 		pipeline.Metrics.Password = metricsConfig.Password
@@ -109,9 +115,12 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	return pipeline
 }
 
-func (f *FlowEngine) DeletePipeline(id string, userId string) string {
+func (f *FlowEngine) DeletePipeline(id string, userId string, authorization string) string {
 	println("Deleting Pipeline:" + id)
-	var pipeline, _ = getPipeline(id, userId)
+	var pipeline, err = getPipeline(id, userId, authorization)
+	if err != nil {
+		fmt.Println(err)
+	}
 	for _, operator := range pipeline.Operators {
 		switch operator.DeploymentType {
 		case "cloud":
@@ -132,11 +141,16 @@ func (f *FlowEngine) DeletePipeline(id string, userId string) string {
 			}
 		}
 	}
-	err := deletePipeline(id, userId)
+	err = deletePipeline(id, userId, authorization)
 	if err != nil {
 		fmt.Println(err)
 	}
-	f.metricsService.UnregisterPipeline(pipeline.Id.String())
+	if pipeline.Metrics.Enabled == true {
+		err = f.metricsService.UnregisterPipeline(pipeline.Id.String())
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
 	return "done"
 }
 

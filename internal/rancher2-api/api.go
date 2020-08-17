@@ -42,7 +42,7 @@ func NewRancher2(url string, accessKey string, secretKey string, stackId string,
 	return &Rancher2{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipeConfig lib.PipelineConfig) string {
+func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
 	fmt.Println("Rancher2 Create " + pipelineId)
 	config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
 	env := map[string]string{
@@ -94,12 +94,12 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 	}
 	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads").Send(reqBody).End()
 	if resp.StatusCode != http.StatusCreated {
-		fmt.Println("Could not create Operator", body)
+		err = errors.New("could not create operator: " + body)
 	}
 	if len(e) > 0 {
-		fmt.Println("Something went wrong", e)
+		err = errors.New("could not create operator: an error occurred")
 	}
-	return ""
+	return
 }
 
 func (r *Rancher2) DeleteOperator(operatorId string) (err error) {

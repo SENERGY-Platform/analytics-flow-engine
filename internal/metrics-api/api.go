@@ -19,9 +19,10 @@ package metrics_api
 import (
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"github.com/parnurzeal/gorequest"
 	"net/http"
+	"strconv"
 )
 
 type MetricsApi struct {
@@ -32,35 +33,37 @@ func NewMetricsApi(url string) *MetricsApi {
 	return &MetricsApi{url}
 }
 
-func (a MetricsApi) RegisterPipeline(id string) MetricsConfig {
+func (a MetricsApi) RegisterPipeline(id string) (metricsConfig MetricsConfig, err error) {
 	// Create influx db via metrics api
 	metricApiRequest := gorequest.New().TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
-	metricsApiResp, metricsApiBody, e := metricApiRequest.Post(a.url + "/pipelines/" + id).End()
-	if metricsApiResp.StatusCode != http.StatusCreated {
-		fmt.Println("Problem contacting metrics api", metricsApiBody)
+	resp, body, e := metricApiRequest.Post(a.url + "/pipelines/" + id).End()
+	if resp.StatusCode != http.StatusCreated {
+		err = errors.New("could not create metrics service: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		return
 	}
 	if len(e) > 0 {
-		fmt.Println("Problem contacting metrics api", e)
+		err = errors.New("could not create metrics service: an error occurred")
+		return
 	}
-	var metricsConfig MetricsConfig
-	err := json.Unmarshal([]byte(metricsApiBody), &metricsConfig)
+	err = json.Unmarshal([]byte(body), &metricsConfig)
 	if err != nil {
-		fmt.Println("Problem unmarshaling metrics api response", err)
+		err = errors.New("could not unmarshal metrics api response: " + err.Error())
+		return
 	}
 
-	return metricsConfig
+	return
 }
 
-func (a MetricsApi) UnregisterPipeline(id string) bool {
+func (a MetricsApi) UnregisterPipeline(id string) (err error) {
 	metricApiRequest := gorequest.New().TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
-	metricsApiResp, metricsApiBody, e := metricApiRequest.Delete(a.url + "/pipelines/" + id).End()
-	if metricsApiResp.StatusCode != http.StatusOK {
-		fmt.Println("Problem contacting metrics api", metricsApiBody)
-		return false
+	resp, body, e := metricApiRequest.Delete(a.url + "/pipelines/" + id).End()
+	if resp.StatusCode != http.StatusOK {
+		err = errors.New("could not delete metrics from metrics service: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		return
 	}
 	if len(e) > 0 {
-		fmt.Println("Problem contacting metrics api", e)
-		return false
+		err = errors.New("could not delete metrics from metrics service: an error occurred")
+		return
 	}
-	return true
+	return
 }

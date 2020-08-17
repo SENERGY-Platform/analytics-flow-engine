@@ -20,7 +20,6 @@ import (
 	"analytics-flow-engine/internal/lib"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -39,7 +38,7 @@ func NewRancher(url string, accessKey string, secretKey string, stackId string, 
 	return &Rancher{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, pipeConfig lib.PipelineConfig) string {
+func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
 	config, _ := json.Marshal(lib.OperatorRequestConfig{Config: input.Config, InputTopics: input.InputTopics})
 	env := map[string]string{
 		"ZK_QUORUM":                         r.zookeeper,
@@ -93,13 +92,12 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, pipeConfi
 
 	resp, body, e := request.Post(r.url + "services").Send(reqBody).End()
 	if resp.StatusCode != http.StatusCreated {
-		fmt.Println("Could not create Operator", body)
+		err = errors.New("could not create operator: " + body)
 	}
 	if len(e) > 0 {
-		fmt.Println("Something went wrong", e)
+		err = errors.New("could not create operator: an error occurred")
 	}
-	data := lib.ToJson(body)
-	return data["id"].(string)
+	return
 }
 
 func (r Rancher) DeleteOperator(operatorName string) (err error) {
