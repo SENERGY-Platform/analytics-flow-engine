@@ -1,4 +1,4 @@
-FROM golang:1.12
+FROM golang:1.14
 
 COPY . /go/src/flow-engine
 WORKDIR /go/src/flow-engine
