@@ -23,8 +23,9 @@ import (
 
 type Driver interface {
 	CreateOperator(pipelineId string, input Operator, pipelineConfig PipelineConfig) error
+	CreateOperators(pipelineId string, input []Operator, pipelineConfig PipelineConfig) error
 	DeleteOperator(id string) error
-	GetOperatorName(pipelineId string, operator Operator) string
+	GetOperatorName(pipelineId string, operator Operator) []string
 }
 
 type ParsingApiService interface {

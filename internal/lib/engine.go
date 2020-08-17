@@ -18,7 +18,6 @@ package lib
 
 import (
 	"fmt"
-	"strconv"
 )
 
 type FlowEngine struct {
@@ -44,7 +43,14 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	//Convert parsing Schema to internal Schema
 	var tmpPipeline Pipeline
 	for _, operator := range parsedPipeline.Operators {
-		op := Operator{Id: operator.Id, Name: operator.Name, ImageId: operator.ImageId, OperatorId: operator.OperatorId, DeploymentType: operator.DeploymentType}
+		op := Operator{
+			Id:             operator.Id,
+			Name:           operator.Name,
+			ImageId:        operator.ImageId,
+			OperatorId:     operator.OperatorId,
+			DeploymentType: operator.DeploymentType,
+			OutputTopic:    f.getOperatorOutputTopic(operator.Name),
+		}
 		for _, topic := range operator.InputTopics {
 			top := InputTopic{Name: topic.TopicName, FilterType: topic.FilterType, FilterValue: topic.FilterValue}
 			for _, mapping := range topic.Mappings {
@@ -123,21 +129,19 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, authorization stri
 	}
 	for _, operator := range pipeline.Operators {
 		switch operator.DeploymentType {
-		case "cloud":
-			err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator))
-			if err != nil {
-				fmt.Println(err)
-			}
-			break
 		case "local":
 			fmt.Println("stop local Operator: " + operator.Name)
 			stopOperator(pipeline.Id.String(),
 				operator)
 			break
 		default:
-			err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator))
+			err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator)[0])
 			if err != nil {
 				fmt.Println(err)
+				err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator)[1])
+				if err != nil {
+					fmt.Println(err)
+				}
 			}
 		}
 	}
@@ -160,28 +164,33 @@ func (f *FlowEngine) GetPipelineStatus(id string) string {
 }
 
 func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig) {
-	for key, operator := range pipeline.Operators {
-		fmt.Println(strconv.Itoa(key) + ": Starting Operator:" + operator.Id + "-" + operator.Name)
-		pipeConfig.OutputTopic = f.getOperatorOutputTopic(operator.Name)
+	var localOperators []Operator
+	var cloudOperators []Operator
+	for _, operator := range pipeline.Operators {
 		switch operator.DeploymentType {
-		case "cloud":
-			f.driver.CreateOperator(
-				pipeline.Id.String(),
-				operator,
-				pipeConfig,
-			)
-			break
 		case "local":
+			localOperators = append(localOperators, operator)
+			break
+		default:
+			cloudOperators = append(cloudOperators, operator)
+			break
+		}
+	}
+	if len(cloudOperators) > 0 {
+		err := f.driver.CreateOperators(
+			pipeline.Id.String(),
+			cloudOperators,
+			pipeConfig,
+		)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+	if len(localOperators) > 0 {
+		for _, operator := range localOperators {
 			fmt.Println("start local Operator: " + operator.Name)
 			startOperator(operator,
 				pipeConfig)
-			break
-		default:
-			f.driver.CreateOperator(
-				pipeline.Id.String(),
-				operator,
-				pipeConfig,
-			)
 		}
 	}
 }

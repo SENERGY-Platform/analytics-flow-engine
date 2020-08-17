@@ -39,6 +39,7 @@ type Operator struct {
 	DeploymentType string            `json:"deploymentType,omitempty"`
 	OperatorId     string            `json:"operatorId,omitempty"`
 	Config         map[string]string `json:"config,omitempty"`
+	OutputTopic    string            `json:"outputTopic,omitempty"`
 	InputTopics    []InputTopic
 }
 
@@ -106,7 +107,6 @@ type PipelineConfig struct {
 	Metrics        Metrics
 	ConsumerOffset string
 	FlowId         string
-	OutputTopic    string
 	PipelineId     string
 }
 

@@ -51,8 +51,8 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, pipeConfi
 		"CONSUMER_AUTO_OFFSET_RESET_CONFIG": pipeConfig.ConsumerOffset,
 	}
 
-	if pipeConfig.OutputTopic != "" {
-		env["OUTPUT"] = pipeConfig.OutputTopic
+	if input.OutputTopic != "" {
+		env["OUTPUT"] = input.OutputTopic
 	}
 
 	labels := map[string]string{
@@ -66,7 +66,7 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, pipeConfi
 
 	reqBody := &Request{
 		Type:          "service",
-		Name:          r.GetOperatorName(pipelineId, input),
+		Name:          r.GetOperatorName(pipelineId, input)[0],
 		StackId:       r.stackId,
 		Scale:         1,
 		StartOnCreate: true,
@@ -100,6 +100,79 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, pipeConfi
 	return
 }
 
+func (r Rancher) CreateOperators(pipelineId string, inputs []lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
+	var operators []LaunchConfig
+	for _, input := range inputs {
+		config, _ := json.Marshal(lib.OperatorRequestConfig{Config: input.Config, InputTopics: input.InputTopics})
+		env := map[string]string{
+			"ZK_QUORUM":                         r.zookeeper,
+			"CONFIG_APPLICATION_ID":             "analytics-" + pipelineId + "-" + input.Id,
+			"PIPELINE_ID":                       pipelineId,
+			"OPERATOR_ID":                       input.Id,
+			"WINDOW_TIME":                       strconv.Itoa(pipeConfig.WindowTime),
+			"CONFIG":                            string(config),
+			"DEVICE_ID_PATH":                    "device_id",
+			"CONSUMER_AUTO_OFFSET_RESET_CONFIG": pipeConfig.ConsumerOffset,
+		}
+
+		if input.OutputTopic != "" {
+			env["OUTPUT"] = input.OutputTopic
+		}
+
+		labels := map[string]string{
+			"flow_id":                         pipeConfig.FlowId,
+			"operator_id":                     input.Id,
+			"service_type":                    "analytics-service",
+			"io.rancher.container.pull_image": "always",
+			"io.rancher.scheduler.affinity:host_label": "role=worker",
+		}
+
+		launchConfig := LaunchConfig{
+			Name:        input.Id,
+			ImageUuid:   "docker:" + input.ImageId,
+			Environment: env,
+			Labels:      labels,
+		}
+
+		if pipeConfig.Metrics.Enabled {
+			env["METRICS_URL"] = pipeConfig.Metrics.Url
+			env["METRICS_USER"] = pipeConfig.Metrics.Username
+			env["METRICS_PASSWORD"] = pipeConfig.Metrics.Password
+			env["METRICS_INTERVAL"] = pipeConfig.Metrics.Interval
+			launchConfig.Command = []string{
+				"java",
+				"-javaagent:jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
+				"-jar",
+				"/usr/src/app/target/operator-" + input.Name + "-jar-with-dependencies.jar",
+			}
+		}
+		operators = append(operators, launchConfig)
+	}
+
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
+
+	if len(operators) > 0 {
+		reqBody := &Request{
+			Type:                   "service",
+			Name:                   r.GetOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1],
+			StackId:                r.stackId,
+			Scale:                  1,
+			StartOnCreate:          true,
+			LaunchConfig:           operators[0],
+			SecondaryLaunchConfigs: operators[1:],
+		}
+
+		resp, body, e := request.Post(r.url + "services").Send(reqBody).End()
+		if resp.StatusCode != http.StatusCreated {
+			err = errors.New("could not create operators: " + body)
+		}
+		if len(e) > 0 {
+			err = errors.New("could not create operators: an error occurred")
+		}
+	}
+	return
+}
+
 func (r Rancher) DeleteOperator(operatorName string) (err error) {
 	service, err := r.getServiceByName(operatorName)
 	if err != nil {
@@ -113,8 +186,8 @@ func (r Rancher) DeleteOperator(operatorName string) (err error) {
 	return
 }
 
-func (r Rancher) GetOperatorName(pipelineId string, operator lib.Operator) string {
-	return "v2-" + pipelineId + "-" + operator.Id[0:8]
+func (r Rancher) GetOperatorName(pipelineId string, operator lib.Operator) []string {
+	return []string{"v2-" + pipelineId + "-" + operator.Id[0:8], "v3-" + pipelineId}
 }
 
 func (r Rancher) getServiceByName(name string) (service Service, err error) {

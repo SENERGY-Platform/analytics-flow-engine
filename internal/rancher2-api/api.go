@@ -56,17 +56,17 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 		"CONSUMER_AUTO_OFFSET_RESET_CONFIG": pipeConfig.ConsumerOffset,
 	}
 
-	if pipeConfig.OutputTopic != "" {
-		env["OUTPUT"] = pipeConfig.OutputTopic
+	if operator.OutputTopic != "" {
+		env["OUTPUT"] = operator.OutputTopic
 	}
 
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	reqBody := &Request{
-		Name:        r.GetOperatorName(pipelineId, operator),
+		Name:        r.GetOperatorName(pipelineId, operator)[0],
 		NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
 		Containers: []Container{{
 			Image:           operator.ImageId,
-			Name:            r.GetOperatorName(pipelineId, operator),
+			Name:            r.GetOperatorName(pipelineId, operator)[0],
 			Environment:     env,
 			ImagePullPolicy: "Always",
 		}},
@@ -81,7 +81,7 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 		env["METRICS_INTERVAL"] = pipeConfig.Metrics.Interval
 		reqBody.Containers = []Container{{
 			Image:           operator.ImageId,
-			Name:            r.GetOperatorName(pipelineId, operator),
+			Name:            r.GetOperatorName(pipelineId, operator)[0],
 			Environment:     env,
 			ImagePullPolicy: "Always",
 			Command: []string{
@@ -102,6 +102,13 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 	return
 }
 
+func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
+	for _, input := range inputs {
+		r.CreateOperator(pipelineId, input, pipeConfig)
+	}
+	return
+}
+
 func (r *Rancher2) DeleteOperator(operatorId string) (err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
@@ -117,6 +124,6 @@ func (r *Rancher2) DeleteOperator(operatorId string) (err error) {
 	return
 }
 
-func (r *Rancher2) GetOperatorName(pipelineId string, operator lib.Operator) string {
-	return "operator-" + pipelineId + "-" + operator.Id[0:8]
+func (r *Rancher2) GetOperatorName(pipelineId string, operator lib.Operator) []string {
+	return []string{"operator-" + pipelineId + "-" + operator.Id[0:8], "pipeline-" + pipelineId}
 }
