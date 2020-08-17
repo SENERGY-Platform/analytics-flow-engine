@@ -31,6 +31,7 @@ type Container struct {
 	Environment     map[string]string `json:"environment,omitempty"`
 	ImagePullPolicy string            `json:"imagePullPolicy,omitempty"`
 	Command         []string          `json:"command,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
 }
 
 type Selector struct {

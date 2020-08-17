@@ -103,8 +103,60 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 }
 
 func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
-	for _, input := range inputs {
-		r.CreateOperator(pipelineId, input, pipeConfig)
+	var containers []Container
+	for _, operator := range inputs {
+		config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
+		labels := map[string]string{"operatorId": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId}
+		env := map[string]string{
+			"ZK_QUORUM":                         r.zookeeper,
+			"CONFIG_APPLICATION_ID":             "analytics-" + pipelineId + "-" + operator.Id,
+			"PIPELINE_ID":                       pipelineId,
+			"OPERATOR_ID":                       operator.Id,
+			"WINDOW_TIME":                       strconv.Itoa(pipeConfig.WindowTime),
+			"CONFIG":                            string(config),
+			"DEVICE_ID_PATH":                    "device_id",
+			"CONSUMER_AUTO_OFFSET_RESET_CONFIG": pipeConfig.ConsumerOffset,
+		}
+		container := Container{
+			Image:           operator.ImageId,
+			Name:            operator.Id,
+			Environment:     env,
+			ImagePullPolicy: "Always",
+		}
+		if operator.OutputTopic != "" {
+			env["OUTPUT"] = operator.OutputTopic
+		}
+		if pipeConfig.Metrics.Enabled {
+			env["METRICS_URL"] = pipeConfig.Metrics.Url
+			env["METRICS_USER"] = pipeConfig.Metrics.Username
+			env["METRICS_PASSWORD"] = pipeConfig.Metrics.Password
+			env["METRICS_INTERVAL"] = pipeConfig.Metrics.Interval
+			container.Command = []string{
+				"java",
+				"-javaagent:jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
+				"-jar",
+				"/usr/src/app/target/operator-" + operator.Name + "-jar-with-dependencies.jar",
+			}
+		}
+		container.Labels = labels
+		containers = append(containers, container)
+	}
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	reqBody := &Request{
+		Name:        r.GetOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1],
+		NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
+		Containers:  containers,
+		Scheduling:  Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
+		Labels:      map[string]string{"flowId": pipeConfig.FlowId, "pipelineId": pipelineId},
+		Selector:    Selector{MatchLabels: map[string]string{"pipelineId": pipelineId}},
+	}
+
+	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads").Send(reqBody).End()
+	if resp.StatusCode != http.StatusCreated {
+		err = errors.New("could not create operators: " + body)
+	}
+	if len(e) > 0 {
+		err = errors.New("could not create operators: an error occurred")
 	}
 	return
 }
