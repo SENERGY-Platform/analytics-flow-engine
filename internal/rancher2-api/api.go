@@ -86,9 +86,9 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 			ImagePullPolicy: "Always",
 			Command: []string{
 				"java",
-				"-javaagent:jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
+				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
 				"-jar",
-				"/usr/src/app/target/operator-" + operator.Name + "-jar-with-dependencies.jar",
+				"/opt/operator-" + operator.Name + "-jar-with-dependencies.jar",
 			},
 		}}
 	}
@@ -133,9 +133,9 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 			env["METRICS_INTERVAL"] = pipeConfig.Metrics.Interval
 			container.Command = []string{
 				"java",
-				"-javaagent:jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
+				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
 				"-jar",
-				"/usr/src/app/target/operator-" + operator.Name + "-jar-with-dependencies.jar",
+				"/opt/operator-" + operator.Name + "-jar-with-dependencies.jar",
 			}
 		}
 		container.Labels = labels
