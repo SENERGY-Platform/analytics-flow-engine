@@ -88,7 +88,7 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 				"java",
 				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
 				"-jar",
-				"/opt/operator-" + operator.Name + "-jar-with-dependencies.jar",
+				"/opt/operator.jar",
 			},
 		}}
 	}
@@ -135,7 +135,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 				"java",
 				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
 				"-jar",
-				"/opt/operator-" + operator.Name + "-jar-with-dependencies.jar",
+				"/opt/operator.jar",
 			}
 		}
 		container.Labels = labels

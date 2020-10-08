@@ -85,7 +85,7 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, pipeConfi
 			"java",
 			"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
 			"-jar",
-			"/opt/operator-" + input.Name + "-jar-with-dependencies.jar",
+			"/opt/operator.jar",
 		}
 
 	}
@@ -143,7 +143,7 @@ func (r Rancher) CreateOperators(pipelineId string, inputs []lib.Operator, pipeC
 				"java",
 				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
 				"-jar",
-				"/opt/operator-" + input.Name + "-jar-with-dependencies.jar",
+				"/opt/operator.jar",
 			}
 		}
 		operators = append(operators, launchConfig)
