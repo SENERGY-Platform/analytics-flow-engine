@@ -160,7 +160,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, authorization stri
 
 func (f *FlowEngine) GetPipelineStatus(id string) string {
 	//TODO: Implement method
-	return PIPELINE_RUNNING
+	return PipelineRunning
 }
 
 func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig) {

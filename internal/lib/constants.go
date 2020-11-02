@@ -16,6 +16,6 @@
 
 package lib
 
-const PIPELINE_RUNNING  = "running"
-const PIPELINE_STOPPED  = "stopped"
-const PIPELINE_MISSING  = "missing"
+const PipelineRunning = "running"
+const MQTTTopicPrefix = "fog/"
+const MQTTControlTopic = MQTTTopicPrefix + "control"

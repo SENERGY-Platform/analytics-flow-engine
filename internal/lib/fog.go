@@ -36,7 +36,7 @@ func startOperator(input Operator, pipelineConfig PipelineConfig) {
 	if err != nil {
 		panic(err)
 	}
-	publishMessage("control", string(out))
+	publishMessage(MQTTControlTopic, string(out))
 }
 
 func stopOperator(pipelineId string, input Operator) {
@@ -48,5 +48,5 @@ func stopOperator(pipelineId string, input Operator) {
 	if err != nil {
 		panic(err)
 	}
-	publishMessage("control", string(out))
+	publishMessage(MQTTControlTopic, string(out))
 }
