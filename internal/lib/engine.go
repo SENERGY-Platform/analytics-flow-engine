@@ -18,6 +18,7 @@ package lib
 
 import (
 	"fmt"
+	"strings"
 )
 
 type FlowEngine struct {
@@ -67,11 +68,13 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 			if operator.Id == node.NodeId {
 				if len(node.Inputs) > 0 {
 					for _, input := range node.Inputs {
-						t := InputTopic{Name: input.TopicName, FilterType: "DeviceId", FilterValue: input.DeviceId}
-						for _, value := range input.Values {
-							t.Mappings = append(t.Mappings, Mapping{value.Name, value.Path})
+						for _, topicName := range strings.Split(input.TopicName, ",") {
+							t := InputTopic{Name: topicName, FilterType: "DeviceId", FilterValue: input.DeviceId}
+							for _, value := range input.Values {
+								t.Mappings = append(t.Mappings, Mapping{value.Name, value.Path})
+							}
+							operator.InputTopics = append(operator.InputTopics, t)
 						}
-						operator.InputTopics = append(operator.InputTopics, t)
 					}
 				}
 
