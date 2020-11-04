@@ -29,8 +29,9 @@ func processMessage(message MQTT.Message) {
 func startOperator(input Operator, pipelineConfig PipelineConfig) {
 	command := &ControlCommand{"startOperator", OperatorJob{ImageId: input.ImageId, InputTopics: input.InputTopics,
 		Config: FogConfig{OutputTopic: input.OutputTopic,
-			OperatorId: input.OperatorId,
-			PipelineId: pipelineConfig.PipelineId,
+			OperatorId:     input.Id,
+			PipelineId:     pipelineConfig.PipelineId,
+			BaseOperatorId: input.OperatorId,
 		}}}
 	out, err := json.Marshal(command)
 	if err != nil {
@@ -41,8 +42,9 @@ func startOperator(input Operator, pipelineConfig PipelineConfig) {
 
 func stopOperator(pipelineId string, input Operator) {
 	command := &ControlCommand{"stopOperator", OperatorJob{Config: FogConfig{
-		OperatorId: input.OperatorId,
-		PipelineId: pipelineId,
+		OperatorId:     input.Id,
+		PipelineId:     pipelineId,
+		BaseOperatorId: input.OperatorId,
 	}}}
 	out, err := json.Marshal(command)
 	if err != nil {
