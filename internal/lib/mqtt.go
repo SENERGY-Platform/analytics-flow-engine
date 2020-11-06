@@ -45,8 +45,8 @@ func ConnectMQTTBroker() {
 	qos = flag.Int("qos", 0, "The QoS to subscribe to messages at")
 	retained = flag.Bool("retained", false, "Are the messages sent with the retained flag")
 	clientId := flag.String("clientid", hostname+strconv.Itoa(time.Now().Second()), "A clientid for the connection")
-	username := flag.String("username", "", "A username to authenticate to the MQTT server")
-	password := flag.String("password", "", "Password to match username")
+	username := flag.String("username", GetEnv("BROKER_USER", ""), "A username to authenticate to the MQTT server")
+	password := flag.String("password", GetEnv("BROKER_PASSWORD", ""), "Password to match username")
 	flag.Parse()
 
 	connOpts := MQTT.NewClientOptions().AddBroker(*server).SetClientID(*clientId).SetCleanSession(true)
