@@ -72,8 +72,18 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 			if operator.Id == node.NodeId {
 				if len(node.Inputs) > 0 {
 					for _, input := range node.Inputs {
-						for _, topicName := range strings.Split(input.TopicName, ",") {
-							t := InputTopic{Name: topicName, FilterType: "DeviceId", FilterValue: input.DeviceId}
+						deviceId := input.DeviceId
+						var deviceIds []string
+						if operator.DeploymentType == "local" {
+							deviceIds = strings.Split(input.DeviceId, ",")
+						}
+						for topicKey, topicName := range strings.Split(input.TopicName, ",") {
+							if operator.DeploymentType == "local" {
+								if len(deviceIds) > 0 {
+									deviceId = deviceIds[topicKey]
+								}
+							}
+							t := InputTopic{Name: topicName, FilterType: "DeviceId", FilterValue: deviceId}
 							for _, value := range input.Values {
 								t.Mappings = append(t.Mappings, Mapping{value.Name, value.Path})
 							}
