@@ -27,6 +27,11 @@ func processMessage(message MQTT.Message) {
 }
 
 func startOperator(input Operator, pipelineConfig PipelineConfig) {
+	for key, topic := range input.InputTopics {
+		if topic.FilterType == "OperatorId" {
+			input.InputTopics[key].Name = topic.Name + "/" + pipelineConfig.PipelineId
+		}
+	}
 	command := &ControlCommand{"startOperator", OperatorJob{ImageId: input.ImageId, InputTopics: input.InputTopics,
 		Config: FogConfig{OutputTopic: input.OutputTopic,
 			OperatorId:     input.Id,
