@@ -116,9 +116,10 @@ type ControlCommand struct {
 }
 
 type OperatorJob struct {
-	ImageId     string       `json:"imageId,omitempty"`
-	InputTopics []InputTopic `json:"inputTopics,omitempty"`
-	Config      FogConfig    `json:"config,omitempty"`
+	ImageId        string            `json:"imageId,omitempty"`
+	InputTopics    []InputTopic      `json:"inputTopics,omitempty"`
+	Config         FogConfig         `json:"config,omitempty"`
+	OperatorConfig map[string]string `json:"operatorConfig,omitempty"`
 }
 
 type FogConfig struct {

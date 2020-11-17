@@ -32,8 +32,12 @@ func startOperator(input Operator, pipelineConfig PipelineConfig) {
 			input.InputTopics[key].Name = topic.Name + "/" + pipelineConfig.PipelineId
 		}
 	}
-	command := &ControlCommand{"startOperator", OperatorJob{ImageId: input.ImageId, InputTopics: input.InputTopics,
-		Config: FogConfig{OutputTopic: input.OutputTopic,
+	command := &ControlCommand{"startOperator", OperatorJob{
+		ImageId:        input.ImageId,
+		InputTopics:    input.InputTopics,
+		OperatorConfig: input.Config,
+		Config: FogConfig{
+			OutputTopic:    input.OutputTopic,
 			OperatorId:     input.Id,
 			PipelineId:     pipelineConfig.PipelineId,
 			BaseOperatorId: input.OperatorId,
