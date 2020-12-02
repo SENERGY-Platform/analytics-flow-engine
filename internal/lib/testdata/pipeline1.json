@@ -1,0 +1,54 @@
+{
+  "flowId": "5fc6510234241789690b9d1e",
+  "image": "image",
+  "operators": {
+    "47ef81cb-fa88-45c2-99fe-ac82d57774ba": {
+      "id": "47ef81cb-fa88-45c2-99fe-ac82d57774ba",
+      "name": "adder",
+      "operatorId": "5d2da1c0de2c3100015801f3",
+      "deploymentType": "cloud",
+      "ImageId": "repo/analytics-operator-adder:dev",
+      "InputTopics": [
+        {
+          "TopicName": "analytics-adder",
+          "FilterType": "OperatorId",
+          "FilterValue": "738dc0c6-91f9-47c0-96d8-3b09c0278837",
+          "Mappings": [
+            {
+              "Source": "lastTimestamp",
+              "Dest": "timestamp"
+            }
+          ]
+        }
+      ]
+    },
+    "6fc47542-dfee-4d6e-b352-dab9c91e5aed": {
+      "id": "6fc47542-dfee-4d6e-b352-dab9c91e5aed",
+      "name": "adder",
+      "operatorId": "5d2da1c0de2c3100015801f3",
+      "deploymentType": "cloud",
+      "ImageId": "repo/analytics-operator-adder:dev",
+      "InputTopics": [
+        {
+          "TopicName": "analytics-adder",
+          "FilterType": "OperatorId",
+          "FilterValue": "738dc0c6-91f9-47c0-96d8-3b09c0278837",
+          "Mappings": [
+            {
+              "Source": "sum",
+              "Dest": "value"
+            }
+          ]
+        }
+      ]
+    },
+    "738dc0c6-91f9-47c0-96d8-3b09c0278837": {
+      "id": "738dc0c6-91f9-47c0-96d8-3b09c0278837",
+      "name": "adder",
+      "operatorId": "5d2da1c0de2c3100015801f3",
+      "deploymentType": "cloud",
+      "ImageId": "repo/analytics-operator-adder:dev",
+      "InputTopics": null
+    }
+  }
+}

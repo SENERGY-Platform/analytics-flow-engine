@@ -18,7 +18,6 @@ package lib
 
 import (
 	"fmt"
-	"strings"
 )
 
 type FlowEngine struct {
@@ -41,68 +40,9 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	pipeline.FlowId = parsedPipeline.FlowId
 	pipeline.Image = parsedPipeline.Image
 
-	//Convert parsing Schema to internal Schema
-	var tmpPipeline Pipeline
-	for _, operator := range parsedPipeline.Operators {
-		outputTopicName := operator.Name
-		if operator.DeploymentType != "local" {
-			outputTopicName = f.getOperatorOutputTopic(operator.Name)
-		}
-		op := Operator{
-			Id:             operator.Id,
-			Name:           operator.Name,
-			ImageId:        operator.ImageId,
-			OperatorId:     operator.OperatorId,
-			DeploymentType: operator.DeploymentType,
-			OutputTopic:    outputTopicName,
-		}
-		for _, topic := range operator.InputTopics {
-			top := InputTopic{Name: topic.TopicName, FilterType: topic.FilterType, FilterValue: topic.FilterValue}
-			for _, mapping := range topic.Mappings {
-				top.Mappings = append(top.Mappings, Mapping{mapping.Dest, mapping.Source})
-			}
-			op.InputTopics = append(op.InputTopics, top)
-		}
-		tmpPipeline.Operators = append(tmpPipeline.Operators, op)
-	}
+	tmpPipeline := createPipeline(parsedPipeline)
+	pipeline.Operators = addStartingOperatorConfigs(pipelineRequest, tmpPipeline)
 
-	//Add starting operators
-	for _, operator := range tmpPipeline.Operators {
-		for _, node := range pipelineRequest.Nodes {
-			if operator.Id == node.NodeId {
-				if len(node.Inputs) > 0 {
-					for _, input := range node.Inputs {
-						deviceId := input.DeviceId
-						var deviceIds []string
-						if operator.DeploymentType == "local" {
-							deviceIds = strings.Split(input.DeviceId, ",")
-						}
-						for topicKey, topicName := range strings.Split(input.TopicName, ",") {
-							if operator.DeploymentType == "local" {
-								if len(deviceIds) > 0 {
-									deviceId = deviceIds[topicKey]
-								}
-							}
-							t := InputTopic{Name: topicName, FilterType: "DeviceId", FilterValue: deviceId}
-							for _, value := range input.Values {
-								t.Mappings = append(t.Mappings, Mapping{value.Name, value.Path})
-							}
-							operator.InputTopics = append(operator.InputTopics, t)
-						}
-					}
-				}
-
-				if len(node.Config) > 0 {
-					m := make(map[string]string)
-					for _, config := range node.Config {
-						m[config.Name] = config.Value
-					}
-					operator.Config = m
-				}
-			}
-		}
-		pipeline.Operators = append(pipeline.Operators, operator)
-	}
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
 
@@ -210,9 +150,4 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 				pipeConfig)
 		}
 	}
-}
-
-func (f *FlowEngine) getOperatorOutputTopic(name string) (op_name string) {
-	op_name = "analytics-" + name
-	return
 }
