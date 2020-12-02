@@ -16,7 +16,7 @@
 
 package lib
 
-import uuid "github.com/satori/go.uuid"
+import "github.com/google/uuid"
 
 type Response struct {
 	Message string `json:"message,omitempty"`
@@ -35,6 +35,7 @@ type Pipeline struct {
 type Operator struct {
 	Id             string            `json:"id,omitempty"`
 	Name           string            `json:"name,omitempty"`
+	ApplicationId  uuid.UUID         `json:"applicationId,omitempty"`
 	ImageId        string            `json:"imageId,omitempty"`
 	DeploymentType string            `json:"deploymentType,omitempty"`
 	OperatorId     string            `json:"operatorId,omitempty"`

@@ -18,6 +18,7 @@ package lib
 
 import (
 	parsingApi "analytics-flow-engine/internal/parsing-api"
+	"github.com/google/uuid"
 	"strings"
 )
 
@@ -29,6 +30,7 @@ func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
 		}
 		op := Operator{
 			Id:             operator.Id,
+			ApplicationId:  uuid.New(),
 			Name:           operator.Name,
 			ImageId:        operator.ImageId,
 			OperatorId:     operator.OperatorId,

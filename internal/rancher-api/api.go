@@ -42,7 +42,7 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, pipeConfi
 	config, _ := json.Marshal(lib.OperatorRequestConfig{Config: input.Config, InputTopics: input.InputTopics})
 	env := map[string]string{
 		"ZK_QUORUM":                         r.zookeeper,
-		"CONFIG_APPLICATION_ID":             "analytics-" + pipelineId + "-" + input.Id,
+		"CONFIG_APPLICATION_ID":             "analytics-" + input.ApplicationId.String(),
 		"PIPELINE_ID":                       pipelineId,
 		"OPERATOR_ID":                       input.Id,
 		"WINDOW_TIME":                       strconv.Itoa(pipeConfig.WindowTime),
@@ -106,7 +106,7 @@ func (r Rancher) CreateOperators(pipelineId string, inputs []lib.Operator, pipeC
 		config, _ := json.Marshal(lib.OperatorRequestConfig{Config: input.Config, InputTopics: input.InputTopics})
 		env := map[string]string{
 			"ZK_QUORUM":                         r.zookeeper,
-			"CONFIG_APPLICATION_ID":             "analytics-" + pipelineId + "-" + input.Id,
+			"CONFIG_APPLICATION_ID":             "analytics-" + input.ApplicationId.String(),
 			"PIPELINE_ID":                       pipelineId,
 			"OPERATOR_ID":                       input.Id,
 			"WINDOW_TIME":                       strconv.Itoa(pipeConfig.WindowTime),
