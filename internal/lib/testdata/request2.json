@@ -1,0 +1,71 @@
+{
+  "id": "5fc6510234241789690b9d1e",
+  "name": "Test",
+  "description": "",
+  "nodes": [
+    {
+      "nodeId": "738dc0c6-91f9-47c0-96d8-3b09c0278837",
+      "inputs": [
+        {
+          "deviceId": "1",
+          "values": [
+            {
+              "name": "timestamp",
+              "path": "value.root.time"
+            }
+          ],
+          "topicName": "device1"
+        },
+        {
+          "deviceId": "2",
+          "values": [
+            {
+              "name": "value",
+              "path": "CHANGED"
+            }
+          ],
+          "topicName": "device2"
+        }
+      ],
+      "config": [],
+      "deploymentType": "cloud"
+    },
+    {
+      "nodeId": "6fc47542-dfee-4d6e-b352-dab9c91e5aed",
+      "inputs": [
+        {
+          "deviceId": "3",
+          "values": [
+            {
+              "name": "timestamp",
+              "path": "value.root.time"
+            }
+          ],
+          "topicName": "device3"
+        }
+      ],
+      "config": [],
+      "deploymentType": "cloud"
+    },
+    {
+      "nodeId": "47ef81cb-fa88-45c2-99fe-ac82d57774ba",
+      "inputs": [
+        {
+          "deviceId": "4",
+          "values": [
+            {
+              "name": "value",
+              "path": "value.root.OBIS_16_7.value"
+            }
+          ],
+          "topicName": "device4"
+        }
+      ],
+      "config": [],
+      "deploymentType": "cloud"
+    }
+  ],
+  "windowTime": 30,
+  "metrics": false,
+  "consumeAllMessages": false
+}

@@ -67,7 +67,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 		log.Println(err.Error())
 		return
 	}
-	//pipeline.Operators = addStartingOperatorConfigs(pipelineRequest, tmpPipeline)
+	pipeline.Operators = addStartingOperatorConfigs(pipelineRequest, pipeline)
 
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
