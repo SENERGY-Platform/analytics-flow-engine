@@ -33,15 +33,16 @@ type Pipeline struct {
 }
 
 type Operator struct {
-	Id             string            `json:"id,omitempty"`
-	Name           string            `json:"name,omitempty"`
-	ApplicationId  uuid.UUID         `json:"applicationId,omitempty"`
-	ImageId        string            `json:"imageId,omitempty"`
-	DeploymentType string            `json:"deploymentType,omitempty"`
-	OperatorId     string            `json:"operatorId,omitempty"`
-	Config         map[string]string `json:"config,omitempty"`
-	OutputTopic    string            `json:"outputTopic,omitempty"`
-	InputTopics    []InputTopic
+	Id              string            `json:"id,omitempty"`
+	Name            string            `json:"name,omitempty"`
+	ApplicationId   uuid.UUID         `json:"applicationId,omitempty"`
+	ImageId         string            `json:"imageId,omitempty"`
+	DeploymentType  string            `json:"deploymentType,omitempty"`
+	OperatorId      string            `json:"operatorId,omitempty"`
+	Config          map[string]string `json:"config,omitempty"`
+	OutputTopic     string            `json:"outputTopic,omitempty"`
+	InputTopics     []InputTopic
+	InputSelections []InputSelection `json:"inputSelections,omitempty"`
 }
 
 type OperatorRequestConfig struct {
@@ -73,6 +74,7 @@ type Metrics struct {
 
 type PipelineRequest struct {
 	Id                 string         `json:"id,omitempty"`
+	FlowId             string         `json:"flowId,omitempty"`
 	Name               string         `json:"name,omitempty"`
 	Description        string         `json:"description,omitempty"`
 	WindowTime         int            `json:"windowTime,omitempty"`
@@ -82,14 +84,23 @@ type PipelineRequest struct {
 }
 
 type PipelineNode struct {
-	NodeId string       `json:"nodeId, omitempty"`
-	Inputs []NodeInput  `json:"inputs,omitempty"`
-	Config []NodeConfig `json:"config,omitempty"`
+	NodeId          string           `json:"nodeId, omitempty"`
+	Inputs          []NodeInput      `json:"inputs,omitempty"`
+	Config          []NodeConfig     `json:"config,omitempty"`
+	InputSelections []InputSelection `json:"inputSelections,omitempty"`
 }
 
 type NodeConfig struct {
 	Name  string `json:"name,omitempty"`
 	Value string `json:"value,omitempty"`
+}
+
+type InputSelection struct {
+	InputName         string   `json:"inputName,omitempty"`
+	AspectId          string   `json:"aspectId,omitempty"`
+	FunctionId        string   `json:"functionId,omitempty"`
+	CharacteristicIds []string `json:"characteristicIds,omitempty"`
+	SelectableId      string   `json:"selectableId,omitempty"`
 }
 
 type NodeInput struct {

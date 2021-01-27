@@ -65,6 +65,7 @@ func CreateServer() {
 	router.HandleFunc("/", e.getRootEndpoint).Methods("GET")
 	router.HandleFunc("/pipeline/{id}", e.getPipelineStatus).Methods("GET")
 	router.HandleFunc("/pipeline", e.startPipeline).Methods("POST")
+	router.HandleFunc("/pipeline", e.updatePipeline).Methods("PUT")
 	router.HandleFunc("/pipeline/{id}", e.deletePipeline).Methods("DELETE")
 	c := cors.New(
 		cors.Options{

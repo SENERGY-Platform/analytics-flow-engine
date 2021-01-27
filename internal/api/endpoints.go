@@ -54,16 +54,32 @@ func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request) {
 
 func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(req.Body)
-	var pipe_req lib.PipelineRequest
-	err := decoder.Decode(&pipe_req)
+	var pipeReq lib.PipelineRequest
+	err := decoder.Decode(&pipeReq)
 	if err != nil {
 		fmt.Println(err)
 	}
 	defer req.Body.Close()
-	ret := e.engine.StartPipeline(pipe_req, e.getUserId(req), req.Header.Get("Authorization"))
+	ret := e.engine.StartPipeline(pipeReq, e.getUserId(req), req.Header.Get("Authorization"))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(ret)
+}
+
+func (e *Endpoint) updatePipeline(w http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(req.Body)
+	var pipeReq lib.PipelineRequest
+	err := decoder.Decode(&pipeReq)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer func() {
+		_ = req.Body.Close()
+	}()
+	ret := e.engine.UpdatePipeline(pipeReq, e.getUserId(req), req.Header.Get("Authorization"))
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(ret)
 }
 
 func (e *Endpoint) deletePipeline(w http.ResponseWriter, req *http.Request) {

@@ -18,6 +18,7 @@ package lib
 
 import (
 	"fmt"
+	"log"
 )
 
 type FlowEngine struct {
@@ -33,9 +34,10 @@ func NewFlowEngine(driver Driver, parsingService ParsingApiService, metricsServi
 // Starts a pipeline
 func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, authorization string) (pipeline Pipeline) {
 	//Get parsed pipeline
-	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.Id, userId, authorization)
+	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, authorization)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err.Error())
+		return
 	}
 	pipeline.FlowId = parsedPipeline.FlowId
 	pipeline.Image = parsedPipeline.Image
@@ -45,37 +47,67 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
+	pipeline.Metrics.Enabled = pipelineRequest.Metrics
+	if pipeline.Metrics.Enabled {
+		pipeline = f.registerMetrics(pipeline)
+	}
 
 	pipeline.Id, _ = registerPipeline(&pipeline, userId, authorization)
 
-	pipeline.Metrics.Enabled = pipelineRequest.Metrics
-	if pipeline.Metrics.Enabled {
-		metricsConfig, err := f.metricsService.RegisterPipeline(pipeline.Id.String())
-		if err != nil {
-			fmt.Println(err)
-		}
-		pipeline.Metrics.Database = metricsConfig.Database
-		pipeline.Metrics.Username = metricsConfig.Username
-		pipeline.Metrics.Password = metricsConfig.Password
-		pipeline.Metrics.Url = metricsConfig.Url
-		pipeline.Metrics.Interval = metricsConfig.Interval
-		pipeline.Metrics.XmlUrl = metricsConfig.XmlUrl
-	}
-
-	var pipeConfig = PipelineConfig{
-		WindowTime:     pipelineRequest.WindowTime,
-		FlowId:         pipelineRequest.Id,
-		ConsumerOffset: "latest",
-		PipelineId:     pipeline.Id.String(),
-		Metrics:        pipeline.Metrics,
-	}
-	if pipelineRequest.ConsumeAllMessages {
-		pipeConfig.ConsumerOffset = "earliest"
-	}
+	pipeConfig := f.createPipelineConfig(pipelineRequest, pipeline)
 
 	f.startOperators(pipeline, pipeConfig)
 
 	return pipeline
+}
+
+func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId string, authorization string) (pipeline Pipeline) {
+	pipeline, err := getPipeline(pipelineRequest.Id, userId, authorization)
+	if err != nil {
+		log.Println(err.Error())
+		return
+	}
+	//pipeline.Operators = addStartingOperatorConfigs(pipelineRequest, tmpPipeline)
+
+	pipeline.Name = pipelineRequest.Name
+	pipeline.Description = pipelineRequest.Description
+	if pipeline.Metrics.Enabled != pipelineRequest.Metrics {
+		pipeline.Metrics.Enabled = pipelineRequest.Metrics
+		if pipeline.Metrics.Enabled {
+			pipeline = f.registerMetrics(pipeline)
+		} else {
+			err = f.metricsService.UnregisterPipeline(pipeline.Id.String())
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}
+	for _, operator := range pipeline.Operators {
+		switch operator.DeploymentType {
+		case "local":
+			fmt.Println("stop local Operator: " + operator.Name)
+			stopOperator(pipeline.Id.String(),
+				operator)
+			break
+		default:
+			err := f.driver.DeleteOperator(f.driver.GetOperatorName(pipeline.Id.String(), operator)[0])
+			if err != nil {
+				fmt.Println(err)
+				err := f.driver.DeleteOperator(f.driver.GetOperatorName(pipeline.Id.String(), operator)[1])
+				if err != nil {
+					fmt.Println(err)
+				}
+			}
+		}
+	}
+
+	pipeConfig := f.createPipelineConfig(pipelineRequest, pipeline)
+
+	f.startOperators(pipeline, pipeConfig)
+
+	_ = updatePipeline(&pipeline, userId, authorization)
+
+	return
 }
 
 func (f *FlowEngine) DeletePipeline(id string, userId string, authorization string) string {
@@ -150,4 +182,32 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 				pipeConfig)
 		}
 	}
+}
+
+func (f *FlowEngine) createPipelineConfig(pipelineRequest PipelineRequest, pipeline Pipeline) PipelineConfig {
+	var pipeConfig = PipelineConfig{
+		WindowTime:     pipelineRequest.WindowTime,
+		FlowId:         pipelineRequest.FlowId,
+		ConsumerOffset: "latest",
+		PipelineId:     pipeline.Id.String(),
+		Metrics:        pipeline.Metrics,
+	}
+	if pipelineRequest.ConsumeAllMessages {
+		pipeConfig.ConsumerOffset = "earliest"
+	}
+	return pipeConfig
+}
+
+func (f *FlowEngine) registerMetrics(pipeline Pipeline) Pipeline {
+	metricsConfig, err := f.metricsService.RegisterPipeline(pipeline.Id.String())
+	if err != nil {
+		fmt.Println(err)
+	}
+	pipeline.Metrics.Database = metricsConfig.Database
+	pipeline.Metrics.Username = metricsConfig.Username
+	pipeline.Metrics.Password = metricsConfig.Password
+	pipeline.Metrics.Url = metricsConfig.Url
+	pipeline.Metrics.Interval = metricsConfig.Interval
+	pipeline.Metrics.XmlUrl = metricsConfig.XmlUrl
+	return pipeline
 }

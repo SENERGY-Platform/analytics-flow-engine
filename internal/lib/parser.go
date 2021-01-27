@@ -53,6 +53,7 @@ func addStartingOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pip
 	for _, operator := range tmpPipeline.Operators {
 		for _, node := range pipelineRequest.Nodes {
 			if operator.Id == node.NodeId {
+				operator.InputSelections = node.InputSelections
 				if len(node.Inputs) > 0 {
 					for _, input := range node.Inputs {
 						deviceId := input.DeviceId

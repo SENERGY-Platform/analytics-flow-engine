@@ -53,6 +53,20 @@ func registerPipeline(pipeline *Pipeline, userId string, authorization string) (
 	return
 }
 
+func updatePipeline(pipeline *Pipeline, userId string, authorization string) (err error) {
+	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
+	request := gorequest.New()
+	request.Put(pipelineServiceUrl+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization).Send(pipeline)
+	resp, body, e := request.End()
+	if resp.StatusCode != http.StatusOK {
+		err = errors.New("could not register pipeline at pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
+	}
+	if len(e) > 0 {
+		err = errors.New("could not register pipeline at pipeline registry: an error occurred")
+	}
+	return
+}
+
 func getPipeline(id string, userId string, authorization string) (pipe Pipeline, err error) {
 	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
 	request := gorequest.New()
