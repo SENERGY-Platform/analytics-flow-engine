@@ -109,6 +109,9 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 		}
 	}
 
+	// give the backend some time to delete the operators
+	time.Sleep(3 * time.Second)
+
 	pipeConfig := f.createPipelineConfig(pipeline)
 
 	f.startOperators(pipeline, pipeConfig)
