@@ -32,11 +32,10 @@ func NewFlowEngine(driver Driver, parsingService ParsingApiService, metricsServi
 }
 
 // Starts a pipeline
-func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, authorization string) (pipeline Pipeline) {
+func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, authorization string) (pipeline Pipeline, err error) {
 	//Get parsed pipeline
 	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, authorization)
 	if err != nil {
-		log.Println(err.Error())
 		return
 	}
 	pipeline.FlowId = parsedPipeline.FlowId
@@ -51,18 +50,23 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	pipeline.Description = pipelineRequest.Description
 	pipeline.Metrics = pipelineRequest.Metrics
 	if pipeline.Metrics {
-		pipeline = f.registerMetrics(pipeline)
+		err = f.registerMetrics(&pipeline)
+		if err != nil {
+			return
+		}
 	}
-	pipeline.Id, _ = registerPipeline(&pipeline, userId, authorization)
+	pipeline.Id, err = registerPipeline(&pipeline, userId, authorization)
+	if err != nil {
+		return
+	}
 	pipeConfig := f.createPipelineConfig(pipeline)
 	f.startOperators(pipeline, pipeConfig)
-	return pipeline
+	return
 }
 
-func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId string, authorization string) (pipeline Pipeline) {
-	pipeline, err := getPipeline(pipelineRequest.Id, userId, authorization)
+func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId string, authorization string) (pipeline Pipeline, err error) {
+	pipeline, err = getPipeline(pipelineRequest.Id, userId, authorization)
 	if err != nil {
-		log.Println(err.Error())
 		return
 	}
 	pipeline.Operators = addStartingOperatorConfigs(pipelineRequest, pipeline)
@@ -75,11 +79,14 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	if pipeline.Metrics != pipelineRequest.Metrics {
 		pipeline.Metrics = pipelineRequest.Metrics
 		if pipeline.Metrics {
-			pipeline = f.registerMetrics(pipeline)
+			err = f.registerMetrics(&pipeline)
+			if err != nil {
+				return
+			}
 		} else {
 			err = f.metricsService.UnregisterPipeline(pipeline.Id.String())
 			if err != nil {
-				log.Println(err)
+				return
 			}
 		}
 	}
@@ -106,16 +113,16 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 
 	f.startOperators(pipeline, pipeConfig)
 
-	_ = updatePipeline(&pipeline, userId, authorization)
+	err = updatePipeline(&pipeline, userId, authorization)
 
 	return
 }
 
-func (f *FlowEngine) DeletePipeline(id string, userId string, authorization string) string {
-	println("Deleting Pipeline:" + id)
-	var pipeline, err = getPipeline(id, userId, authorization)
+func (f *FlowEngine) DeletePipeline(id string, userId string, authorization string) (err error) {
+	log.Println("engine - delete pipeline: " + id)
+	pipeline, err := getPipeline(id, userId, authorization)
 	if err != nil {
-		log.Println(err)
+		return
 	}
 	for _, operator := range pipeline.Operators {
 		switch operator.DeploymentType {
@@ -137,15 +144,15 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, authorization stri
 	}
 	err = deletePipeline(id, userId, authorization)
 	if err != nil {
-		log.Println(err)
+		return
 	}
 	if pipeline.Metrics == true {
 		err = f.metricsService.UnregisterPipeline(pipeline.Id.String())
 		if err != nil {
-			log.Println(err)
+			return
 		}
 	}
-	return "done"
+	return
 }
 
 func (f *FlowEngine) GetPipelineStatus(id string) string {
@@ -204,10 +211,10 @@ func (f *FlowEngine) createPipelineConfig(pipeline Pipeline) PipelineConfig {
 	return pipeConfig
 }
 
-func (f *FlowEngine) registerMetrics(pipeline Pipeline) Pipeline {
+func (f *FlowEngine) registerMetrics(pipeline *Pipeline) (err error) {
 	metricsConfig, err := f.metricsService.RegisterPipeline(pipeline.Id.String())
 	if err != nil {
-		log.Println(err)
+		return
 	}
 	pipeline.MetricsData.Database = metricsConfig.Database
 	pipeline.MetricsData.Username = metricsConfig.Username
@@ -215,5 +222,5 @@ func (f *FlowEngine) registerMetrics(pipeline Pipeline) Pipeline {
 	pipeline.MetricsData.Url = metricsConfig.Url
 	pipeline.MetricsData.Interval = metricsConfig.Interval
 	pipeline.MetricsData.XmlUrl = metricsConfig.XmlUrl
-	return pipeline
+	return
 }

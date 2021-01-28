@@ -41,15 +41,14 @@ func NewEndpoint(driver lib.Driver, parsingService lib.ParsingApiService, metric
 func (e *Endpoint) getRootEndpoint(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	json.NewEncoder(w).Encode(lib.Response{"OK"})
+	_ = json.NewEncoder(w).Encode(lib.Response{Message: "OK"})
 }
 
 func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
-	ret := e.engine.GetPipelineStatus(vars["id"])
+	_ = e.engine.GetPipelineStatus(vars["id"])
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	json.NewEncoder(w).Encode(lib.Response{ret})
 }
 
 func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
@@ -59,11 +58,17 @@ func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Println(err)
 	}
-	defer req.Body.Close()
-	ret := e.engine.StartPipeline(pipeReq, e.getUserId(req), req.Header.Get("Authorization"))
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(ret)
+	defer func() {
+		_ = req.Body.Close()
+	}()
+	ret, err := e.engine.StartPipeline(pipeReq, e.getUserId(req), req.Header.Get("Authorization"))
+	if err != nil {
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(ret)
+	}
 }
 
 func (e *Endpoint) updatePipeline(w http.ResponseWriter, req *http.Request) {
@@ -76,18 +81,27 @@ func (e *Endpoint) updatePipeline(w http.ResponseWriter, req *http.Request) {
 	defer func() {
 		_ = req.Body.Close()
 	}()
-	ret := e.engine.UpdatePipeline(pipeReq, e.getUserId(req), req.Header.Get("Authorization"))
+	ret, err := e.engine.UpdatePipeline(pipeReq, e.getUserId(req), req.Header.Get("Authorization"))
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(ret)
+	if err != nil {
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(ret)
+	}
 }
 
 func (e *Endpoint) deletePipeline(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
-	ret := e.engine.DeletePipeline(vars["id"], e.getUserId(req), req.Header.Get("Authorization"))
+	err := e.engine.DeletePipeline(vars["id"], e.getUserId(req), req.Header.Get("Authorization"))
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	json.NewEncoder(w).Encode(lib.Response{ret})
+	if err != nil {
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 func (e *Endpoint) getUserId(req *http.Request) (userId string) {
