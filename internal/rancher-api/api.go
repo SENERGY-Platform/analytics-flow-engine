@@ -76,14 +76,14 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, pipeConfi
 			Labels:      labels,
 		},
 	}
-	if pipeConfig.Metrics.Enabled {
-		env["METRICS_URL"] = pipeConfig.Metrics.Url
-		env["METRICS_USER"] = pipeConfig.Metrics.Username
-		env["METRICS_PASSWORD"] = pipeConfig.Metrics.Password
-		env["METRICS_INTERVAL"] = pipeConfig.Metrics.Interval
+	if pipeConfig.Metrics {
+		env["METRICS_URL"] = pipeConfig.MetricsData.Url
+		env["METRICS_USER"] = pipeConfig.MetricsData.Username
+		env["METRICS_PASSWORD"] = pipeConfig.MetricsData.Password
+		env["METRICS_INTERVAL"] = pipeConfig.MetricsData.Interval
 		reqBody.LaunchConfig.Command = []string{
 			"java",
-			"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
+			"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.MetricsData.XmlUrl,
 			"-jar",
 			"/opt/operator.jar",
 		}
@@ -134,14 +134,14 @@ func (r Rancher) CreateOperators(pipelineId string, inputs []lib.Operator, pipeC
 			Labels:      labels,
 		}
 
-		if pipeConfig.Metrics.Enabled {
-			env["METRICS_URL"] = pipeConfig.Metrics.Url
-			env["METRICS_USER"] = pipeConfig.Metrics.Username
-			env["METRICS_PASSWORD"] = pipeConfig.Metrics.Password
-			env["METRICS_INTERVAL"] = pipeConfig.Metrics.Interval
+		if pipeConfig.Metrics {
+			env["METRICS_URL"] = pipeConfig.MetricsData.Url
+			env["METRICS_USER"] = pipeConfig.MetricsData.Username
+			env["METRICS_PASSWORD"] = pipeConfig.MetricsData.Password
+			env["METRICS_INTERVAL"] = pipeConfig.MetricsData.Interval
 			launchConfig.Command = []string{
 				"java",
-				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
+				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.MetricsData.XmlUrl,
 				"-jar",
 				"/opt/operator.jar",
 			}

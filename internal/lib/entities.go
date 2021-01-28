@@ -23,13 +23,16 @@ type Response struct {
 }
 
 type Pipeline struct {
-	Id          uuid.UUID `json:"id,omitempty"`
-	FlowId      string    `json:"flowId,omitempty"`
-	Name        string    `json:"name,omitempty"`
-	Description string    `json:"description,omitempty"`
-	Image       string    `json:"image,omitempty"`
-	Metrics     Metrics
-	Operators   []Operator `json:"operators,omitempty"`
+	Id                 uuid.UUID  `json:"id,omitempty"`
+	FlowId             string     `json:"flowId,omitempty"`
+	Name               string     `json:"name,omitempty"`
+	Description        string     `json:"description,omitempty"`
+	Image              string     `json:"image,omitempty"`
+	WindowTime         int        `json:"windowTime,omitempty"`
+	ConsumeAllMessages bool       `json:"consumeAllMessages,omitempty"`
+	Metrics            bool       `json:"metrics,omitempty"`
+	MetricsData        Metrics    `json:"metricsData,omitempty"`
+	Operators          []Operator `json:"operators,omitempty"`
 }
 
 type Operator struct {
@@ -63,7 +66,6 @@ type Mapping struct {
 }
 
 type Metrics struct {
-	Enabled  bool
 	Database string `json:"database,omitempty"`
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
@@ -116,7 +118,8 @@ type NodeValue struct {
 
 type PipelineConfig struct {
 	WindowTime     int
-	Metrics        Metrics
+	Metrics        bool
+	MetricsData    Metrics
 	ConsumerOffset string
 	FlowId         string
 	PipelineId     string

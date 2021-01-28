@@ -41,23 +41,21 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	}
 	pipeline.FlowId = parsedPipeline.FlowId
 	pipeline.Image = parsedPipeline.Image
+	pipeline.WindowTime = pipelineRequest.WindowTime
+	pipeline.ConsumeAllMessages = pipelineRequest.ConsumeAllMessages
 
 	tmpPipeline := createPipeline(parsedPipeline)
 	pipeline.Operators = addStartingOperatorConfigs(pipelineRequest, tmpPipeline)
 
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
-	pipeline.Metrics.Enabled = pipelineRequest.Metrics
-	if pipeline.Metrics.Enabled {
+	pipeline.Metrics = pipelineRequest.Metrics
+	if pipeline.Metrics {
 		pipeline = f.registerMetrics(pipeline)
 	}
-
-	pipeline.Id, _ = registerPipeline(&pipeline, userId, authorization)
-
-	pipeConfig := f.createPipelineConfig(pipelineRequest, pipeline)
-
+	pipeConfig := f.createPipelineConfig(pipeline)
 	f.startOperators(pipeline, pipeConfig)
-
+	pipeline.Id, _ = registerPipeline(&pipeline, userId, authorization)
 	return pipeline
 }
 
@@ -71,9 +69,12 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
-	if pipeline.Metrics.Enabled != pipelineRequest.Metrics {
-		pipeline.Metrics.Enabled = pipelineRequest.Metrics
-		if pipeline.Metrics.Enabled {
+	pipeline.WindowTime = pipelineRequest.WindowTime
+	pipeline.ConsumeAllMessages = pipelineRequest.ConsumeAllMessages
+
+	if pipeline.Metrics != pipelineRequest.Metrics {
+		pipeline.Metrics = pipelineRequest.Metrics
+		if pipeline.Metrics {
 			pipeline = f.registerMetrics(pipeline)
 		} else {
 			err = f.metricsService.UnregisterPipeline(pipeline.Id.String())
@@ -101,7 +102,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 		}
 	}
 
-	pipeConfig := f.createPipelineConfig(pipelineRequest, pipeline)
+	pipeConfig := f.createPipelineConfig(pipeline)
 
 	f.startOperators(pipeline, pipeConfig)
 
@@ -138,7 +139,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, authorization stri
 	if err != nil {
 		fmt.Println(err)
 	}
-	if pipeline.Metrics.Enabled == true {
+	if pipeline.Metrics == true {
 		err = f.metricsService.UnregisterPipeline(pipeline.Id.String())
 		if err != nil {
 			fmt.Println(err)
@@ -184,15 +185,16 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 	}
 }
 
-func (f *FlowEngine) createPipelineConfig(pipelineRequest PipelineRequest, pipeline Pipeline) PipelineConfig {
+func (f *FlowEngine) createPipelineConfig(pipeline Pipeline) PipelineConfig {
 	var pipeConfig = PipelineConfig{
-		WindowTime:     pipelineRequest.WindowTime,
-		FlowId:         pipelineRequest.FlowId,
+		WindowTime:     pipeline.WindowTime,
+		FlowId:         pipeline.FlowId,
 		ConsumerOffset: "latest",
-		PipelineId:     pipeline.Id.String(),
 		Metrics:        pipeline.Metrics,
+		PipelineId:     pipeline.Id.String(),
+		MetricsData:    pipeline.MetricsData,
 	}
-	if pipelineRequest.ConsumeAllMessages {
+	if pipeline.ConsumeAllMessages {
 		pipeConfig.ConsumerOffset = "earliest"
 	}
 	return pipeConfig
@@ -203,11 +205,11 @@ func (f *FlowEngine) registerMetrics(pipeline Pipeline) Pipeline {
 	if err != nil {
 		fmt.Println(err)
 	}
-	pipeline.Metrics.Database = metricsConfig.Database
-	pipeline.Metrics.Username = metricsConfig.Username
-	pipeline.Metrics.Password = metricsConfig.Password
-	pipeline.Metrics.Url = metricsConfig.Url
-	pipeline.Metrics.Interval = metricsConfig.Interval
-	pipeline.Metrics.XmlUrl = metricsConfig.XmlUrl
+	pipeline.MetricsData.Database = metricsConfig.Database
+	pipeline.MetricsData.Username = metricsConfig.Username
+	pipeline.MetricsData.Password = metricsConfig.Password
+	pipeline.MetricsData.Url = metricsConfig.Url
+	pipeline.MetricsData.Interval = metricsConfig.Interval
+	pipeline.MetricsData.XmlUrl = metricsConfig.XmlUrl
 	return pipeline
 }

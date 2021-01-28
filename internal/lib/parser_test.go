@@ -34,10 +34,8 @@ func TestParser_createPipeline(t *testing.T) {
 	}
 	id, _ := uuid.Parse("00000000-0000-0000-0000-000000000000")
 	var expected = Pipeline{
-		Id: id,
-		Metrics: Metrics{
-			Enabled: false,
-		},
+		Id:      id,
+		Metrics: false,
 		Operators: []Operator{
 			{
 				Id:             "6fc47542-dfee-4d6e-b352-dab9c91e5aed",
@@ -111,10 +109,8 @@ func TestParser_createPipeline(t *testing.T) {
 func TestParser_addStartingOperatorConfigs(t *testing.T) {
 	id, _ := uuid.Parse("00000000-0000-0000-0000-000000000000")
 	var expected = Pipeline{
-		Id: id,
-		Metrics: Metrics{
-			Enabled: false,
-		},
+		Id:      id,
+		Metrics: false,
 		Operators: []Operator{
 			{
 				Id:             "6fc47542-dfee-4d6e-b352-dab9c91e5aed",
@@ -241,10 +237,8 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 	id, _ := uuid.Parse("00000000-0000-0000-0000-000000000000")
 	var expected = Pipeline{
-		Id: id,
-		Metrics: Metrics{
-			Enabled: false,
-		},
+		Id:      id,
+		Metrics: false,
 		Operators: []Operator{
 			{
 				Id:             "6fc47542-dfee-4d6e-b352-dab9c91e5aed",

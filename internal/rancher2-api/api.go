@@ -74,11 +74,11 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 		Labels:     map[string]string{"op": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId},
 		Selector:   Selector{MatchLabels: map[string]string{"op": operator.Id}},
 	}
-	if pipeConfig.Metrics.Enabled {
-		env["METRICS_URL"] = pipeConfig.Metrics.Url
-		env["METRICS_USER"] = pipeConfig.Metrics.Username
-		env["METRICS_PASSWORD"] = pipeConfig.Metrics.Password
-		env["METRICS_INTERVAL"] = pipeConfig.Metrics.Interval
+	if pipeConfig.Metrics {
+		env["METRICS_URL"] = pipeConfig.MetricsData.Url
+		env["METRICS_USER"] = pipeConfig.MetricsData.Username
+		env["METRICS_PASSWORD"] = pipeConfig.MetricsData.Password
+		env["METRICS_INTERVAL"] = pipeConfig.MetricsData.Interval
 		reqBody.Containers = []Container{{
 			Image:           operator.ImageId,
 			Name:            r.GetOperatorName(pipelineId, operator)[0],
@@ -86,7 +86,7 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 			ImagePullPolicy: "Always",
 			Command: []string{
 				"java",
-				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
+				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.MetricsData.XmlUrl,
 				"-jar",
 				"/opt/operator.jar",
 			},
@@ -126,14 +126,14 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 		if operator.OutputTopic != "" {
 			env["OUTPUT"] = operator.OutputTopic
 		}
-		if pipeConfig.Metrics.Enabled {
-			env["METRICS_URL"] = pipeConfig.Metrics.Url
-			env["METRICS_USER"] = pipeConfig.Metrics.Username
-			env["METRICS_PASSWORD"] = pipeConfig.Metrics.Password
-			env["METRICS_INTERVAL"] = pipeConfig.Metrics.Interval
+		if pipeConfig.Metrics {
+			env["METRICS_URL"] = pipeConfig.MetricsData.Url
+			env["METRICS_USER"] = pipeConfig.MetricsData.Username
+			env["METRICS_PASSWORD"] = pipeConfig.MetricsData.Password
+			env["METRICS_INTERVAL"] = pipeConfig.MetricsData.Interval
 			container.Command = []string{
 				"java",
-				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.Metrics.XmlUrl,
+				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.MetricsData.XmlUrl,
 				"-jar",
 				"/opt/operator.jar",
 			}
