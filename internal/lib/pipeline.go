@@ -37,16 +37,16 @@ func registerPipeline(pipeline *Pipeline, userId string, authorization string) (
 	request.Post(pipelineServiceUrl+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization).Send(pipeline)
 	resp, body, e := request.End()
 	if resp.StatusCode != http.StatusOK {
-		err = errors.New("could not register pipeline at pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		err = errors.New("pipeline API - could not register pipeline at pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
 		return
 	}
 	if len(e) > 0 {
-		err = errors.New("could not register pipeline at pipeline registry: an error occurred")
+		err = errors.New("pipeline API - could not register pipeline at pipeline registry: an error occurred")
 		return
 	}
 	var res PipelineResponse
 	if err = json.Unmarshal([]byte(body), &res); err != nil {
-		err = errors.New("could not parse pipeline response: " + err.Error())
+		err = errors.New("pipeline API - could not parse pipeline response: " + err.Error())
 		return
 	}
 	id = res.Id
@@ -59,10 +59,10 @@ func updatePipeline(pipeline *Pipeline, userId string, authorization string) (er
 	request.Put(pipelineServiceUrl+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization).Send(pipeline)
 	resp, body, e := request.End()
 	if resp.StatusCode != http.StatusOK {
-		err = errors.New("could not register pipeline at pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		err = errors.New("pipeline API - could not register pipeline at pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
 	}
 	if len(e) > 0 {
-		err = errors.New("could not register pipeline at pipeline registry: an error occurred")
+		err = errors.New("pipeline API - could not register pipeline at pipeline registry: an error occurred")
 	}
 	return
 }
@@ -74,10 +74,10 @@ func getPipeline(id string, userId string, authorization string) (pipe Pipeline,
 	resp, body, e := request.End()
 
 	if resp.StatusCode != 200 {
-		err = errors.New("could not get pipeline from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		err = errors.New("pipeline API - could not get pipeline from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
 	}
 	if len(e) > 0 {
-		err = errors.New("could not get pipeline from pipeline registry: an error occurred")
+		err = errors.New("pipeline API - could not get pipeline from pipeline registry: an error occurred")
 		return
 	}
 	err = json.Unmarshal([]byte(body), &pipe)
@@ -94,10 +94,10 @@ func deletePipeline(id string, userId string, authorization string) (err error) 
 	request.Delete(pipelineServiceUrl+"/pipeline/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
 	resp, body, e := request.End()
 	if resp.StatusCode != 200 {
-		err = errors.New("could not delete pipeline from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		err = errors.New("pipeline API - could not delete pipeline from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
 	}
 	if len(e) > 0 {
-		err = errors.New("could not delete pipeline from pipeline registry: an error occurred")
+		err = errors.New("pipeline API - could not delete pipeline from pipeline registry: an error occurred")
 		return
 	}
 	return

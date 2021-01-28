@@ -19,7 +19,7 @@ package lib
 import (
 	"crypto/tls"
 	"flag"
-	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"time"
@@ -67,9 +67,9 @@ func ConnectMQTTBroker() {
 
 	client = MQTT.NewClient(connOpts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		fmt.Printf("local deployment not working: %s\n", token.Error())
+		log.Printf("local deployment not working: %s\n", token.Error())
 	} else {
-		fmt.Printf("Connected to %s\n", *server)
+		log.Printf("Connected to %s\n", *server)
 	}
 }
 
@@ -78,7 +78,7 @@ func publishMessage(topic string, message string) {
 }
 
 func onMessageReceived(client MQTT.Client, message MQTT.Message) {
-	fmt.Printf("Received message on topic: %s\nMessage: %s\n", message.Topic(), message.Payload())
+	log.Printf("Received message on topic: %s\nMessage: %s\n", message.Topic(), message.Payload())
 	go processMessage(message)
 }
 

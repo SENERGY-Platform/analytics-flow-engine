@@ -38,16 +38,16 @@ func (a MetricsApi) RegisterPipeline(id string) (metricsConfig MetricsConfig, er
 	metricApiRequest := gorequest.New().TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e := metricApiRequest.Post(a.url + "/pipelines/" + id).End()
 	if resp.StatusCode != http.StatusCreated {
-		err = errors.New("could not create metrics service: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		err = errors.New("metrics API - could not create metrics service: " + strconv.Itoa(resp.StatusCode) + " " + body)
 		return
 	}
 	if len(e) > 0 {
-		err = errors.New("could not create metrics service: an error occurred")
+		err = errors.New("metrics API - could not create metrics service: an error occurred")
 		return
 	}
 	err = json.Unmarshal([]byte(body), &metricsConfig)
 	if err != nil {
-		err = errors.New("could not unmarshal metrics api response: " + err.Error())
+		err = errors.New("metrics API - could not unmarshal metrics api response: " + err.Error())
 		return
 	}
 
@@ -58,11 +58,11 @@ func (a MetricsApi) UnregisterPipeline(id string) (err error) {
 	metricApiRequest := gorequest.New().TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e := metricApiRequest.Delete(a.url + "/pipelines/" + id).End()
 	if resp.StatusCode != http.StatusOK {
-		err = errors.New("could not delete metrics from metrics service: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		err = errors.New("metrics API - could not delete metrics from metrics service: " + strconv.Itoa(resp.StatusCode) + " " + body)
 		return
 	}
 	if len(e) > 0 {
-		err = errors.New("could not delete metrics from metrics service: an error occurred")
+		err = errors.New("metrics API - could not delete metrics from metrics service: an error occurred")
 		return
 	}
 	return

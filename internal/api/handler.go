@@ -22,7 +22,6 @@ import (
 	"analytics-flow-engine/internal/parsing-api"
 	"analytics-flow-engine/internal/rancher-api"
 	rancher2_api "analytics-flow-engine/internal/rancher2-api"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -50,7 +49,7 @@ func CreateServer() {
 			lib.GetEnv("ZOOKEEPER", ""),
 		)
 	default:
-		fmt.Println("No driver selected")
+		log.Println("No driver selected")
 	}
 
 	parser := parsing_api.NewParsingApi(
@@ -58,7 +57,7 @@ func CreateServer() {
 	)
 	metrics := metrics_api.NewMetricsApi(lib.GetEnv("METRICS_API_ENDPOINT", "http://localhost:5000"))
 	port := lib.GetEnv("API_PORT", "8000")
-	fmt.Print("Starting Server at port " + port + "\n")
+	log.Println("Starting Server at port " + port + "\n")
 	router := mux.NewRouter()
 
 	e := NewEndpoint(driver, parser, metrics)

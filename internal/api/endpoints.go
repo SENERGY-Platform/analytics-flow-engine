@@ -19,8 +19,8 @@ package api
 import (
 	"analytics-flow-engine/internal/lib"
 	"encoding/json"
-	"fmt"
 	"github.com/dgrijalva/jwt-go"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -57,7 +57,7 @@ func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
 	var pipeReq lib.PipelineRequest
 	err := decoder.Decode(&pipeReq)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	defer req.Body.Close()
 	ret := e.engine.StartPipeline(pipeReq, e.getUserId(req), req.Header.Get("Authorization"))
@@ -71,7 +71,7 @@ func (e *Endpoint) updatePipeline(w http.ResponseWriter, req *http.Request) {
 	var pipeReq lib.PipelineRequest
 	err := decoder.Decode(&pipeReq)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	defer func() {
 		_ = req.Body.Close()

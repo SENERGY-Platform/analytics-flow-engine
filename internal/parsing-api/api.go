@@ -38,11 +38,11 @@ func (a ParsingApi) GetPipeline(id string, userId string, authorization string) 
 	request.Get(a.url+"/flow/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
 	resp, body, e := request.End()
 	if resp.StatusCode != http.StatusOK {
-		err = errors.New("could not get pipeline from parsing service: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		err = errors.New("parser API - could not get pipeline from parsing service: " + strconv.Itoa(resp.StatusCode) + " " + body)
 		return
 	}
 	if len(e) > 0 {
-		err = errors.New("could not get pipeline from parsing service: an error occurred")
+		err = errors.New("parser API - could not get pipeline from parsing service: an error occurred")
 		return
 	}
 	err = json.Unmarshal([]byte(body), &p)
