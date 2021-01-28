@@ -53,9 +53,9 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	if pipeline.Metrics {
 		pipeline = f.registerMetrics(pipeline)
 	}
+	pipeline.Id, _ = registerPipeline(&pipeline, userId, authorization)
 	pipeConfig := f.createPipelineConfig(pipeline)
 	f.startOperators(pipeline, pipeConfig)
-	pipeline.Id, _ = registerPipeline(&pipeline, userId, authorization)
 	return pipeline
 }
 
