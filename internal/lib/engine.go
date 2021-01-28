@@ -17,8 +17,8 @@
 package lib
 
 import (
-	"fmt"
 	"log"
+	"time"
 )
 
 type FlowEngine struct {
@@ -79,24 +79,24 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 		} else {
 			err = f.metricsService.UnregisterPipeline(pipeline.Id.String())
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 			}
 		}
 	}
 	for _, operator := range pipeline.Operators {
 		switch operator.DeploymentType {
 		case "local":
-			fmt.Println("stop local Operator: " + operator.Name)
+			log.Println("engine - stop local Operator: " + operator.Name)
 			stopOperator(pipeline.Id.String(),
 				operator)
 			break
 		default:
 			err := f.driver.DeleteOperator(f.driver.GetOperatorName(pipeline.Id.String(), operator)[0])
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 				err := f.driver.DeleteOperator(f.driver.GetOperatorName(pipeline.Id.String(), operator)[1])
 				if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 				}
 			}
 		}
@@ -115,34 +115,34 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, authorization stri
 	println("Deleting Pipeline:" + id)
 	var pipeline, err = getPipeline(id, userId, authorization)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	for _, operator := range pipeline.Operators {
 		switch operator.DeploymentType {
 		case "local":
-			fmt.Println("stop local Operator: " + operator.Name)
+			log.Println("engine - stop local Operator: " + operator.Name)
 			stopOperator(pipeline.Id.String(),
 				operator)
 			break
 		default:
 			err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator)[0])
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 				err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator)[1])
 				if err != nil {
-					fmt.Println(err)
+					log.Println(err)
 				}
 			}
 		}
 	}
 	err = deletePipeline(id, userId, authorization)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	if pipeline.Metrics == true {
 		err = f.metricsService.UnregisterPipeline(pipeline.Id.String())
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 	}
 	return "done"
@@ -167,18 +167,22 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 		}
 	}
 	if len(cloudOperators) > 0 {
-		err := f.driver.CreateOperators(
-			pipeline.Id.String(),
-			cloudOperators,
-			pipeConfig,
-		)
+		err := retry(3, 3*time.Second, func() (err error) {
+			return f.driver.CreateOperators(
+				pipeline.Id.String(),
+				cloudOperators,
+				pipeConfig,
+			)
+		})
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
+		} else {
+			log.Println("engine - successfully started cloud operators - " + pipeline.Id.String())
 		}
 	}
 	if len(localOperators) > 0 {
 		for _, operator := range localOperators {
-			fmt.Println("start local Operator: " + operator.Name)
+			log.Println("start local Operator: " + operator.Name)
 			startOperator(operator,
 				pipeConfig)
 		}
@@ -203,7 +207,7 @@ func (f *FlowEngine) createPipelineConfig(pipeline Pipeline) PipelineConfig {
 func (f *FlowEngine) registerMetrics(pipeline Pipeline) Pipeline {
 	metricsConfig, err := f.metricsService.RegisterPipeline(pipeline.Id.String())
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	pipeline.MetricsData.Database = metricsConfig.Database
 	pipeline.MetricsData.Username = metricsConfig.Username

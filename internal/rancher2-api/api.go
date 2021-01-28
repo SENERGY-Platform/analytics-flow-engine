@@ -97,7 +97,7 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 		err = errors.New("could not create operator: " + body)
 	}
 	if len(e) > 0 {
-		err = errors.New("could not create operator: an error occurred")
+		err = errors.New("rancher2 API - could not create operator: an error occurred")
 	}
 	return
 }
@@ -153,10 +153,10 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 
 	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads").Send(reqBody).End()
 	if resp.StatusCode != http.StatusCreated {
-		err = errors.New("could not create operators: " + body)
+		err = errors.New("rancher2 API - could not create operators " + body)
 	}
 	if len(e) > 0 {
-		err = errors.New("could not create operators: an error occurred")
+		err = errors.New("rancher2 API -  could not create operators - an error occurred")
 	}
 	return
 }
@@ -166,11 +166,11 @@ func (r *Rancher2) DeleteOperator(operatorId string) (err error) {
 	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + operatorId).End()
 	if resp.StatusCode != http.StatusNoContent {
-		err = errors.New("could not delete operator: " + body)
+		err = errors.New("rancher2 API - could not delete operator " + body)
 		return
 	}
 	if len(e) > 0 {
-		err = errors.New("something went wrong")
+		err = errors.New("rancher2 API - something went wrong")
 		return
 	}
 	return
