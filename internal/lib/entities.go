@@ -54,10 +54,11 @@ type OperatorRequestConfig struct {
 }
 
 type InputTopic struct {
-	Name        string    `json:"name,omitempty"`
-	FilterType  string    `json:"filterType,omitempty"`
-	FilterValue string    `json:"filterValue,omitempty"`
-	Mappings    []Mapping `json:"mappings,omitempty"`
+	Name         string    `json:"name,omitempty"`
+	FilterType   string    `json:"filterType,omitempty"`
+	FilterValue  string    `json:"filterValue,omitempty"`
+	FilterValue2 string    `json:"filterValue2,omitempty"`
+	Mappings     []Mapping `json:"mappings,omitempty"`
 }
 
 type Mapping struct {
@@ -106,9 +107,10 @@ type InputSelection struct {
 }
 
 type NodeInput struct {
-	DeviceId  string      `json:"deviceId,omitempty"`
-	TopicName string      `json:"topicName,omitempty"`
-	Values    []NodeValue `json:"values,omitempty"`
+	FilterType string      `json:"filterType,omitempty"`
+	FilterIds  string      `json:"filterIds,omitempty"`
+	TopicName  string      `json:"topicName,omitempty"`
+	Values     []NodeValue `json:"values,omitempty"`
 }
 
 type NodeValue struct {

@@ -7,7 +7,8 @@
       "nodeId": "738dc0c6-91f9-47c0-96d8-3b09c0278837",
       "inputs": [
         {
-          "deviceId": "1",
+          "filterIds": "1",
+          "filterType": "deviceId",
           "values": [
             {
               "name": "timestamp",
@@ -17,7 +18,8 @@
           "topicName": "device1"
         },
         {
-          "deviceId": "2",
+          "filterIds": "2",
+          "filterType": "deviceId",
           "values": [
             {
               "name": "value",
@@ -34,7 +36,8 @@
       "nodeId": "6fc47542-dfee-4d6e-b352-dab9c91e5aed",
       "inputs": [
         {
-          "deviceId": "3",
+          "filterIds": "3",
+          "filterType": "deviceId",
           "values": [
             {
               "name": "timestamp",
@@ -51,7 +54,8 @@
       "nodeId": "47ef81cb-fa88-45c2-99fe-ac82d57774ba",
       "inputs": [
         {
-          "deviceId": "4",
+          "filterIds": "4",
+          "filterType": "deviceId",
           "values": [
             {
               "name": "value",

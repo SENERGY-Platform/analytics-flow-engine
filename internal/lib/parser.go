@@ -67,18 +67,22 @@ func addStartingOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pip
 				operator.InputSelections = node.InputSelections
 				if len(node.Inputs) > 0 {
 					for _, input := range node.Inputs {
-						deviceId := input.DeviceId
-						var deviceIds []string
+						filterId := input.FilterIds
+						var filterIds []string
 						if operator.DeploymentType == "local" {
-							deviceIds = strings.Split(input.DeviceId, ",")
+							filterIds = strings.Split(input.FilterIds, ",")
 						}
 						for topicKey, topicName := range strings.Split(input.TopicName, ",") {
 							if operator.DeploymentType == "local" {
-								if len(deviceIds) > 0 {
-									deviceId = deviceIds[topicKey]
+								if len(filterIds) > 0 {
+									filterId = filterIds[topicKey]
 								}
 							}
-							t := InputTopic{Name: topicName, FilterType: "DeviceId", FilterValue: deviceId}
+							filterType := "DeviceId"
+							if input.FilterType == "operatorId" {
+								filterType = "OperatorId"
+							}
+							t := InputTopic{Name: topicName, FilterType: filterType, FilterValue: filterId}
 							for _, value := range input.Values {
 								t.Mappings = append(t.Mappings, Mapping{value.Name, value.Path})
 							}
