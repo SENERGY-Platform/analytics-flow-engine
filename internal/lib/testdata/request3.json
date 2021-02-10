@@ -1,0 +1,39 @@
+{
+  "id": "5fc6510234241789690b9d1e",
+  "name": "Test",
+  "description": "",
+  "nodes": [
+    {
+      "nodeId": "738dc0c6-91f9-47c0-96d8-3b09c0278837",
+      "inputs": [
+        {
+          "filterIds": "1",
+          "filterType": "deviceId",
+          "values": [
+            {
+              "name": "timestamp",
+              "path": "value.root.time"
+            }
+          ],
+          "topicName": "device1"
+        },
+        {
+          "filterIds": "2",
+          "filterType": "deviceId",
+          "values": [
+            {
+              "name": "value",
+              "path": "CHANGED"
+            }
+          ],
+          "topicName": "device2"
+        }
+      ],
+      "config": [],
+      "deploymentType": "cloud"
+    }
+  ],
+  "windowTime": 30,
+  "metrics": false,
+  "consumeAllMessages": false
+}
