@@ -50,18 +50,17 @@ func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
 }
 
 func addStartingOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline) (operators []Operator) {
+	operatorIds := make([]string, 0)
+	for _, operator := range tmpPipeline.Operators {
+		operatorIds = append(operatorIds, operator.Id)
+	}
 	for _, operator := range tmpPipeline.Operators {
 		toKeep := make([]int, 0)
-		inRequest := false
-		for _, node := range pipelineRequest.Nodes {
-			if node.NodeId == operator.Id {
-				inRequest = true
-			}
-		}
-		if !inRequest {
-			for key, _ := range operator.InputTopics {
+		for key, topic := range operator.InputTopics {
+			if StringInSlice(topic.FilterValue, operatorIds) {
 				toKeep = append(toKeep, key)
 			}
+
 		}
 		tmpTopics := make([]InputTopic, 0)
 		for _, indexToKeep := range toKeep {
