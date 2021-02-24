@@ -86,6 +86,8 @@ func addStartingOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pip
 							filterType := "DeviceId"
 							if input.FilterType == "operatorId" {
 								filterType = "OperatorId"
+							} else if input.FilterType == "ImportId" {
+								filterType = "ImportId"
 							}
 							t := InputTopic{Name: topicName, FilterType: filterType, FilterValue: filterId}
 							for _, value := range input.Values {
