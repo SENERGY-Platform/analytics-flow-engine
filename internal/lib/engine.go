@@ -17,6 +17,7 @@
 package lib
 
 import (
+	"github.com/google/uuid"
 	"log"
 	"time"
 )
@@ -31,7 +32,6 @@ func NewFlowEngine(driver Driver, parsingService ParsingApiService, metricsServi
 	return &FlowEngine{driver, parsingService, metricsService}
 }
 
-// Starts a pipeline
 func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, authorization string) (pipeline Pipeline, err error) {
 	//Get parsed pipeline
 	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, authorization)
@@ -74,7 +74,6 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
 	pipeline.WindowTime = pipelineRequest.WindowTime
-	pipeline.ConsumeAllMessages = pipelineRequest.ConsumeAllMessages
 
 	if pipeline.Metrics != pipelineRequest.Metrics {
 		pipeline.Metrics = pipelineRequest.Metrics
@@ -113,6 +112,12 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	time.Sleep(3 * time.Second)
 
 	pipeConfig := f.createPipelineConfig(pipeline)
+	if pipelineRequest.ConsumeAllMessages != pipeline.ConsumeAllMessages {
+		for index := range pipeline.Operators {
+			pipeline.Operators[index].ApplicationId = uuid.New()
+		}
+	}
+	pipeline.ConsumeAllMessages = pipelineRequest.ConsumeAllMessages
 
 	f.startOperators(pipeline, pipeConfig)
 

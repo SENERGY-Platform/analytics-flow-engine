@@ -70,7 +70,7 @@ func CreateServer() {
 		cors.Options{
 			AllowedHeaders: []string{"Content-Type", "Authorization"},
 			AllowedOrigins: []string{"*"},
-			AllowedMethods: []string{"GET", "POST", "DELETE", "OPTIONS"},
+			AllowedMethods: []string{"GET", "POST", "DELETE", "OPTIONS", "PUT"},
 		})
 	handler := c.Handler(router)
 	logger := lib.NewLogger(handler, "CALL")
