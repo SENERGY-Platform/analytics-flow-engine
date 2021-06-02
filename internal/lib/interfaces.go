@@ -36,3 +36,7 @@ type MetricsApiService interface {
 	RegisterPipeline(id string) (metrics_api.MetricsConfig, error)
 	UnregisterPipeline(id string) error
 }
+
+type PermissionApiService interface {
+	UserHasDevicesReadAccess(ids []string, authorization string) (bool, error)
+}

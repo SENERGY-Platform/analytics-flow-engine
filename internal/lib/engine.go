@@ -17,22 +17,38 @@
 package lib
 
 import (
+	"errors"
 	"github.com/google/uuid"
 	"log"
+	"strings"
 	"time"
 )
 
 type FlowEngine struct {
-	driver         Driver
-	parsingService ParsingApiService
-	metricsService MetricsApiService
+	driver            Driver
+	parsingService    ParsingApiService
+	metricsService    MetricsApiService
+	permissionService PermissionApiService
 }
 
-func NewFlowEngine(driver Driver, parsingService ParsingApiService, metricsService MetricsApiService) *FlowEngine {
-	return &FlowEngine{driver, parsingService, metricsService}
+func NewFlowEngine(driver Driver, parsingService ParsingApiService,
+	metricsService MetricsApiService,
+	permissionService PermissionApiService) *FlowEngine {
+	return &FlowEngine{driver, parsingService, metricsService, permissionService}
 }
 
 func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, authorization string) (pipeline Pipeline, err error) {
+	//Check access
+	deviceIds := getDeviceIdsFromPipelineRequest(pipelineRequest)
+	hasAccess, err := f.permissionService.UserHasDevicesReadAccess(deviceIds, authorization)
+	if err != nil {
+		return
+	}
+	if !hasAccess {
+		err = errors.New("engine - user does not have the rights to access the devices")
+		return
+	}
+
 	//Get parsed pipeline
 	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, authorization)
 	if err != nil {
@@ -65,6 +81,17 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 }
 
 func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId string, authorization string) (pipeline Pipeline, err error) {
+	//Check access
+	deviceIds := getDeviceIdsFromPipelineRequest(pipelineRequest)
+	hasAccess, err := f.permissionService.UserHasDevicesReadAccess(deviceIds, authorization)
+	if err != nil {
+		return
+	}
+	if !hasAccess {
+		err = errors.New("engine - user does not have the rights to access the devices")
+		return
+	}
+
 	pipeline, err = getPipeline(pipelineRequest.Id, userId, authorization)
 	if err != nil {
 		return
@@ -231,4 +258,19 @@ func (f *FlowEngine) registerMetrics(pipeline *Pipeline) (err error) {
 	pipeline.MetricsData.Interval = metricsConfig.Interval
 	pipeline.MetricsData.XmlUrl = metricsConfig.XmlUrl
 	return
+}
+
+func getDeviceIdsFromPipelineRequest(pipelineRequest PipelineRequest) []string {
+	var deviceIds []string
+	for _, node := range pipelineRequest.Nodes {
+		for _, input := range node.Inputs {
+			if input.FilterType == "deviceId" {
+				stringSlice := strings.Split(input.FilterIds, ",")
+				deviceIds = append(deviceIds, stringSlice...)
+			}
+
+		}
+
+	}
+	return deviceIds
 }

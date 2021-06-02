@@ -27,15 +27,12 @@ import (
 )
 
 type Endpoint struct {
-	driver         lib.Driver
-	engine         *lib.FlowEngine
-	parsingService lib.ParsingApiService
-	metricService  lib.MetricsApiService
+	engine *lib.FlowEngine
 }
 
-func NewEndpoint(driver lib.Driver, parsingService lib.ParsingApiService, metricsService lib.MetricsApiService) *Endpoint {
-	ret := lib.NewFlowEngine(driver, parsingService, metricsService)
-	return &Endpoint{driver, ret, parsingService, metricsService}
+func NewEndpoint(driver lib.Driver, parsingService lib.ParsingApiService, metricsService lib.MetricsApiService, permissionService lib.PermissionApiService) *Endpoint {
+	ret := lib.NewFlowEngine(driver, parsingService, metricsService, permissionService)
+	return &Endpoint{ret}
 }
 
 func (e *Endpoint) getRootEndpoint(w http.ResponseWriter, req *http.Request) {
