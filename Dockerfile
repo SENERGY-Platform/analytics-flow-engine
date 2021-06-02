@@ -1,5 +1,6 @@
-LABEL org.opencontainers.image.source https://github.com/SENERGY-Platform/analytics-flow-engine
 FROM golang:1.15 AS builder
+
+LABEL org.opencontainers.image.source https://github.com/SENERGY-Platform/analytics-flow-engine
 
 COPY . /go/src/app
 WORKDIR /go/src/app
