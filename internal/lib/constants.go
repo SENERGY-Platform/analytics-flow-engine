@@ -19,3 +19,6 @@ package lib
 const PipelineRunning = "running"
 const MQTTTopicPrefix = "fog/"
 const MQTTControlTopic = MQTTTopicPrefix + "control"
+
+const RequestDeviceId = "deviceId"
+const RequestOperatorId = "operatorId"

@@ -37,20 +37,31 @@ func NewFlowEngine(driver Driver, parsingService ParsingApiService,
 	return &FlowEngine{driver, parsingService, metricsService, permissionService}
 }
 
-func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, authorization string) (pipeline Pipeline, err error) {
+func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
 	//Check access
-	deviceIds := getDeviceIdsFromPipelineRequest(pipelineRequest)
-	hasAccess, err := f.permissionService.UserHasDevicesReadAccess(deviceIds, authorization)
-	if err != nil {
-		return
+	deviceIds, operatorIds := getFilterIdsFromPipelineRequest(pipelineRequest)
+	if len(deviceIds) > 0 {
+		hasAccess, e := f.permissionService.UserHasDevicesReadAccess(deviceIds, token)
+		if e != nil {
+			return pipeline, e
+		}
+		if !hasAccess {
+			e = errors.New("engine - user does not have the rights to access the devices")
+			return pipeline, e
+		}
 	}
-	if !hasAccess {
-		err = errors.New("engine - user does not have the rights to access the devices")
-		return
+	if len(operatorIds) > 0 {
+		for _, operatorId := range operatorIds {
+			_, e := getPipeline(strings.Split(operatorId, ":")[1], userId, token)
+			if e != nil {
+				e = errors.New("engine - user does not have the rights to access the pipeline: " + strings.Split(operatorId, ":")[1])
+				return pipeline, e
+			}
+		}
 	}
 
 	//Get parsed pipeline
-	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, authorization)
+	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, token)
 	if err != nil {
 		return
 	}
@@ -71,7 +82,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 			return
 		}
 	}
-	pipeline.Id, err = registerPipeline(&pipeline, userId, authorization)
+	pipeline.Id, err = registerPipeline(&pipeline, userId, token)
 	if err != nil {
 		return
 	}
@@ -80,19 +91,30 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	return
 }
 
-func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId string, authorization string) (pipeline Pipeline, err error) {
+func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
 	//Check access
-	deviceIds := getDeviceIdsFromPipelineRequest(pipelineRequest)
-	hasAccess, err := f.permissionService.UserHasDevicesReadAccess(deviceIds, authorization)
-	if err != nil {
-		return
+	deviceIds, operatorIds := getFilterIdsFromPipelineRequest(pipelineRequest)
+	if len(deviceIds) > 0 {
+		hasAccess, e := f.permissionService.UserHasDevicesReadAccess(deviceIds, token)
+		if e != nil {
+			return pipeline, e
+		}
+		if !hasAccess {
+			e = errors.New("engine - user does not have the rights to access the devices")
+			return pipeline, e
+		}
 	}
-	if !hasAccess {
-		err = errors.New("engine - user does not have the rights to access the devices")
-		return
+	if len(operatorIds) > 0 {
+		for _, operatorId := range operatorIds {
+			_, e := getPipeline(strings.Split(operatorId, ":")[1], userId, token)
+			if e != nil {
+				e = errors.New("engine - user does not have the rights to access the pipeline: " + strings.Split(operatorId, ":")[1])
+				return pipeline, e
+			}
+		}
 	}
 
-	pipeline, err = getPipeline(pipelineRequest.Id, userId, authorization)
+	pipeline, err = getPipeline(pipelineRequest.Id, userId, token)
 	if err != nil {
 		return
 	}
@@ -148,14 +170,14 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 
 	f.startOperators(pipeline, pipeConfig)
 
-	err = updatePipeline(&pipeline, userId, authorization)
+	err = updatePipeline(&pipeline, userId, token)
 
 	return
 }
 
-func (f *FlowEngine) DeletePipeline(id string, userId string, authorization string) (err error) {
+func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err error) {
 	log.Println("engine - delete pipeline: " + id)
-	pipeline, err := getPipeline(id, userId, authorization)
+	pipeline, err := getPipeline(id, userId, token)
 	if err != nil {
 		return
 	}
@@ -177,7 +199,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, authorization stri
 			}
 		}
 	}
-	err = deletePipeline(id, userId, authorization)
+	err = deletePipeline(id, userId, token)
 	if err != nil {
 		return
 	}
@@ -260,17 +282,22 @@ func (f *FlowEngine) registerMetrics(pipeline *Pipeline) (err error) {
 	return
 }
 
-func getDeviceIdsFromPipelineRequest(pipelineRequest PipelineRequest) []string {
+func getFilterIdsFromPipelineRequest(pipelineRequest PipelineRequest) ([]string, []string) {
 	var deviceIds []string
+	var operatorIds []string
 	for _, node := range pipelineRequest.Nodes {
 		for _, input := range node.Inputs {
-			if input.FilterType == "deviceId" {
+			if input.FilterType == RequestDeviceId {
 				stringSlice := strings.Split(input.FilterIds, ",")
 				deviceIds = append(deviceIds, stringSlice...)
+			}
+			if input.FilterType == RequestOperatorId {
+				stringSlice := strings.Split(input.FilterIds, ",")
+				operatorIds = append(operatorIds, stringSlice...)
 			}
 
 		}
 
 	}
-	return deviceIds
+	return deviceIds, operatorIds
 }
