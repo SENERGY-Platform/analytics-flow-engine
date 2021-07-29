@@ -19,7 +19,7 @@ package api
 import (
 	"analytics-flow-engine/internal/lib"
 	"encoding/json"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 	"log"
 	"net/http"
 
