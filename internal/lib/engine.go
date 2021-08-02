@@ -75,16 +75,16 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
+	pipeline.Id, err = registerPipeline(&pipeline, userId, token)
+	if err != nil {
+		return
+	}
 	pipeline.Metrics = pipelineRequest.Metrics
 	if pipeline.Metrics {
 		err = f.registerMetrics(&pipeline)
 		if err != nil {
 			return
 		}
-	}
-	pipeline.Id, err = registerPipeline(&pipeline, userId, token)
-	if err != nil {
-		return
 	}
 	pipeConfig := f.createPipelineConfig(pipeline)
 	f.startOperators(pipeline, pipeConfig)
