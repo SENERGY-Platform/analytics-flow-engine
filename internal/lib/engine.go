@@ -160,6 +160,13 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	// give the backend some time to delete the operators
 	time.Sleep(3 * time.Second)
 
+	missingUuid, _ := uuid.FromBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+	for index := range pipeline.Operators {
+		if pipeline.Operators[index].ApplicationId == missingUuid {
+			pipeline.Operators[index].ApplicationId = uuid.New()
+		}
+	}
+
 	pipeConfig := f.createPipelineConfig(pipeline)
 	if pipelineRequest.ConsumeAllMessages != pipeline.ConsumeAllMessages {
 		for index := range pipeline.Operators {
