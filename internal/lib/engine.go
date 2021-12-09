@@ -113,7 +113,6 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 			}
 		}
 	}
-
 	pipeline, err = getPipeline(pipelineRequest.Id, userId, token)
 	if err != nil {
 		return
@@ -138,6 +137,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 			}
 		}
 	}
+
 	for _, operator := range pipeline.Operators {
 		switch operator.DeploymentType {
 		case "local":
@@ -162,8 +162,17 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 
 	missingUuid, _ := uuid.FromBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
 	for index := range pipeline.Operators {
+		// if app id is missing, set a new one
 		if pipeline.Operators[index].ApplicationId == missingUuid {
 			pipeline.Operators[index].ApplicationId = uuid.New()
+		}
+		// if output topic is missing,set it
+		if pipeline.Operators[index].OutputTopic == "" {
+			outputTopicName := pipeline.Operators[index].Name
+			if pipeline.Operators[index].DeploymentType != "local" {
+				outputTopicName = getOperatorOutputTopic(pipeline.Operators[index].Name)
+			}
+			pipeline.Operators[index].OutputTopic = outputTopicName
 		}
 	}
 
