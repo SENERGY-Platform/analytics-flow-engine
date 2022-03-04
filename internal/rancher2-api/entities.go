@@ -28,7 +28,7 @@ type Request struct {
 type Container struct {
 	Image           string            `json:"image,omitempty"`
 	Name            string            `json:"name,omitempty"`
-	Environment     map[string]string `json:"environment,omitempty"`
+	Env             map[string]string `json:"env,omitempty"`
 	ImagePullPolicy string            `json:"imagePullPolicy,omitempty"`
 	Command         []string          `json:"command,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`

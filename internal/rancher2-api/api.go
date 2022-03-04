@@ -67,7 +67,7 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 		Containers: []Container{{
 			Image:           operator.ImageId,
 			Name:            r.GetOperatorName(pipelineId, operator)[0],
-			Environment:     env,
+			Env:             env,
 			ImagePullPolicy: "Always",
 		}},
 		Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
@@ -82,7 +82,7 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 		reqBody.Containers = []Container{{
 			Image:           operator.ImageId,
 			Name:            r.GetOperatorName(pipelineId, operator)[0],
-			Environment:     env,
+			Env:             env,
 			ImagePullPolicy: "Always",
 			Command: []string{
 				"java",
@@ -120,7 +120,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 		container := Container{
 			Image:           operator.ImageId,
 			Name:            "operator-" + operator.Id,
-			Environment:     env,
+			Env:             env,
 			ImagePullPolicy: "Always",
 		}
 		if operator.OutputTopic != "" {
