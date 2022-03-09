@@ -59,7 +59,20 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 	if operator.OutputTopic != "" {
 		env["OUTPUT"] = operator.OutputTopic
 	}
+	if pipeConfig.Metrics {
+		env["METRICS_URL"] = pipeConfig.MetricsData.Url
+		env["METRICS_USER"] = pipeConfig.MetricsData.Username
+		env["METRICS_PASSWORD"] = pipeConfig.MetricsData.Password
+		env["METRICS_INTERVAL"] = pipeConfig.MetricsData.Interval
+	}
 
+	var r2Env []Env
+	for k, v := range env {
+		r2Env = append(r2Env, Env{
+			Name:  k,
+			Value: v,
+		})
+	}
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	reqBody := &Request{
 		Name:        r.GetOperatorName(pipelineId, operator)[0],
@@ -67,7 +80,7 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 		Containers: []Container{{
 			Image:           operator.ImageId,
 			Name:            r.GetOperatorName(pipelineId, operator)[0],
-			Env:             env,
+			Env:             r2Env,
 			ImagePullPolicy: "Always",
 		}},
 		Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
@@ -75,14 +88,10 @@ func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipe
 		Selector:   Selector{MatchLabels: map[string]string{"op": operator.Id}},
 	}
 	if pipeConfig.Metrics {
-		env["METRICS_URL"] = pipeConfig.MetricsData.Url
-		env["METRICS_USER"] = pipeConfig.MetricsData.Username
-		env["METRICS_PASSWORD"] = pipeConfig.MetricsData.Password
-		env["METRICS_INTERVAL"] = pipeConfig.MetricsData.Interval
 		reqBody.Containers = []Container{{
 			Image:           operator.ImageId,
 			Name:            r.GetOperatorName(pipelineId, operator)[0],
-			Env:             env,
+			Env:             r2Env,
 			ImagePullPolicy: "Always",
 			Command: []string{
 				"java",
@@ -117,20 +126,32 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 			"DEVICE_ID_PATH":                    "device_id",
 			"CONSUMER_AUTO_OFFSET_RESET_CONFIG": pipeConfig.ConsumerOffset,
 		}
-		container := Container{
-			Image:           operator.ImageId,
-			Name:            "operator-" + operator.Id,
-			Env:             env,
-			ImagePullPolicy: "Always",
-		}
-		if operator.OutputTopic != "" {
-			env["OUTPUT"] = operator.OutputTopic
-		}
+
 		if pipeConfig.Metrics {
 			env["METRICS_URL"] = pipeConfig.MetricsData.Url
 			env["METRICS_USER"] = pipeConfig.MetricsData.Username
 			env["METRICS_PASSWORD"] = pipeConfig.MetricsData.Password
 			env["METRICS_INTERVAL"] = pipeConfig.MetricsData.Interval
+		}
+		if operator.OutputTopic != "" {
+			env["OUTPUT"] = operator.OutputTopic
+		}
+
+		var r2Env []Env
+		for k, v := range env {
+			r2Env = append(r2Env, Env{
+				Name:  k,
+				Value: v,
+			})
+		}
+
+		container := Container{
+			Image:           operator.ImageId,
+			Name:            "operator-" + operator.Id,
+			Env:             r2Env,
+			ImagePullPolicy: "Always",
+		}
+		if pipeConfig.Metrics {
 			container.Command = []string{
 				"java",
 				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.MetricsData.XmlUrl,
