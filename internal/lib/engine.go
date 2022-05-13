@@ -87,6 +87,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 		}
 	}
 	pipeConfig := f.createPipelineConfig(pipeline)
+	pipeConfig.UserId = userId
 	f.startOperators(pipeline, pipeConfig)
 	return
 }
@@ -177,6 +178,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	}
 
 	pipeConfig := f.createPipelineConfig(pipeline)
+	pipeConfig.UserId = userId
 	if pipelineRequest.ConsumeAllMessages != pipeline.ConsumeAllMessages {
 		for index := range pipeline.Operators {
 			pipeline.Operators[index].ApplicationId = uuid.New()

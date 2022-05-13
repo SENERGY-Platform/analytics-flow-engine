@@ -49,6 +49,7 @@ func (r Rancher) CreateOperator(pipelineId string, input lib.Operator, pipeConfi
 		"CONFIG":                            string(config),
 		"DEVICE_ID_PATH":                    "device_id",
 		"CONSUMER_AUTO_OFFSET_RESET_CONFIG": pipeConfig.ConsumerOffset,
+		"USER_ID":                           pipeConfig.UserId,
 	}
 
 	if input.OutputTopic != "" {
@@ -113,6 +114,7 @@ func (r Rancher) CreateOperators(pipelineId string, inputs []lib.Operator, pipeC
 			"CONFIG":                            string(config),
 			"DEVICE_ID_PATH":                    "device_id",
 			"CONSUMER_AUTO_OFFSET_RESET_CONFIG": pipeConfig.ConsumerOffset,
+			"USER_ID":                           pipeConfig.UserId,
 		}
 
 		if input.OutputTopic != "" {

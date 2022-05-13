@@ -16,7 +16,9 @@
 
 package lib
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+)
 
 type Response struct {
 	Message string `json:"message,omitempty"`
@@ -125,6 +127,7 @@ type PipelineConfig struct {
 	ConsumerOffset string
 	FlowId         string
 	PipelineId     string
+	UserId         string
 }
 
 type ControlCommand struct {
