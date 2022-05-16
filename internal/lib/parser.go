@@ -49,7 +49,7 @@ func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
 	return pipeline
 }
 
-func addStartingOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline) (operators []Operator) {
+func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline) (operators []Operator) {
 	operatorIds := make([]string, 0)
 	for _, operator := range tmpPipeline.Operators {
 		operatorIds = append(operatorIds, operator.Id)
@@ -69,6 +69,7 @@ func addStartingOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pip
 		operator.InputTopics = tmpTopics
 		for _, node := range pipelineRequest.Nodes {
 			if operator.Id == node.NodeId {
+				operator.PersistData = node.PersistData
 				operator.InputSelections = node.InputSelections
 				if len(node.Inputs) > 0 {
 					for _, input := range node.Inputs {

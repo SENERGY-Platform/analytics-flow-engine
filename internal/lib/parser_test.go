@@ -221,7 +221,7 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 		fmt.Println(err)
 	}
 	pipeline := createPipeline(parsedPipeline)
-	pipeline.Operators = addStartingOperatorConfigs(pipelineRequest, pipeline)
+	pipeline.Operators = addOperatorConfigs(pipelineRequest, pipeline)
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}
@@ -332,8 +332,8 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 		fmt.Println(err)
 	}
 	pipeline := createPipeline(parsedPipeline)
-	pipeline.Operators = addStartingOperatorConfigs(pipelineRequest, pipeline)
-	pipeline.Operators = addStartingOperatorConfigs(pipelineRequest2, pipeline)
+	pipeline.Operators = addOperatorConfigs(pipelineRequest, pipeline)
+	pipeline.Operators = addOperatorConfigs(pipelineRequest2, pipeline)
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}
@@ -466,8 +466,8 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 		fmt.Println(err)
 	}
 	pipeline := createPipeline(parsedPipeline)
-	pipeline.Operators = addStartingOperatorConfigs(pipelineRequest, pipeline)
-	pipeline.Operators = addStartingOperatorConfigs(pipelineRequest2, pipeline)
+	pipeline.Operators = addOperatorConfigs(pipelineRequest, pipeline)
+	pipeline.Operators = addOperatorConfigs(pipelineRequest2, pipeline)
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}

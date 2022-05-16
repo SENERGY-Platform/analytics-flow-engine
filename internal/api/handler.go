@@ -21,7 +21,6 @@ import (
 	metrics_api "analytics-flow-engine/internal/metrics-api"
 	"analytics-flow-engine/internal/parsing-api"
 	permission_api "analytics-flow-engine/internal/permission-api"
-	"analytics-flow-engine/internal/rancher-api"
 	rancher2_api "analytics-flow-engine/internal/rancher2-api"
 	"log"
 	"net/http"
@@ -33,15 +32,7 @@ import (
 func CreateServer() {
 	var driver lib.Driver
 	switch selectedDriver := lib.GetEnv("DRIVER", "rancher"); selectedDriver {
-	case "rancher":
-		driver = rancher_api.NewRancher(
-			lib.GetEnv("RANCHER_ENDPOINT", ""),
-			lib.GetEnv("RANCHER_ACCESS_KEY", ""),
-			lib.GetEnv("RANCHER_SECRET_KEY", ""),
-			lib.GetEnv("RANCHER_STACK_ID", ""),
-			lib.GetEnv("ZOOKEEPER", ""),
-		)
-	case "rancher2":
+	default:
 		driver = rancher2_api.NewRancher2(
 			lib.GetEnv("RANCHER2_ENDPOINT", ""),
 			lib.GetEnv("RANCHER2_ACCESS_KEY", ""),
@@ -49,8 +40,6 @@ func CreateServer() {
 			lib.GetEnv("RANCHER2_STACK_ID", ""),
 			lib.GetEnv("ZOOKEEPER", ""),
 		)
-	default:
-		log.Println("No driver selected")
 	}
 
 	parser := parsing_api.NewParsingApi(lib.GetEnv("PARSER_API_ENDPOINT", ""))

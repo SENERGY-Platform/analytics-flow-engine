@@ -19,9 +19,9 @@ package rancher2_api
 import (
 	"analytics-flow-engine/internal/lib"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"crypto/tls"
 
@@ -42,78 +42,9 @@ func NewRancher2(url string, accessKey string, secretKey string, stackId string,
 	return &Rancher2{url, accessKey, secretKey, stackId, zookeeper}
 }
 
-func (r *Rancher2) CreateOperator(pipelineId string, operator lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
-	fmt.Println("Rancher2 Create " + pipelineId)
-	config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
-	env := map[string]string{
-		"ZK_QUORUM":                         r.zookeeper,
-		"CONFIG_APPLICATION_ID":             "analytics-" + operator.ApplicationId.String(),
-		"PIPELINE_ID":                       pipelineId,
-		"OPERATOR_ID":                       operator.Id,
-		"WINDOW_TIME":                       strconv.Itoa(pipeConfig.WindowTime),
-		"CONFIG":                            string(config),
-		"DEVICE_ID_PATH":                    "device_id",
-		"CONSUMER_AUTO_OFFSET_RESET_CONFIG": pipeConfig.ConsumerOffset,
-		"USER_ID":                           pipeConfig.UserId,
-	}
-
-	if operator.OutputTopic != "" {
-		env["OUTPUT"] = operator.OutputTopic
-	}
-	if pipeConfig.Metrics {
-		env["METRICS_URL"] = pipeConfig.MetricsData.Url
-		env["METRICS_USER"] = pipeConfig.MetricsData.Username
-		env["METRICS_PASSWORD"] = pipeConfig.MetricsData.Password
-		env["METRICS_INTERVAL"] = pipeConfig.MetricsData.Interval
-	}
-
-	var r2Env []Env
-	for k, v := range env {
-		r2Env = append(r2Env, Env{
-			Name:  k,
-			Value: v,
-		})
-	}
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
-	reqBody := &Request{
-		Name:        r.GetOperatorName(pipelineId, operator)[0],
-		NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
-		Containers: []Container{{
-			Image:           operator.ImageId,
-			Name:            r.GetOperatorName(pipelineId, operator)[0],
-			Env:             r2Env,
-			ImagePullPolicy: "Always",
-		}},
-		Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
-		Labels:     map[string]string{"op": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId},
-		Selector:   Selector{MatchLabels: map[string]string{"op": operator.Id}},
-	}
-	if pipeConfig.Metrics {
-		reqBody.Containers = []Container{{
-			Image:           operator.ImageId,
-			Name:            r.GetOperatorName(pipelineId, operator)[0],
-			Env:             r2Env,
-			ImagePullPolicy: "Always",
-			Command: []string{
-				"java",
-				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.MetricsData.XmlUrl,
-				"-jar",
-				"/opt/operator.jar",
-			},
-		}}
-	}
-	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads").Send(reqBody).End()
-	if resp.StatusCode != http.StatusCreated {
-		err = errors.New("could not create operator: " + body)
-	}
-	if len(e) > 0 {
-		err = errors.New("rancher2 API - could not create operator: an error occurred")
-	}
-	return
-}
-
 func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
 	var containers []Container
+	var volumes []Volume
 	for _, operator := range inputs {
 		config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
 		labels := map[string]string{"operatorId": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId}
@@ -153,6 +84,20 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 			Env:             r2Env,
 			ImagePullPolicy: "Always",
 		}
+
+		if operator.PersistData {
+			err = r.createPersistentVolumeClaim(r.getOperatorName(pipelineId, operator)[0])
+			vm := VolumeMount{
+				Name:      r.getOperatorName(pipelineId, operator)[0],
+				MountPath: "/opt/data",
+			}
+			container.VolumeMounts = append(container.VolumeMounts, vm)
+			volumes = append(volumes, Volume{
+				Name:                  r.getOperatorName(pipelineId, operator)[0],
+				PersistentVolumeClaim: PersistentVolumeClaim{PersistentVolumeClaimId: r.getOperatorName(pipelineId, operator)[0]}},
+			)
+		}
+
 		if pipeConfig.Metrics {
 			container.Command = []string{
 				"java",
@@ -164,10 +109,12 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 		container.Labels = labels
 		containers = append(containers, container)
 	}
+	time.Sleep(3 * time.Second)
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
-	reqBody := &Request{
-		Name:        r.GetOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1],
+	reqBody := &WorkloadRequest{
+		Name:        r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1],
 		NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
+		Volumes:     volumes,
 		Containers:  containers,
 		Scheduling:  Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
 		Labels:      map[string]string{"flowId": pipeConfig.FlowId, "pipelineId": pipelineId},
@@ -184,10 +131,13 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 	return
 }
 
-func (r *Rancher2) DeleteOperator(operatorId string) (err error) {
+func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err error) {
+	if operator.PersistData {
+		err = r.deletePersistentVolumeClaim(r.getOperatorName(pipelineId, operator)[0])
+	}
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
-		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + operatorId).End()
+		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
 	if resp.StatusCode != http.StatusNoContent {
 		err = errors.New("rancher2 API - could not delete operator " + body)
 		return
@@ -199,6 +149,40 @@ func (r *Rancher2) DeleteOperator(operatorId string) (err error) {
 	return
 }
 
-func (r *Rancher2) GetOperatorName(pipelineId string, operator lib.Operator) []string {
+func (r *Rancher2) getOperatorName(pipelineId string, operator lib.Operator) []string {
 	return []string{"operator-" + pipelineId + "-" + operator.Id[0:8], "pipeline-" + pipelineId}
+}
+
+func (r *Rancher2) createPersistentVolumeClaim(name string) (err error) {
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	reqBody := &VolumeClaimRequest{
+		Name:           name,
+		NamespaceId:    lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
+		AccessModes:    []string{"ReadWriteOnce"},
+		Resources:      Resources{Requests: map[string]string{"storage": "50M"}},
+		StorageClassId: lib.GetEnv("RANCHER2_STORAGE_DRIVER", "nfs-client"),
+	}
+	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/persistentvolumeclaims").Send(reqBody).End()
+	if resp.StatusCode != http.StatusCreated {
+		err = errors.New("could not create PersistentVolumeClaim: " + body)
+	}
+	if len(e) > 0 {
+		err = errors.New("rancher2 API - could not create PersistentVolumeClaim: an error occurred")
+	}
+	return
+}
+
+func (r *Rancher2) deletePersistentVolumeClaim(name string) (err error) {
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/persistentVolumeClaims/" +
+		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + name).End()
+	if resp.StatusCode != http.StatusOK {
+		err = errors.New("rancher2 API - could not delete PersistentVolumeClaim " + body)
+		return
+	}
+	if len(e) > 0 {
+		err = errors.New("rancher2 API - something went wrong")
+		return
+	}
+	return
 }

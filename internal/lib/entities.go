@@ -46,6 +46,7 @@ type Operator struct {
 	OperatorId      string            `json:"operatorId,omitempty"`
 	Config          map[string]string `json:"config,omitempty"`
 	OutputTopic     string            `json:"outputTopic,omitempty"`
+	PersistData     bool              `json:"persistData,omitempty"`
 	InputTopics     []InputTopic
 	InputSelections []InputSelection `json:"inputSelections,omitempty"`
 }
@@ -93,6 +94,7 @@ type PipelineNode struct {
 	Inputs          []NodeInput      `json:"inputs,omitempty"`
 	Config          []NodeConfig     `json:"config,omitempty"`
 	InputSelections []InputSelection `json:"inputSelections,omitempty"`
+	PersistData     bool             `json:"persistData,omitempty"`
 }
 
 type NodeConfig struct {

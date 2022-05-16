@@ -71,7 +71,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	pipeline.ConsumeAllMessages = pipelineRequest.ConsumeAllMessages
 
 	tmpPipeline := createPipeline(parsedPipeline)
-	pipeline.Operators = addStartingOperatorConfigs(pipelineRequest, tmpPipeline)
+	pipeline.Operators = addOperatorConfigs(pipelineRequest, tmpPipeline)
 
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
@@ -118,7 +118,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	if err != nil {
 		return
 	}
-	pipeline.Operators = addStartingOperatorConfigs(pipelineRequest, pipeline)
+	pipeline.Operators = addOperatorConfigs(pipelineRequest, pipeline)
 
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
@@ -147,13 +147,9 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 				operator)
 			break
 		default:
-			err := f.driver.DeleteOperator(f.driver.GetOperatorName(pipeline.Id.String(), operator)[0])
+			err := f.driver.DeleteOperator(pipeline.Id.String(), operator)
 			if err != nil {
 				log.Println(err)
-				err := f.driver.DeleteOperator(f.driver.GetOperatorName(pipeline.Id.String(), operator)[1])
-				if err != nil {
-					log.Println(err)
-				}
 			}
 		}
 	}
@@ -207,13 +203,9 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 				operator)
 			break
 		default:
-			err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator)[0])
+			err := f.driver.DeleteOperator(id, operator)
 			if err != nil {
 				log.Println(err)
-				err := f.driver.DeleteOperator(f.driver.GetOperatorName(id, operator)[1])
-				if err != nil {
-					log.Println(err)
-				}
 			}
 		}
 	}

@@ -16,13 +16,14 @@
 
 package rancher2_api
 
-type Request struct {
+type WorkloadRequest struct {
 	Name        string            `json:"name,omitempty"`
 	NamespaceId string            `json:"namespaceId,omitempty"`
 	Containers  []Container       `json:"containers,omitempty"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	Selector    Selector          `json:"selector,omitempty"`
 	Scheduling  Scheduling        `json:"scheduling,omitempty"`
+	Volumes     []Volume          `json:"volumes,omitempty"`
 }
 
 type Container struct {
@@ -32,6 +33,21 @@ type Container struct {
 	ImagePullPolicy string            `json:"imagePullPolicy,omitempty"`
 	Command         []string          `json:"command,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
+	VolumeMounts    []VolumeMount     `json:"volumeMounts,omitempty"`
+}
+
+type Volume struct {
+	Name                  string                `json:"name,omitempty"`
+	PersistentVolumeClaim PersistentVolumeClaim `json:"persistentVolumeClaim,omitempty"`
+}
+
+type PersistentVolumeClaim struct {
+	PersistentVolumeClaimId string `json:"persistentVolumeClaimId,omitempty"`
+}
+
+type VolumeMount struct {
+	Name      string `json:"name,omitempty"`
+	MountPath string `json:"mountPath,omitempty"`
 }
 
 type Env struct {
@@ -50,4 +66,16 @@ type Scheduling struct {
 
 type Node struct {
 	RequireAll []string `json:"requireAll,omitempty"`
+}
+
+type VolumeClaimRequest struct {
+	Name           string    `json:"name,omitempty"`
+	NamespaceId    string    `json:"namespaceId,omitempty"`
+	AccessModes    []string  `json:"accessModes,omitempty"`
+	StorageClassId string    `json:"storageClassId,omitempty"`
+	Resources      Resources `json:"resources,omitempty"`
+}
+
+type Resources struct {
+	Requests map[string]string `json:"requests,omitempty"`
 }

@@ -18,7 +18,6 @@ package lib
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/google/uuid"
 	"net/http"
 
@@ -81,7 +80,6 @@ func getPipeline(id string, userId string, authorization string) (pipe Pipeline,
 		err = errors.New("pipeline API - could not get pipeline from pipeline registry: an error occurred")
 		return
 	}
-	fmt.Println(body)
 	err = json.Unmarshal([]byte(body), &pipe)
 	if err != nil {
 		err = errors.New("pipeline API  - could not parse pipeline: " + err.Error())
