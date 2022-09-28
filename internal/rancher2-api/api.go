@@ -54,6 +54,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 			"PIPELINE_ID":                       pipelineId,
 			"OPERATOR_ID":                       operator.Id,
 			"WINDOW_TIME":                       strconv.Itoa(pipeConfig.WindowTime),
+			"JOIN_STRATEGY":                     pipeConfig.MergeStrategy,
 			"CONFIG":                            string(config),
 			"DEVICE_ID_PATH":                    "device_id",
 			"CONSUMER_AUTO_OFFSET_RESET_CONFIG": pipeConfig.ConsumerOffset,

@@ -31,6 +31,7 @@ type Pipeline struct {
 	Description        string     `json:"description,omitempty"`
 	Image              string     `json:"image,omitempty"`
 	WindowTime         int        `json:"windowTime,omitempty"`
+	MergeStrategy      string     `json:"mergeStrategy,omitempty"`
 	ConsumeAllMessages bool       `json:"consumeAllMessages,omitempty"`
 	Metrics            bool       `json:"metrics,omitempty"`
 	MetricsData        Metrics    `json:"metricsData,omitempty"`
@@ -84,6 +85,7 @@ type PipelineRequest struct {
 	Name               string         `json:"name,omitempty"`
 	Description        string         `json:"description,omitempty"`
 	WindowTime         int            `json:"windowTime,omitempty"`
+	MergeStrategy      string         `json:"mergeStrategy,omitempty"`
 	ConsumeAllMessages bool           `json:"consumeAllMessages,omitempty"`
 	Metrics            bool           `json:"metrics,omitempty"`
 	Nodes              []PipelineNode `json:"nodes,omitempty"`
@@ -124,6 +126,7 @@ type NodeValue struct {
 
 type PipelineConfig struct {
 	WindowTime     int
+	MergeStrategy  string
 	Metrics        bool
 	MetricsData    Metrics
 	ConsumerOffset string

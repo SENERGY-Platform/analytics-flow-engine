@@ -68,6 +68,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	pipeline.FlowId = parsedPipeline.FlowId
 	pipeline.Image = parsedPipeline.Image
 	pipeline.WindowTime = pipelineRequest.WindowTime
+	pipeline.MergeStrategy = pipelineRequest.MergeStrategy
 	pipeline.ConsumeAllMessages = pipelineRequest.ConsumeAllMessages
 
 	tmpPipeline := createPipeline(parsedPipeline)
@@ -123,6 +124,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
 	pipeline.WindowTime = pipelineRequest.WindowTime
+	pipeline.MergeStrategy = pipelineRequest.MergeStrategy
 
 	if pipeline.Metrics != pipelineRequest.Metrics {
 		pipeline.Metrics = pipelineRequest.Metrics
@@ -266,6 +268,7 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 func (f *FlowEngine) createPipelineConfig(pipeline Pipeline) PipelineConfig {
 	var pipeConfig = PipelineConfig{
 		WindowTime:     pipeline.WindowTime,
+		MergeStrategy:  pipeline.MergeStrategy,
 		FlowId:         pipeline.FlowId,
 		ConsumerOffset: "latest",
 		Metrics:        pipeline.Metrics,
