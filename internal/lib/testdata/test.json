@@ -1,0 +1,83 @@
+{
+ "id": "00000000-0000-0000-0000-000000000000",
+ "metricsData": {},
+ "operators": [
+  {
+   "id": "47ef81cb-fa88-45c2-99fe-ac82d57774ba",
+   "name": "adder",
+   "applicationId": "00000000-0000-0000-0000-000000000000",
+   "imageId": "repo/analytics-operator-adder:dev",
+   "deploymentType": "cloud",
+   "operatorId": "5d2da1c0de2c3100015801f3",
+   "outputTopic": "analytics-adder",
+   "InputTopics": [
+    {
+     "name": "analytics-adder",
+     "filterType": "OperatorId",
+     "filterValue": "738dc0c6-91f9-47c0-96d8-3b09c0278837",
+     "mappings": [
+      {
+       "dest": "timestamp",
+       "source": "lastTimestamp"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "738dc0c6-91f9-47c0-96d8-3b09c0278837",
+   "name": "adder",
+   "applicationId": "00000000-0000-0000-0000-000000000000",
+   "imageId": "repo/analytics-operator-adder:dev",
+   "deploymentType": "cloud",
+   "operatorId": "5d2da1c0de2c3100015801f3",
+   "outputTopic": "analytics-adder",
+   "InputTopics": [
+    {
+     "name": "device1",
+     "filterType": "DeviceId",
+     "filterValue": "1",
+     "mappings": [
+      {
+       "dest": "timestamp",
+       "source": "value.root.time"
+      }
+     ]
+    },
+    {
+     "name": "device2",
+     "filterType": "DeviceId",
+     "filterValue": "2",
+     "mappings": [
+      {
+       "dest": "value",
+       "source": "CHANGED"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "6fc47542-dfee-4d6e-b352-dab9c91e5aed",
+   "name": "adder",
+   "applicationId": "00000000-0000-0000-0000-000000000000",
+   "imageId": "repo/analytics-operator-adder:dev",
+   "deploymentType": "cloud",
+   "operatorId": "5d2da1c0de2c3100015801f3",
+   "outputTopic": "analytics-adder",
+   "InputTopics": [
+    {
+     "name": "analytics-adder",
+     "filterType": "OperatorId",
+     "filterValue": "738dc0c6-91f9-47c0-96d8-3b09c0278837",
+     "mappings": [
+      {
+       "dest": "value",
+       "source": "sum"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

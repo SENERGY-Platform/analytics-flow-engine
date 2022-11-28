@@ -18,9 +18,7 @@ package rancher2_api
 
 import (
 	"analytics-flow-engine/internal/lib"
-	"fmt"
 	"github.com/joho/godotenv"
-	"log"
 	"testing"
 	"time"
 )
@@ -28,7 +26,8 @@ import (
 func TestRancher2_createPersistentVolumeClaim(t *testing.T) {
 	err := godotenv.Load("../../.env")
 	if err != nil {
-		log.Print("Error loading .env file")
+		t.Error("Error loading .env file")
+		return
 	}
 	driver := NewRancher2(
 		lib.GetEnv("RANCHER2_ENDPOINT", ""),
@@ -40,13 +39,15 @@ func TestRancher2_createPersistentVolumeClaim(t *testing.T) {
 	name := "test"
 	err = driver.createPersistentVolumeClaim(name)
 	if err != nil {
-		fmt.Println(err.Error())
+		t.Error(err.Error())
+		return
 	}
 	time.Sleep(3 * time.Second)
 
 	err = driver.deletePersistentVolumeClaim(name)
 	if err != nil {
-		fmt.Println(err.Error())
+		t.Error(err.Error())
+		return
 	}
 
 }

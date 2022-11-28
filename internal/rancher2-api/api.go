@@ -164,25 +164,25 @@ func (r *Rancher2) createPersistentVolumeClaim(name string) (err error) {
 		StorageClassId: lib.GetEnv("RANCHER2_STORAGE_DRIVER", "nfs-client"),
 	}
 	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/persistentvolumeclaims").Send(reqBody).End()
-	if resp.StatusCode != http.StatusCreated {
-		err = errors.New("could not create PersistentVolumeClaim: " + body)
-	}
 	if len(e) > 0 {
-		err = errors.New("rancher2 API - could not create PersistentVolumeClaim: an error occurred")
+		return errors.New("rancher2 API - could not create PersistentVolumeClaim: an error occurred")
 	}
-	return
+	if resp.StatusCode != http.StatusCreated {
+		return errors.New("could not create PersistentVolumeClaim: " + body)
+	}
+	return nil
 }
 
 func (r *Rancher2) deletePersistentVolumeClaim(name string) (err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/persistentVolumeClaims/" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + name).End()
-	if resp.StatusCode != http.StatusOK {
-		err = errors.New("rancher2 API - could not delete PersistentVolumeClaim " + body)
-		return
-	}
 	if len(e) > 0 {
 		err = errors.New("rancher2 API - something went wrong")
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		err = errors.New("rancher2 API - could not delete PersistentVolumeClaim " + body)
 		return
 	}
 	return

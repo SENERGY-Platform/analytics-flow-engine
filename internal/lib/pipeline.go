@@ -67,18 +67,21 @@ func updatePipeline(pipeline *Pipeline, userId string, authorization string) (er
 	return
 }
 
+var ErrNotFound = errors.New("not found")
+
 func getPipeline(id string, userId string, authorization string) (pipe Pipeline, err error) {
 	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
 	request := gorequest.New()
 	request.Get(pipelineServiceUrl+"/pipeline/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
 	resp, body, e := request.End()
-
-	if resp.StatusCode != 200 {
-		err = errors.New("pipeline API - could not get pipeline from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
-	}
 	if len(e) > 0 {
-		err = errors.New("pipeline API - could not get pipeline from pipeline registry: an error occurred")
-		return
+		return pipe, errors.New("pipeline API - could not get pipeline from pipeline registry: an error occurred")
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return pipe, ErrNotFound
+	}
+	if resp.StatusCode != 200 {
+		return pipe, errors.New("pipeline API - could not get pipeline from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
 	}
 	err = json.Unmarshal([]byte(body), &pipe)
 	if err != nil {

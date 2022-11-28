@@ -92,6 +92,10 @@ func (e *Endpoint) updatePipeline(w http.ResponseWriter, req *http.Request) {
 func (e *Endpoint) deletePipeline(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	err := e.engine.DeletePipeline(vars["id"], e.getUserId(req), req.Header.Get("Authorization"))
+	if err == lib.ErrNotFound {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		log.Println(err.Error())
