@@ -19,7 +19,7 @@ package lib
 import (
 	"encoding/json"
 	"fmt"
-	parsing_api "github.com/SENERGY-Platform/analytics-flow-engine/internal/parsing-api"
+	parsing_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	"github.com/google/uuid"
 	"io/ioutil"
 	"reflect"

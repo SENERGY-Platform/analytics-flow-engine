@@ -18,7 +18,7 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/SENERGY-Platform/analytics-flow-engine/internal/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	"github.com/golang-jwt/jwt"
 	"log"
 	"net/http"

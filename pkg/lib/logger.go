@@ -17,16 +17,16 @@
 package lib
 
 import (
-	"net/http"
-	"log"
 	"bytes"
+	"log"
+	"net/http"
 )
 
-func NewLogger(handler http.Handler, logLevel string) *LoggerMiddleWare{
-	return &LoggerMiddleWare{handler:handler, logLevel:logLevel}
+func NewLogger(handler http.Handler, logLevel string) *LoggerMiddleWare {
+	return &LoggerMiddleWare{handler: handler, logLevel: logLevel}
 }
 
-type LoggerMiddleWare struct{
+type LoggerMiddleWare struct {
 	handler  http.Handler
 	logLevel string `DEBUG | CALL | NONE`
 }
@@ -41,15 +41,15 @@ func (this *LoggerMiddleWare) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 func (this *LoggerMiddleWare) log(request *http.Request) {
-	if this.logLevel != "NONE"{
+	if this.logLevel != "NONE" {
 		method := request.Method
 		path := request.URL
 
-		if this.logLevel == "CALL"{
+		if this.logLevel == "CALL" {
 			log.Printf("[%v] %v \n", method, path)
 		}
 
-		if this.logLevel == "DEBUG"{
+		if this.logLevel == "DEBUG" {
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(request.Body)
 			body := buf.String()

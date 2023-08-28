@@ -17,7 +17,7 @@
 package rancher2_api
 
 import (
-	"github.com/SENERGY-Platform/analytics-flow-engine/internal/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	"github.com/joho/godotenv"
 	"testing"
 	"time"

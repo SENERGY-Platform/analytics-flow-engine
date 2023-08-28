@@ -17,11 +17,11 @@
 package api
 
 import (
-	"github.com/SENERGY-Platform/analytics-flow-engine/internal/lib"
-	metrics_api "github.com/SENERGY-Platform/analytics-flow-engine/internal/metrics-api"
-	"github.com/SENERGY-Platform/analytics-flow-engine/internal/parsing-api"
-	permission_api "github.com/SENERGY-Platform/analytics-flow-engine/internal/permission-api"
-	rancher2_api "github.com/SENERGY-Platform/analytics-flow-engine/internal/rancher2-api"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
+	metrics_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/metrics-api"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
+	permission_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/permission-api"
+	rancher2_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/rancher2-api"
 	"log"
 	"net/http"
 
