@@ -17,8 +17,8 @@
 package rancher2_api
 
 import (
-	"analytics-flow-engine/internal/lib"
 	"errors"
+	"github.com/SENERGY-Platform/analytics-flow-engine/internal/lib"
 	"net/http"
 	"strconv"
 	"time"

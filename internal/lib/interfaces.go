@@ -17,8 +17,8 @@
 package lib
 
 import (
-	"analytics-flow-engine/internal/metrics-api"
-	"analytics-flow-engine/internal/parsing-api"
+	"github.com/SENERGY-Platform/analytics-flow-engine/internal/metrics-api"
+	"github.com/SENERGY-Platform/analytics-flow-engine/internal/parsing-api"
 )
 
 type Driver interface {

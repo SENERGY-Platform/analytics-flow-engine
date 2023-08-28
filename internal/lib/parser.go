@@ -17,7 +17,7 @@
 package lib
 
 import (
-	parsingApi "analytics-flow-engine/internal/parsing-api"
+	parsingApi "github.com/SENERGY-Platform/analytics-flow-engine/internal/parsing-api"
 	"github.com/google/uuid"
 	"strings"
 )

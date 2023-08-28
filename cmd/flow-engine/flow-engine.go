@@ -17,8 +17,8 @@
 package main
 
 import (
-	"analytics-flow-engine/internal/api"
-	"analytics-flow-engine/internal/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/internal/api"
+	"github.com/SENERGY-Platform/analytics-flow-engine/internal/lib"
 	"log"
 	"os"
 	"os/signal"
