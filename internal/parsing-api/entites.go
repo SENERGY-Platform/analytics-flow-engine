@@ -29,6 +29,7 @@ type Operator struct {
 	DeploymentType string `json:"deploymentType,omitempty"`
 	ImageId        string `json:"ImageId,omitempty"`
 	InputTopics    []InputTopic
+	Cost           uint `json:"cost"`
 }
 
 type InputTopic struct {
