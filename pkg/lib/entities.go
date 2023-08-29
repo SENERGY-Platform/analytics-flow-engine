@@ -50,6 +50,7 @@ type Operator struct {
 	PersistData     bool              `json:"persistData,omitempty"`
 	InputTopics     []InputTopic
 	InputSelections []InputSelection `json:"inputSelections,omitempty"`
+	Cost            uint             `json:"cost"`
 }
 
 type OperatorRequestConfig struct {

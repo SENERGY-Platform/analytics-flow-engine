@@ -36,6 +36,7 @@ func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
 			OperatorId:     operator.OperatorId,
 			DeploymentType: operator.DeploymentType,
 			OutputTopic:    outputTopicName,
+			Cost:           operator.Cost,
 		}
 		for _, topic := range operator.InputTopics {
 			top := InputTopic{Name: topic.TopicName, FilterType: topic.FilterType, FilterValue: topic.FilterValue}
