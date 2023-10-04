@@ -26,7 +26,7 @@ import (
 func TestRancher2_createPersistentVolumeClaim(t *testing.T) {
 	err := godotenv.Load("../../.env")
 	if err != nil {
-		t.Error("Error loading .env file")
+		t.Skip("missing .env file")
 		return
 	}
 	driver := NewRancher2(

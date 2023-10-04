@@ -22,7 +22,10 @@ import (
 	parsing_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	"github.com/google/uuid"
 	"io/ioutil"
+	"os"
 	"reflect"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -97,6 +100,12 @@ func TestParser_createPipeline(t *testing.T) {
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}
+	slices.SortFunc(expected.Operators, func(a, b Operator) int {
+		return strings.Compare(a.Id, b.Id)
+	})
+	slices.SortFunc(pipeline.Operators, func(a, b Operator) int {
+		return strings.Compare(a.Id, b.Id)
+	})
 	if !reflect.DeepEqual(expected, pipeline) {
 		fmt.Println(expected)
 		fmt.Println(pipeline)
@@ -225,11 +234,17 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}
+	slices.SortFunc(expected.Operators, func(a, b Operator) int {
+		return strings.Compare(a.Id, b.Id)
+	})
+	slices.SortFunc(pipeline.Operators, func(a, b Operator) int {
+		return strings.Compare(a.Id, b.Id)
+	})
 	if !reflect.DeepEqual(expected, pipeline) {
 		fmt.Println(expected)
 		fmt.Println(pipeline)
 		file, _ := json.MarshalIndent(pipeline, "", " ")
-		_ = ioutil.WriteFile("./testdata/test.json", file, 0644)
+		_ = os.WriteFile("./testdata/test.json", file, 0644)
 		t.Error("structs do not match")
 	}
 }
@@ -337,11 +352,17 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}
+	slices.SortFunc(expected.Operators, func(a, b Operator) int {
+		return strings.Compare(a.Id, b.Id)
+	})
+	slices.SortFunc(pipeline.Operators, func(a, b Operator) int {
+		return strings.Compare(a.Id, b.Id)
+	})
 	if !reflect.DeepEqual(expected, pipeline) {
 		fmt.Println(expected)
 		fmt.Println(pipeline)
 		file, _ := json.MarshalIndent(pipeline, "", " ")
-		_ = ioutil.WriteFile("./testdata/test.json", file, 0644)
+		_ = os.WriteFile("./testdata/test.json", file, 0644)
 		t.Error("structs do not match")
 	}
 }
@@ -471,11 +492,17 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}
+	slices.SortFunc(expected.Operators, func(a, b Operator) int {
+		return strings.Compare(a.Id, b.Id)
+	})
+	slices.SortFunc(pipeline.Operators, func(a, b Operator) int {
+		return strings.Compare(a.Id, b.Id)
+	})
 	if !reflect.DeepEqual(expected, pipeline) {
 		fmt.Println(expected)
 		fmt.Println(pipeline)
 		file, _ := json.MarshalIndent(pipeline, "", " ")
-		_ = ioutil.WriteFile("./testdata/test.json", file, 0644)
+		_ = os.WriteFile("./testdata/test.json", file, 0644)
 		t.Error("structs do not match")
 	}
 }
