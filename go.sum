@@ -2,6 +2,8 @@ github.com/SENERGY-Platform/analytics-fog-lib v1.0.0 h1:UPu2NRW92pMnnEutdElohEwc
 github.com/SENERGY-Platform/analytics-fog-lib v1.0.0/go.mod h1:WVm6fWbrcAKJ2V+rUXlKQNnVp8bd+11AYJxSlxA6F+Q=
 github.com/SENERGY-Platform/analytics-fog-lib v1.0.1 h1:/1hLzNZSqiuQZKXcliICli1HTWwRXos+RTdBXKhjmjY=
 github.com/SENERGY-Platform/analytics-fog-lib v1.0.1/go.mod h1:WVm6fWbrcAKJ2V+rUXlKQNnVp8bd+11AYJxSlxA6F+Q=
+github.com/SENERGY-Platform/analytics-fog-lib v1.0.2 h1:0p2x5bwrOwjPwFeT3gg9Kdz1CE3abWm1nPRoezwWKbU=
+github.com/SENERGY-Platform/analytics-fog-lib v1.0.2/go.mod h1:WVm6fWbrcAKJ2V+rUXlKQNnVp8bd+11AYJxSlxA6F+Q=
 github.com/SENERGY-Platform/go-service-base/watchdog v0.4.1 h1:DiTETrKnnN8gHfxr0m6A+f8Nd54DD6yZmKL5Oi0qF6E=
 github.com/SENERGY-Platform/go-service-base/watchdog v0.4.1/go.mod h1:B28QtfgfMvOGIcQRklRQkPmXArdHyocy8soE7UoSIKU=
 github.com/eclipse/paho.mqtt.golang v1.4.3 h1:2kwcUGn8seMUfWndX0hGbvH8r7crgcJguQNCyp70xik=
