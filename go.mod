@@ -3,7 +3,7 @@ module github.com/SENERGY-Platform/analytics-flow-engine
 go 1.21.3
 
 require (
-	github.com/SENERGY-Platform/analytics-fog-lib v1.0.0
+	github.com/SENERGY-Platform/analytics-fog-lib v1.0.1
 	github.com/SENERGY-Platform/go-service-base/watchdog v0.4.1
 	github.com/eclipse/paho.mqtt.golang v1.4.3
 	github.com/golang-jwt/jwt v3.2.2+incompatible
