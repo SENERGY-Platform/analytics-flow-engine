@@ -19,23 +19,37 @@ package main
 import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
+	"github.com/SENERGY-Platform/go-service-base/watchdog"
+
 	"log"
 	"os"
-	"os/signal"
 	"syscall"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
+	ec := 0
+	defer func() {
+		os.Exit(ec)
+	}()
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Print("Error loading .env file")
 	}
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	watchdog := watchdog.New(syscall.SIGINT, syscall.SIGTERM)
+
 	lib.ConnectMQTTBroker()
-	defer lib.CloseMQTTConnection()
-	api.CreateServer()
-	<-c
+
+	watchdog.RegisterStopFunc(func() error {
+		lib.CloseMQTTConnection()
+		return nil
+	})
+
+	go api.CreateServer()
+
+	watchdog.Start()
+
+	ec = watchdog.Join()
 }

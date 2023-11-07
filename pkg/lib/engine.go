@@ -18,10 +18,11 @@ package lib
 
 import (
 	"errors"
-	"github.com/google/uuid"
 	"log"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type FlowEngine struct {
@@ -89,7 +90,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	}
 	pipeConfig := f.createPipelineConfig(pipeline)
 	pipeConfig.UserId = userId
-	f.startOperators(pipeline, pipeConfig)
+	f.startOperators(pipeline, pipeConfig, userId)
 	return
 }
 
@@ -145,8 +146,8 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 		switch operator.DeploymentType {
 		case "local":
 			log.Println("engine - stop local Operator: " + operator.Name)
-			stopOperator(pipeline.Id.String(),
-				operator)
+			stopFogOperator(pipeline.Id.String(),
+				operator, userId)
 			break
 		default:
 			err := f.driver.DeleteOperator(pipeline.Id.String(), operator)
@@ -184,7 +185,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	}
 	pipeline.ConsumeAllMessages = pipelineRequest.ConsumeAllMessages
 
-	f.startOperators(pipeline, pipeConfig)
+	f.startOperators(pipeline, pipeConfig, userId)
 
 	err = updatePipeline(&pipeline, userId, token)
 
@@ -201,8 +202,8 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 		switch operator.DeploymentType {
 		case "local":
 			log.Println("engine - stop local Operator: " + operator.Name)
-			stopOperator(pipeline.Id.String(),
-				operator)
+			stopFogOperator(pipeline.Id.String(),
+				operator, userId)
 			break
 		default:
 			err := f.driver.DeleteOperator(id, operator)
@@ -229,7 +230,7 @@ func (f *FlowEngine) GetPipelineStatus(id string) string {
 	return PipelineRunning
 }
 
-func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig) {
+func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig, userID string) {
 	var localOperators []Operator
 	var cloudOperators []Operator
 	for _, operator := range pipeline.Operators {
@@ -259,8 +260,8 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 	if len(localOperators) > 0 {
 		for _, operator := range localOperators {
 			log.Println("start local Operator: " + operator.Name)
-			startOperator(operator,
-				pipeConfig)
+			startFogOperator(operator,
+				pipeConfig, userID)
 		}
 	}
 }

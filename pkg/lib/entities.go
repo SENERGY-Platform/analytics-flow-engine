@@ -136,25 +136,6 @@ type PipelineConfig struct {
 	UserId         string
 }
 
-type ControlCommand struct {
-	Command string      `json:"command,omitempty"`
-	Data    OperatorJob `json:"data,omitempty"`
-}
-
-type OperatorJob struct {
-	ImageId        string            `json:"imageId,omitempty"`
-	InputTopics    []InputTopic      `json:"inputTopics,omitempty"`
-	Config         FogConfig         `json:"config,omitempty"`
-	OperatorConfig map[string]string `json:"operatorConfig,omitempty"`
-}
-
-type FogConfig struct {
-	PipelineId     string `json:"pipelineId,omitempty"`
-	OutputTopic    string `json:"outputTopic,omitempty"`
-	OperatorId     string `json:"operatorId,omitempty"`
-	BaseOperatorId string `json:"baseOperatorId,omitempty"`
-}
-
 type Claims struct {
 	Sub         string              `json:"sub,omitempty"`
 	RealmAccess map[string][]string `json:"realm_access,omitempty"`

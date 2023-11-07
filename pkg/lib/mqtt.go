@@ -25,6 +25,8 @@ import (
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
+
 )
 
 var client MQTT.Client
@@ -40,7 +42,7 @@ func ConnectMQTTBroker() {
 	server := flag.String("server", GetEnv("BROKER_ADDRESS", "tcp://127.0.0.1:1883"), "The full url of the MQTT server to connect to ex: tcp://127.0.0.1:1883")
 
 	topics := map[string]byte{
-		MQTTControlTopic: byte(0),
+		operatorLib.OperatorsResultTopic: byte(0),
 	}
 	qos = flag.Int("qos", 2, "The QoS to subscribe to messages at")
 	retained = flag.Bool("retained", false, "Are the messages sent with the retained flag")

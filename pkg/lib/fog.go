@@ -19,6 +19,8 @@ package lib
 import (
 	"encoding/json"
 
+	controlLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/control"
+	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 )
 
@@ -26,38 +28,77 @@ func processMessage(message MQTT.Message) {
 
 }
 
-func startOperator(input Operator, pipelineConfig PipelineConfig) {
+func convertInputTopics(inputTopics []InputTopic) []operatorLib.InputTopic {
+	// TODO external analytics-lib
+	fogInputTopics := []operatorLib.InputTopic{}
+	for _, v := range inputTopics {
+		fogMappings := []operatorLib.Mapping{}
+		for _, mapping := range v.Mappings {
+			fogMappings = append(fogMappings, operatorLib.Mapping(mapping))
+		}
+
+		fogInputTopics = append(fogInputTopics, operatorLib.InputTopic{
+			Name:        v.Name,
+			FilterType:  v.FilterType,
+			FilterValue: v.FilterValue,
+			Mappings:    fogMappings,
+		})
+	}
+	return fogInputTopics
+}
+
+func startFogOperator(input Operator, pipelineConfig PipelineConfig, userID string) {
 	for key, topic := range input.InputTopics {
 		if topic.FilterType == "OperatorId" {
 			input.InputTopics[key].Name = topic.Name + "/" + pipelineConfig.PipelineId
 		}
 	}
-	command := &ControlCommand{"startOperator", OperatorJob{
-		ImageId:        input.ImageId,
-		InputTopics:    input.InputTopics,
-		OperatorConfig: input.Config,
-		Config: FogConfig{
-			OutputTopic:    input.OutputTopic,
-			OperatorId:     input.Id,
-			PipelineId:     pipelineConfig.PipelineId,
-			BaseOperatorId: input.OperatorId,
-		}}}
+
+	inputTopics := convertInputTopics(input.InputTopics)
+
+	command := &operatorLib.StartOperatorControlCommand{
+		ControlMessage: controlLib.ControlMessage{
+			Command: operatorLib.StartOperatorCommand,
+		},
+		Operator: operatorLib.StartOperatorMessage{
+			ImageId:        input.ImageId,
+			InputTopics:    inputTopics,
+			OperatorConfig: input.Config,
+			Config: operatorLib.FogConfig{
+				OperatorIDs: operatorLib.OperatorIDs{
+					OperatorId:     input.Id,
+					PipelineId:     pipelineConfig.PipelineId,
+					BaseOperatorId: input.OperatorId,
+				},
+				OutputTopic: input.OutputTopic,
+			},
+		},
+	}
+
 	out, err := json.Marshal(command)
 	if err != nil {
 		panic(err)
 	}
-	publishMessage(MQTTControlTopic, string(out))
+	controlTopic := controlLib.GetConnectorControlTopic(userID)
+	publishMessage(controlTopic, string(out))
 }
 
-func stopOperator(pipelineId string, input Operator) {
-	command := &ControlCommand{"stopOperator", OperatorJob{Config: FogConfig{
-		OperatorId:     input.Id,
-		PipelineId:     pipelineId,
-		BaseOperatorId: input.OperatorId,
-	}}}
+func stopFogOperator(pipelineId string, input Operator, userID string) {
+	command := &operatorLib.StopOperatorControlCommand{
+		ControlMessage: controlLib.ControlMessage{
+			Command: operatorLib.StartOperatorCommand,
+		},
+		OperatorIDs: operatorLib.OperatorIDs{
+			OperatorId:     input.Id,
+			PipelineId:     pipelineId,
+			BaseOperatorId: input.OperatorId,
+		},
+	}
 	out, err := json.Marshal(command)
 	if err != nil {
 		panic(err)
 	}
-	publishMessage(MQTTControlTopic, string(out))
+
+	controlTopic := controlLib.GetConnectorControlTopic(userID)
+	publishMessage(controlTopic, string(out))
 }

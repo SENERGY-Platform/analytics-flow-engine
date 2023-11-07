@@ -1,3 +1,7 @@
+github.com/SENERGY-Platform/analytics-fog-lib v1.0.0 h1:UPu2NRW92pMnnEutdElohEwcK8sKcCsQaW/hRcLAyrg=
+github.com/SENERGY-Platform/analytics-fog-lib v1.0.0/go.mod h1:WVm6fWbrcAKJ2V+rUXlKQNnVp8bd+11AYJxSlxA6F+Q=
+github.com/SENERGY-Platform/go-service-base/watchdog v0.4.1 h1:DiTETrKnnN8gHfxr0m6A+f8Nd54DD6yZmKL5Oi0qF6E=
+github.com/SENERGY-Platform/go-service-base/watchdog v0.4.1/go.mod h1:B28QtfgfMvOGIcQRklRQkPmXArdHyocy8soE7UoSIKU=
 github.com/eclipse/paho.mqtt.golang v1.4.3 h1:2kwcUGn8seMUfWndX0hGbvH8r7crgcJguQNCyp70xik=
 github.com/eclipse/paho.mqtt.golang v1.4.3/go.mod h1:CSYvoAlsMkhYOXh/oKyxa8EcBci6dVkLCbo5tTC1RIE=
 github.com/elazarl/goproxy v0.0.0-20200809112317-0581fc3aee2d h1:rtM8HsT3NG37YPjz8sYSbUSdElP9lUsQENYzJDZDUBE=
