@@ -86,7 +86,7 @@ func startFogOperator(input Operator, pipelineConfig PipelineConfig, userID stri
 func stopFogOperator(pipelineId string, input Operator, userID string) {
 	command := &operatorLib.StopOperatorControlCommand{
 		ControlMessage: controlLib.ControlMessage{
-			Command: operatorLib.StartOperatorCommand,
+			Command: operatorLib.StopOperatorCommand,
 		},
 		OperatorIDs: operatorLib.OperatorIDs{
 			OperatorId:     input.Id,
