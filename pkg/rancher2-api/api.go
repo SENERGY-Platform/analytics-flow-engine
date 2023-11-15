@@ -47,7 +47,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 	var volumes []Volume
 	for _, operator := range inputs {
 		config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
-		labels := map[string]string{"operatorId": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId}
+		labels := map[string]string{"operatorId": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId, "user": pipeConfig.UserId}
 		env := map[string]string{
 			"ZK_QUORUM":                         r.zookeeper,
 			"CONFIG_APPLICATION_ID":             "analytics-" + operator.ApplicationId.String(),
@@ -118,7 +118,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 		Volumes:     volumes,
 		Containers:  containers,
 		Scheduling:  Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
-		Labels:      map[string]string{"flowId": pipeConfig.FlowId, "pipelineId": pipelineId},
+		Labels:      map[string]string{"flowId": pipeConfig.FlowId, "pipelineId": pipelineId, "user": pipeConfig.UserId},
 		Selector:    Selector{MatchLabels: map[string]string{"pipelineId": pipelineId}},
 	}
 
