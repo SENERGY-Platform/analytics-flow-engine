@@ -81,7 +81,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 
 		container := Container{
 			Image:           operator.ImageId,
-			Name:            "operator-" + operator.Id,
+			Name:            operator.OperatorId + "--" + operator.Id,
 			Env:             r2Env,
 			ImagePullPolicy: "Always",
 		}
