@@ -143,6 +143,13 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		err = errors.New("rancher2 API - could not delete operator " + body)
 		return
 	}
+	// Delete Service
+	resp, body, e = request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/services/" +
+		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
+	if resp.StatusCode != http.StatusNoContent {
+		err = errors.New("rancher2 API - could not delete operator service " + body)
+		return
+	}
 	if len(e) > 0 {
 		err = errors.New("rancher2 API - something went wrong")
 		return
