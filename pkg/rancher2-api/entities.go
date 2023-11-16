@@ -27,13 +27,19 @@ type WorkloadRequest struct {
 }
 
 type Container struct {
-	Image           string            `json:"image,omitempty"`
-	Name            string            `json:"name,omitempty"`
-	Env             []Env             `json:"env,omitempty"`
-	ImagePullPolicy string            `json:"imagePullPolicy,omitempty"`
-	Command         []string          `json:"command,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	VolumeMounts    []VolumeMount     `json:"volumeMounts,omitempty"`
+	Image           string             `json:"image,omitempty"`
+	Name            string             `json:"name,omitempty"`
+	Env             []Env              `json:"env,omitempty"`
+	ImagePullPolicy string             `json:"imagePullPolicy,omitempty"`
+	Command         []string           `json:"command,omitempty"`
+	Labels          map[string]string  `json:"labels,omitempty"`
+	VolumeMounts    []VolumeMount      `json:"volumeMounts,omitempty"`
+	Resources       ContainerResources `json:"resources,omitempty"`
+}
+
+type ContainerResources struct {
+	Limits   map[string]string `json:"limits,omitempty"`
+	Requests map[string]string `json:"requests,omitempty"`
 }
 
 type Volume struct {

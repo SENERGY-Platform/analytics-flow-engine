@@ -107,6 +107,16 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 				"/opt/operator.jar",
 			}
 		}
+		container.Resources = ContainerResources{
+			Requests: map[string]string{
+				"memory": "128Mi",
+				"cpu":    "100m",
+			},
+			Limits: map[string]string{
+				"memory": "512Mi",
+				"cpu":    "500m",
+			},
+		}
 		container.Labels = labels
 		containers = append(containers, container)
 	}
