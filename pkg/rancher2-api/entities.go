@@ -85,3 +85,30 @@ type VolumeClaimRequest struct {
 type Resources struct {
 	Requests map[string]string `json:"requests,omitempty"`
 }
+
+type AutoscalingRequest struct {
+	ApiVersion string                     `json:"apiVersion,omitempty"`
+	Kind       string                     `json:"kind,omitempty"`
+	Metadata   AutoscalingRequestMetadata `json:"metadata,omitempty"`
+	Spec       AutoscalingRequestSpec     `json:"spec,omitempty"`
+}
+
+type AutoscalingRequestMetadata struct {
+	Name      string `json:"name,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type AutoscalingRequestSpec struct {
+	TargetRef    AutoscalingRequestTargetRef    `json:"targetRef,omitempty"`
+	UpdatePolicy AutoscalingRequestUpdatePolicy `json:"updatePolicy,omitempty"`
+}
+
+type AutoscalingRequestTargetRef struct {
+	ApiVersion string `json:"apiVersion,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	Name       string `json:"name,omitempty"`
+}
+
+type AutoscalingRequestUpdatePolicy struct {
+	UpdateMode string `json:"updateMode,omitempty"`
+}

@@ -21,6 +21,7 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"crypto/tls"
@@ -32,6 +33,7 @@ import (
 
 type Rancher2 struct {
 	url       string
+	kubeUrl   string
 	accessKey string
 	secretKey string
 	stackId   string
@@ -39,7 +41,9 @@ type Rancher2 struct {
 }
 
 func NewRancher2(url string, accessKey string, secretKey string, stackId string, zookeeper string) *Rancher2 {
-	return &Rancher2{url, accessKey, secretKey, stackId, zookeeper}
+	kubeUrl := strings.TrimSuffix(url, "v3/") + "k8s/clusters/" +
+		strings.Split(lib.GetEnv("RANCHER2_PROJECT_ID", "_:_"), ":")[0] + "/v1/"
+	return &Rancher2{url, kubeUrl, accessKey, secretKey, stackId, zookeeper}
 }
 
 func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
@@ -139,6 +143,32 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 	if len(e) > 0 {
 		err = errors.New("rancher2 API -  could not create operators - an error occurred")
 	}
+
+	autoscaleRequest := AutoscalingRequest{
+		ApiVersion: "autoscaling.k8s.io/v1",
+		Kind:       "VerticalPodAutoscaler",
+		Metadata: AutoscalingRequestMetadata{
+			Name:      r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + "-vpa",
+			Namespace: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
+		},
+		Spec: AutoscalingRequestSpec{
+			TargetRef: AutoscalingRequestTargetRef{
+				ApiVersion: "apps/v1",
+				Kind:       "Deployment",
+				Name:       r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1],
+			},
+			UpdatePolicy: AutoscalingRequestUpdatePolicy{UpdateMode: "Auto"},
+		},
+	}
+	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	resp, body, e = request.Post(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers").
+		Send(autoscaleRequest).End()
+	if resp.StatusCode != http.StatusCreated {
+		err = errors.New("rancher2 API - could not create vpa " + body)
+	}
+	if len(e) > 0 {
+		err = errors.New("rancher2 API -  could not create operator vpa - an error occurred")
+	}
 	return
 }
 
@@ -153,7 +183,13 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		err = errors.New("rancher2 API - could not delete operator " + body)
 		return
 	}
+	if len(e) > 0 {
+		err = errors.New("rancher2 API - something went wrong")
+		return
+	}
+
 	// Delete Service
+	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e = request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/services/" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
 	if resp.StatusCode != http.StatusNoContent {
@@ -164,6 +200,23 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		err = errors.New("rancher2 API - something went wrong")
 		return
 	}
+
+	// Delete Autoscaler
+	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers/" +
+		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
+		"/" +
+		r.getOperatorName(pipelineId, operator)[1] + "-vpa").
+		End()
+	if resp.StatusCode != http.StatusNoContent {
+		err = errors.New("rancher2 API - could not delete operator vpa " + body)
+		return
+	}
+	if len(e) > 0 {
+		err = errors.New("rancher2 API - something went wrong")
+		return
+	}
+
 	return
 }
 
