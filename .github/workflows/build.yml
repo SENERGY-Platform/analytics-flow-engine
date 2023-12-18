@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
 
 jobs:
@@ -31,8 +33,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.CR_PAT }}
-      -
-        name: Build and push
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          release_branches: ".*"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
         uses: docker/build-push-action@v2
         with:
           context: .
@@ -42,3 +49,7 @@ jobs:
           tags: |
             smartenergyplatform/analytics-flow-engine:latest
             ghcr.io/senergy-platform/analytics-flow-engine:latest
+            smartenergyplatform/analytics-flow-engine:prod
+            ghcr.io/senergy-platform/analytics-flow-engine:prod
+            smartenergyplatform/analytics-flow-engine:${{ steps.tag_version.outputs.new_tag }}
+            ghcr.io/senergy-platform/analytics-flow-engine:${{ steps.tag_version.outputs.new_tag }}
