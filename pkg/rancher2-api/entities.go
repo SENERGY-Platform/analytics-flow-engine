@@ -99,8 +99,9 @@ type AutoscalingRequestMetadata struct {
 }
 
 type AutoscalingRequestSpec struct {
-	TargetRef    AutoscalingRequestTargetRef    `json:"targetRef,omitempty"`
-	UpdatePolicy AutoscalingRequestUpdatePolicy `json:"updatePolicy,omitempty"`
+	TargetRef      AutoscalingRequestTargetRef    `json:"targetRef,omitempty"`
+	UpdatePolicy   AutoscalingRequestUpdatePolicy `json:"updatePolicy,omitempty"`
+	ResourcePolicy ResourcePolicy                 `json:"resourcePolicy,omitempty"`
 }
 
 type AutoscalingRequestTargetRef struct {
@@ -111,4 +112,18 @@ type AutoscalingRequestTargetRef struct {
 
 type AutoscalingRequestUpdatePolicy struct {
 	UpdateMode string `json:"updateMode,omitempty"`
+}
+
+type ResourcePolicy struct {
+	ContainerPolicies []ContainerPolicy `json:"containerPolicies,omitempty"`
+}
+
+type ContainerPolicy struct {
+	ContainerName string     `json:"containerName,omitempty"`
+	MaxAllowed    MaxAllowed `json:"maxAllowed,omitempty"`
+}
+
+type MaxAllowed struct {
+	CPU    string `json:"cpu,omitempty"`
+	Memory string `json:"memory,omitempty"`
 }

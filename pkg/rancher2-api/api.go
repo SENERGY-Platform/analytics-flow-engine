@@ -158,6 +158,17 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 				Name:       r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1],
 			},
 			UpdatePolicy: AutoscalingRequestUpdatePolicy{UpdateMode: "Auto"},
+			ResourcePolicy: ResourcePolicy{
+				ContainerPolicies: []ContainerPolicy{
+					{
+						ContainerName: "*",
+						MaxAllowed: MaxAllowed{
+							CPU:    "1",
+							Memory: "4000Mi",
+						},
+					},
+				},
+			},
 		},
 	}
 	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
