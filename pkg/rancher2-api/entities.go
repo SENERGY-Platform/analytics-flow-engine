@@ -124,6 +124,6 @@ type ContainerPolicy struct {
 }
 
 type MaxAllowed struct {
-	CPU    string `json:"cpu,omitempty"`
+	CPU    int64  `json:"cpu,omitempty"`
 	Memory string `json:"memory,omitempty"`
 }

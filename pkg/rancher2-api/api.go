@@ -163,7 +163,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 					{
 						ContainerName: "*",
 						MaxAllowed: MaxAllowed{
-							CPU:    "1",
+							CPU:    1,
 							Memory: "4000Mi",
 						},
 					},
