@@ -95,6 +95,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 }
 
 func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
+	log.Println("engine - update pipeline: " + pipelineRequest.Id)
 	//Check access
 	deviceIds, operatorIds := getFilterIdsFromPipelineRequest(pipelineRequest)
 	if len(deviceIds) > 0 {
@@ -142,20 +143,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 		}
 	}
 
-	for _, operator := range pipeline.Operators {
-		switch operator.DeploymentType {
-		case "local":
-			log.Println("engine - stop local Operator: " + operator.Name)
-			stopFogOperator(pipeline.Id.String(),
-				operator, userId)
-			break
-		default:
-			err := f.driver.DeleteOperator(pipeline.Id.String(), operator)
-			if err != nil {
-				log.Println(err)
-			}
-		}
-	}
+	f.deleteOperators(pipeline, userId)
 
 	// give the backend some time to delete the operators
 	time.Sleep(3 * time.Second)
@@ -198,20 +186,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 	if err != nil {
 		return
 	}
-	for _, operator := range pipeline.Operators {
-		switch operator.DeploymentType {
-		case "local":
-			log.Println("engine - stop local Operator: " + operator.Name)
-			stopFogOperator(pipeline.Id.String(),
-				operator, userId)
-			break
-		default:
-			err := f.driver.DeleteOperator(id, operator)
-			if err != nil {
-				log.Println(err)
-			}
-		}
-	}
+	f.deleteOperators(pipeline, userId)
 	err = deletePipeline(id, userId, token)
 	if err != nil {
 		return
@@ -228,6 +203,29 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 func (f *FlowEngine) GetPipelineStatus(id string) string {
 	//TODO: Implement method
 	return PipelineRunning
+}
+
+func (f *FlowEngine) deleteOperators(pipeline Pipeline, userId string) {
+	counter := 0
+	for _, operator := range pipeline.Operators {
+		switch operator.DeploymentType {
+		case "local":
+			log.Println("engine - stop local Operator: " + operator.Name)
+			stopFogOperator(pipeline.Id.String(),
+				operator, userId)
+			break
+		default:
+			err := f.driver.DeleteOperator(pipeline.Id.String(), operator)
+			if err != nil {
+				switch {
+				case errors.Is(err, ErrWorkloadNotFound) && counter > 0:
+				default:
+					log.Println(err.Error())
+				}
+			}
+		}
+		counter++
+	}
 }
 
 func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig, userID string) {

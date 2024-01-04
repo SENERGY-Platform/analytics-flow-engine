@@ -184,18 +184,43 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 }
 
 func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err error) {
-	if operator.PersistData {
-		err = r.deletePersistentVolumeClaim(r.getOperatorName(pipelineId, operator)[0])
-	}
+
+	// Delete AutoscalerCheckpoint
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
-	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
-		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
+	resp, body, e := request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
+		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
+		"/" +
+		r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id).
+		End()
 	if resp.StatusCode != http.StatusNoContent {
-		err = errors.New("rancher2 API - could not delete operator " + body)
+		err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
 		return
 	}
 	if len(e) > 0 {
-		err = errors.New("rancher2 API - something went wrong")
+		err = lib.ErrSomethingWentWrong
+		return
+	}
+
+	// Delete Volume
+	if operator.PersistData {
+		err = r.deletePersistentVolumeClaim(r.getOperatorName(pipelineId, operator)[0])
+	}
+
+	//Delete Workload
+	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	resp, body, e = request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
+		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
+	if resp.StatusCode != http.StatusNoContent {
+		switch {
+		case resp.StatusCode == http.StatusNotFound:
+			err = lib.ErrWorkloadNotFound
+		default:
+			err = errors.New("rancher2 API - could not delete operator " + body)
+		}
+		return
+	}
+	if len(e) > 0 {
+		err = lib.ErrSomethingWentWrong
 		return
 	}
 
@@ -208,7 +233,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		return
 	}
 	if len(e) > 0 {
-		err = errors.New("rancher2 API - something went wrong")
+		err = lib.ErrSomethingWentWrong
 		return
 	}
 
@@ -224,7 +249,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		return
 	}
 	if len(e) > 0 {
-		err = errors.New("rancher2 API - something went wrong")
+		err = lib.ErrSomethingWentWrong
 		return
 	}
 
@@ -259,7 +284,7 @@ func (r *Rancher2) deletePersistentVolumeClaim(name string) (err error) {
 	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/persistentVolumeClaims/" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + name).End()
 	if len(e) > 0 {
-		err = errors.New("rancher2 API - something went wrong")
+		err = lib.ErrSomethingWentWrong
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
