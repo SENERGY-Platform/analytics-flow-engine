@@ -98,10 +98,11 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	}
 	pipeConfig := f.createPipelineConfig(pipeline)
 	pipeConfig.UserId = userId
-	pipeline.Operators, err = f.startOperators(pipeline, pipeConfig, userId, token)
+	newOperators, err := f.startOperators(pipeline, pipeConfig, userId, token)
 	if err != nil {
 		return
 	}
+	pipeline.Operators = newOperators
 	err = updatePipeline(&pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
 	log.Printf("%+v", pipeline)
 	return
@@ -206,10 +207,11 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	}
 	pipeline.ConsumeAllMessages = pipelineRequest.ConsumeAllMessages
 
-	pipeline.Operators, err = f.startOperators(pipeline, pipeConfig, userId, token)
+	newOperators, err := f.startOperators(pipeline, pipeConfig, userId, token)
 	if err != nil {
 		return
 	}
+	pipeline.Operators = newOperators
 
 	err = updatePipeline(&pipeline, userId, token)
 
@@ -248,33 +250,6 @@ func (f *FlowEngine) GetPipelineStatus(id, userId, token string) error {
 		return errors.New("Pipeline " + id + " not found")
 	}
 	return nil
-}
-
-func (f *FlowEngine) deleteOperators(pipeline Pipeline, userId string) (err error) {
-	counter := 0
-	for _, operator := range pipeline.Operators {
-		switch operator.DeploymentType {
-		case "local":
-			log.Println("engine - stop local Operator: " + operator.Name)
-			err = stopFogOperator(pipeline.Id.String(),
-				operator, userId)
-			if err != nil {
-				return err
-			}
-			break
-		default:
-			err = f.driver.DeleteOperator(pipeline.Id.String(), operator)
-			if err != nil {
-				switch {
-				case errors.Is(err, ErrWorkloadNotFound) && counter > 0:
-				default:
-					log.Println(err.Error())
-				}
-			}
-		}
-		counter++
-	}
-	return
 }
 
 func seperateOperators(pipeline Pipeline) (localOperators []Operator, cloudOperators []Operator) {
@@ -338,6 +313,7 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 	localOperators, cloudOperators := seperateOperators(pipeline)
 
 	if len(cloudOperators) > 0 {
+		log.Println("Try to start cloud operators")
 		err = retry(3, 3*time.Second, func() (err error) {
 			return f.driver.CreateOperators(
 				pipeline.Id.String(),
@@ -361,11 +337,12 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 	}
 	if len(localOperators) > 0 {
 		for _, operator := range localOperators {
-			log.Println("start local Operator: " + operator.Name)
+			log.Println("try to start local operator: " + operator.Name + " for pipeline: " + pipeline.Id.String())
 			err = startFogOperator(operator, pipeConfig, userID)
 			if err != nil {
 				return 
 			}
+			log.Println("engine - started local operator: " + operator.Name + " for pipeline: " + pipeline.Id.String())
 
 			err = f.enableFogToCloudForwarding(operator, pipeline.Id.String(), userID) 
 			if err != nil {
