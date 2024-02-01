@@ -99,6 +99,9 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	pipeConfig := f.createPipelineConfig(pipeline)
 	pipeConfig.UserId = userId
 	pipeline.Operators, err = f.startOperators(pipeline, pipeConfig, userId, token)
+	if err != nil {
+		return
+	}
 	err = updatePipeline(&pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
 	log.Printf("%+v", pipeline)
 	return
@@ -349,6 +352,7 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 			log.Println("engine - successfully started cloud operators - " + pipeline.Id.String())
 			cloudOperatorsWithDownstreamID, err2 := f.enableCloudToFogForwarding(cloudOperators, pipeline.Id.String(), userID, token)
 			if err2 != nil {
+				log.Println("engine - cant enable cloud2fog forwarding - " + err2.Error())
 				err = err2
 				return 
 			}
