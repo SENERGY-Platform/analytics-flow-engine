@@ -228,6 +228,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 	if err != nil {
 		return
 	}
+	log.Println("removed all operators for pipeline: " + id)
 
 	err = deletePipeline(id, userId, token)
 	if err != nil {
@@ -282,6 +283,7 @@ func (f *FlowEngine) stopOperators(pipeline Pipeline, userID, token string) erro
 					return err
 				}
 			}
+			log.Println("Removed operator: " + operator.Id + " of pipeline: " + pipeline.Id.String())
 			counter++
 		}
 		err := f.disableCloudToFogForwarding(cloudOperators, pipeline.Id.String(), userID, token)
@@ -406,7 +408,8 @@ func (f *FlowEngine) disableCloudToFogForwarding(operators []Operator, pipelineI
 				return err
 			}
 			log.Printf("Disabled Cloud2Fog Forwarding for operator %s\n", operator.Id)
-
+		} else {
+			log.Println("Operator " + operator.Id + " has no downstream forwarding enabled")
 		}
 	}
 	return nil
@@ -427,6 +430,8 @@ func (f *FlowEngine) disableFogToCloudForwarding(operator Operator, pipelineID, 
 		if err != nil {
 			log.Println("cant publish disable Fog2Cloud message for operator: " + operator.Name + " - " + operator.Id + ": " + err.Error())
 		}				
+	} else {
+		log.Println("Operator " + operator.Id + " has no upstream forwarding enabled")
 	}
 	return nil
 }

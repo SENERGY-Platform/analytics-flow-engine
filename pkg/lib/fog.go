@@ -162,11 +162,16 @@ func stopFogOperator(pipelineId string, operator Operator, userID string) error 
 	}
 	out, err := json.Marshal(command)
 	if err != nil {
+		log.Println("cant unmarshal stop command for operator: " + operator.Name + " - " + operator.Id + ": " + err.Error())
 		return err
 	}
 
 	controlTopic := operatorLib.GetStopOperatorCloudTopic(userID)
 	log.Println("publish stop command for operator: " + operator.Name + " - " + operator.Id)
-	publishMessage(controlTopic, string(out))
+	err = publishMessage(controlTopic, string(out))
+	if err != nil {
+		log.Println("cant publish stop command for operator: " + operator.Name + " - " + operator.Id + ": " + err.Error())
+		return err
+	}
 	return nil
 }
