@@ -104,6 +104,9 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	}
 	pipeline.Operators = newOperators
 	err = updatePipeline(&pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
+	if err != nil {
+		log.Println("Cant update pipeline")
+	}
 	log.Printf("Started pipeline with config: %+v", pipeline)
 	return
 }

@@ -199,6 +199,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		"/" + autoscalerCheckpointId).End()
 	if resp.StatusCode != http.StatusNoContent {
 		err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
+		// There must no checkpoint exists
 		if resp.StatusCode == http.StatusNotFound {
 			log.Printf("Cant delete vpa checkpoint %s as it does not exist\n", autoscalerCheckpointId)
 			err = nil
