@@ -103,9 +103,8 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 		return
 	}
 	pipeline.Operators = newOperators
-	log.Printf("%+v", pipeline)
 	err = updatePipeline(&pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
-	log.Printf("%+v", pipeline)
+	log.Printf("Started pipeline with config: %+v", pipeline)
 	return
 }
 
@@ -226,7 +225,6 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 		return
 	}
 	err = f.stopOperators(pipeline, userId, token)
-	log.Printf("%+v", pipeline)
 	if err != nil {
 		return
 	}
@@ -341,6 +339,7 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 			log.Println("try to start local operator: " + operator.Name + " for pipeline: " + pipeline.Id.String())
 			err = startFogOperator(operator, pipeConfig, userID)
 			if err != nil {
+				log.Println("Cant start local operator: " + operator.Name + " for pipeline: " + pipeline.Id.String() + ": " + err.Error())
 				return 
 			}
 			log.Println("engine - started local operator: " + operator.Name + " for pipeline: " + pipeline.Id.String())
@@ -358,9 +357,10 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 func (f *FlowEngine) enableCloudToFogForwarding(operators []Operator, pipelineID, userID, token string) (newOperators []Operator, err error) {
 	for _, operator := range operators {
 		if operator.DownstreamConfig.Enabled {
-			log.Printf("Enable Cloud2Fog Forwarding for operator %s\n", operator.Id)
+			log.Printf("Try to enable Cloud2Fog Forwarding for operator %s\n", operator.Id)
 			createdInstance, err2 := f.kafak2mqttService.StartOperatorInstance(operator.Name, operator.Id, pipelineID, userID, token)
 			if err != nil {
+				log.Printf("Cant enable Cloud2Fog Forwarding for operator %s\n: %s", operator.Id, err.Error())
 				err = err2
 				return 
 			}
@@ -374,24 +374,24 @@ func (f *FlowEngine) enableCloudToFogForwarding(operators []Operator, pipelineID
 
 func (f *FlowEngine) enableFogToCloudForwarding(operator Operator, pipelineID, userID string) (error) {
 	if operator.UpstreamConfig.Enabled {
-		log.Printf("Enable Fog2Cloud Forwarding for operator %s\n", operator.Id)
+		log.Printf("Try to enable Fog2Cloud Forwarding for operator %s\n", operator.Id)
 
 		command := &upstreamLib.UpstreamControlMessage{
 			OperatorOutputTopic: operator.OutputTopic,
 		}
 		message, err := json.Marshal(command)
 		if err != nil {
+			log.Println("Cant unmarshal enable fog2cloud message for operator: " + operator.Name + " - " + operator.Id + ": " + err.Error())
 			return err 
 		}
 		topic := upstreamLib.GetUpstreamEnableCloudTopic(userID)
 		log.Println("try to publish enable forwarding command for operator: " + operator.Name + " - " + operator.Id + " to topic: " + topic)
 		err = publishMessage(topic, string(message))
 		if err != nil {
-			log.Println("Cant enable upstream forwarding for " + operator.Id + ": " + err.Error())
+			log.Println("Cant publish enable upstream forwarding for " + operator.Id + ": " + err.Error())
 			return err 
-		} else {
-			log.Println("publish enable forwarding command for operator: " + operator.Name + " - " + operator.Id + " to topic: " + topic + " was successfull")
-		}
+		} 
+		log.Println("published enable forwarding command for operator: " + operator.Name + " - " + operator.Id + " to topic: " + topic + " was successfull")
 	}
 	return nil
 }
@@ -399,10 +399,14 @@ func (f *FlowEngine) enableFogToCloudForwarding(operator Operator, pipelineID, u
 func (f *FlowEngine) disableCloudToFogForwarding(operators []Operator, pipelineID, userID, token string) error {
 	for _, operator := range operators {
 		if operator.DownstreamConfig.Enabled {
+			log.Printf("Try to disable Cloud2Fog Forwarding for operator %s\n", operator.Id)
 			err := f.kafak2mqttService.RemoveInstance(operator.DownstreamConfig.InstanceID, pipelineID, userID, token)
 			if err != nil {
+				log.Printf("Cant disable Cloud2Fog Forwarding for operator %s: %s\n", operator.Id, err.Error())
 				return err
 			}
+			log.Printf("Disabled Cloud2Fog Forwarding for operator %s\n", operator.Id)
+
 		}
 	}
 	return nil
@@ -419,7 +423,10 @@ func (f *FlowEngine) disableFogToCloudForwarding(operator Operator, pipelineID, 
 			return err
 		}
 		log.Println("publish disable forwarding command for operator: " + operator.Name + " - " + operator.Id)
-		publishMessage(upstreamLib.GetUpstreamDisableCloudTopic(userID), string(message))					
+		err = publishMessage(upstreamLib.GetUpstreamDisableCloudTopic(userID), string(message))	
+		if err != nil {
+			log.Println("cant publish disable Fog2Cloud message for operator: " + operator.Name + " - " + operator.Id + ": " + err.Error())
+		}				
 	}
 	return nil
 }
