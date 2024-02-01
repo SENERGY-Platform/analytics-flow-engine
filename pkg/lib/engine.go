@@ -103,6 +103,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 		return
 	}
 	pipeline.Operators = newOperators
+	log.Printf("%+v", pipeline)
 	err = updatePipeline(&pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
 	log.Printf("%+v", pipeline)
 	return
@@ -364,8 +365,8 @@ func (f *FlowEngine) enableCloudToFogForwarding(operators []Operator, pipelineID
 				return 
 			}
 			operator.DownstreamConfig.InstanceID = createdInstance.Id
-			newOperators = append(newOperators, operator)
-		}
+		} 
+		newOperators = append(newOperators, operator) // operator needs to be appened so that no operator is lost
 	}
 	
 	return 
