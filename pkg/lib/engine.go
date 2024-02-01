@@ -269,6 +269,8 @@ func seperateOperators(pipeline Pipeline) (localOperators []Operator, cloudOpera
 func (f *FlowEngine) stopOperators(pipeline Pipeline, userID, token string) error {
 	localOperators, cloudOperators := seperateOperators(pipeline)
 	// TODO remove localOperators = addPipelineIDToFogTopic(localOperators, pipeline.Id.String())
+	log.Printf("%+v\n", localOperators)
+	log.Printf("%+v", cloudOperators)
 
 	if len(cloudOperators) > 0 {
 		counter := 0
@@ -277,6 +279,7 @@ func (f *FlowEngine) stopOperators(pipeline Pipeline, userID, token string) erro
 			if err != nil {
 				log.Println("Cant delete operator: " + err.Error())
 				switch {
+				// When first operator is deleted -> the whole pod gets removed, so all following operators wont exists anymore
 				case errors.Is(err, ErrWorkloadNotFound) && counter > 0:
 				default:
 					log.Println(err.Error())
