@@ -38,6 +38,15 @@ type Pipeline struct {
 	Operators          []Operator `json:"operators,omitempty"`
 }
 
+type UpstreamConfig struct {
+	Enabled bool 
+}
+
+type DownstreamConfig struct {
+	Enabled bool
+	InstanceID string 
+}
+
 type Operator struct {
 	Id              string            `json:"id,omitempty"`
 	Name            string            `json:"name,omitempty"`
@@ -51,6 +60,8 @@ type Operator struct {
 	InputTopics     []InputTopic
 	InputSelections []InputSelection `json:"inputSelections,omitempty"`
 	Cost            uint             `json:"cost"`
+	UpstreamConfig UpstreamConfig `json:"upstream,omitempty"`
+	DownstreamConfig DownstreamConfig `json:"downstream,omitempty"`
 }
 
 type OperatorRequestConfig struct {

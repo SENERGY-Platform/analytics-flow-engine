@@ -19,15 +19,15 @@ package lib
 import (
 	parsingApi "github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	"github.com/google/uuid"
+	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	"strings"
 )
 
 func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
 	for _, operator := range parsedPipeline.Operators {
-		outputTopicName := operator.Name
-		if operator.DeploymentType != "local" {
-			outputTopicName = getOperatorOutputTopic(operator.Name)
-		}
+		// TODO error handling
+		outputTopicName, _ := operatorLib.GenerateOperatorOutputTopic(operator.Name, operator.OperatorId, operator.Id, operator.DeploymentType)
+		
 		op := Operator{
 			Id:             operator.Id,
 			ApplicationId:  uuid.New(),
@@ -37,6 +37,12 @@ func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
 			DeploymentType: operator.DeploymentType,
 			OutputTopic:    outputTopicName,
 			Cost:           operator.Cost,
+			UpstreamConfig: UpstreamConfig{
+				Enabled: operator.UpstreamConfig.Enabled,
+			},
+			DownstreamConfig: DownstreamConfig{
+				Enabled: operator.DownstreamConfig.Enabled,
+			},
 		}
 		for _, topic := range operator.InputTopics {
 			top := InputTopic{Name: topic.TopicName, FilterType: topic.FilterType, FilterValue: topic.FilterValue}
@@ -112,8 +118,4 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline) (
 		operators = append(operators, operator)
 	}
 	return
-}
-
-func getOperatorOutputTopic(name string) (operatorName string) {
-	return "analytics-" + name
 }

@@ -30,8 +30,8 @@ type Endpoint struct {
 	engine *lib.FlowEngine
 }
 
-func NewEndpoint(driver lib.Driver, parsingService lib.ParsingApiService, metricsService lib.MetricsApiService, permissionService lib.PermissionApiService) *Endpoint {
-	ret := lib.NewFlowEngine(driver, parsingService, metricsService, permissionService)
+func NewEndpoint(driver lib.Driver, parsingService lib.ParsingApiService, metricsService lib.MetricsApiService, permissionService lib.PermissionApiService, kafka2mqttService lib.Kafka2MqttApiService) *Endpoint {
+	ret := lib.NewFlowEngine(driver, parsingService, metricsService, permissionService, kafka2mqttService)
 	return &Endpoint{ret}
 }
 
@@ -43,7 +43,11 @@ func (e *Endpoint) getRootEndpoint(w http.ResponseWriter, req *http.Request) {
 
 func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
-	_ = e.engine.GetPipelineStatus(vars["id"])
+	err := e.engine.GetPipelineStatus(vars["id"], e.getUserId(req), req.Header.Get("Authorization"))
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 }

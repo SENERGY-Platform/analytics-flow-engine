@@ -19,6 +19,8 @@ package lib
 import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/metrics-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
+
 )
 
 type Driver interface {
@@ -37,4 +39,9 @@ type MetricsApiService interface {
 
 type PermissionApiService interface {
 	UserHasDevicesReadAccess(ids []string, authorization string) (bool, error)
+}
+
+type Kafka2MqttApiService interface {
+	StartOperatorInstance(operatorName, operatorID string, pipelineID, userI, token string) (kafka2mqtt_api.Instance, error)
+	RemoveInstance(id, pipelineID, userID, token string) error
 }

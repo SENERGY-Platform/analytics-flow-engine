@@ -92,6 +92,31 @@ func getPipeline(id string, userId string, authorization string) (pipe Pipeline,
 	return
 }
 
+func getPipelines(userId string) (pipelines []Pipeline, err error) {
+	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
+	request := gorequest.New()
+	request.Get(pipelineServiceUrl+"/pipeline").Set("X-UserId", userId)
+	resp, body, e := request.End()
+	if len(e) > 0 {
+		err = errors.New("pipeline API - could not get pipelines from pipeline registry: an error occurred")
+		return
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		err = ErrNotFound
+		return
+	}
+	if resp.StatusCode != 200 {
+		err = errors.New("pipeline API - could not get pipelines from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		return 
+	}
+	err = json.Unmarshal([]byte(body), &pipelines)
+	if err != nil {
+		err = errors.New("pipeline API  - could not parse pipelines: " + err.Error())
+		return
+	}
+	return
+}
+
 func deletePipeline(id string, userId string, authorization string) (err error) {
 	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
 	request := gorequest.New()

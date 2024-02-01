@@ -18,14 +18,88 @@ package lib
 
 import (
 	"encoding/json"
+	"log"
+	"strings"
 
-	controlLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/control"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
+	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
+
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 )
 
 func processMessage(message MQTT.Message) {
+	topic := message.Topic()
+	log.Println("Received message on: " + topic)
 
+	if strings.HasSuffix(topic, "/operator/control/sync/request") {
+		userID := operatorLib.GetUserIDFromOperatorControlSyncTopic(topic)
+		sendActiveOperators(userID)
+	}
+
+	if strings.HasSuffix(topic, "/upstream/sync/request") {
+		userID := upstreamLib.GetUserIDFromUpstreamControlSyncTopic(topic)
+		sendTopicsWithEnabledForward(userID)
+	}
+}
+
+func sendActiveOperators(userID string) {
+	pipelines, err := getPipelines(userID)
+	if err != nil {
+		log.Println("Cant get pipelines: " + err.Error())
+	}
+	startCommands := []operatorLib.StartOperatorControlCommand{}
+	for _, pipeline := range(pipelines) {
+		for _, operator := range pipeline.Operators {
+			if operator.DeploymentType == "local" {
+				inputTopics := convertInputTopics(operator.InputTopics)
+				command := GenerateFogOperatorStartCommand(operator, pipeline.Id.String(), inputTopics)
+				startCommands = append(startCommands, command)
+			}
+		}
+	}
+
+	syncMsgStr, err := json.Marshal(startCommands)
+	if err != nil {
+		log.Println("Cant marshal operator sync message: " + err.Error())
+	}
+	topic := operatorLib.GetOperatorControlSyncResponseTopic(userID)
+	err = publishMessage(topic, string(syncMsgStr))
+	if err != nil {
+		log.Println("Cant publish operator sync message: " + err.Error())
+	} 
+}
+
+func sendTopicsWithEnabledForward(userID string) {
+	pipelines, err := getPipelines(userID)
+	if err != nil {
+		log.Println("Cant get pipelines: " + err.Error())
+	}
+
+	topics := []string{}
+	for _, pipeline := range(pipelines) {
+		// TODO remove pipeline.Operators = addPipelineIDToFogTopic(pipeline.Operators, pipeline.Id.String())
+
+		for _, operator := range pipeline.Operators {
+			if operator.DeploymentType == "local" {
+				if operator.UpstreamConfig.Enabled {
+					topics = append(topics, operator.OutputTopic)
+				}
+			}
+		}
+	}
+
+	log.Printf("Sync %+v\n", topics)
+
+	syncMsg := upstreamLib.UpstreamSyncMessage{OperatorOutputTopics: topics}
+	syncMsgStr, err := json.Marshal(syncMsg)
+	if err != nil {
+		log.Println("Cant marshal upstream sync message: " + err.Error())
+	}
+	topic := upstreamLib.GetUpstreamControlSyncResponseTopic(userID)
+	err = publishMessage(topic, string(syncMsgStr))
+	if err != nil {
+		log.Println("Cant publish upstream sync message: " + err.Error())
+	} 
 }
 
 func convertInputTopics(inputTopics []InputTopic) []operatorLib.InputTopic {
@@ -47,58 +121,52 @@ func convertInputTopics(inputTopics []InputTopic) []operatorLib.InputTopic {
 	return fogInputTopics
 }
 
-func startFogOperator(input Operator, pipelineConfig PipelineConfig, userID string) {
-	for key, topic := range input.InputTopics {
-		if topic.FilterType == "OperatorId" {
-			input.InputTopics[key].Name = topic.Name + "/" + pipelineConfig.PipelineId
-		}
-	}
-
-	inputTopics := convertInputTopics(input.InputTopics)
-
-	command := &operatorLib.StartOperatorControlCommand{
-		ControlMessage: controlLib.ControlMessage{
-			Command: operatorLib.StartOperatorCommand,
-		},
-		Operator: operatorLib.StartOperatorMessage{
-			ImageId:        input.ImageId,
-			InputTopics:    inputTopics,
-			OperatorConfig: input.Config,
-			Config: operatorLib.FogConfig{
+func GenerateFogOperatorStartCommand(operator Operator, pipelineID string, inputTopics []operatorLib.InputTopic) operatorLib.StartOperatorControlCommand {
+	return operatorLib.StartOperatorControlCommand{
+		ImageId:        operator.ImageId,
+		InputTopics:    inputTopics,
+		OperatorConfig: operator.Config,
+		Config: operatorLib.FogConfig{
 				OperatorIDs: operatorLib.OperatorIDs{
-					OperatorId:     input.Id,
-					PipelineId:     pipelineConfig.PipelineId,
-					BaseOperatorId: input.OperatorId,
+					OperatorId:     operator.Id,
+					PipelineId:     pipelineID,
+					BaseOperatorId: operator.OperatorId,
 				},
-				OutputTopic: input.OutputTopic,
-			},
+				OutputTopic: operator.OutputTopic,
 		},
 	}
+} 
 
+func startFogOperator(operator Operator, pipelineConfig PipelineConfig, userID string) error {
+	inputTopics := convertInputTopics(operator.InputTopics)
+
+	command := GenerateFogOperatorStartCommand(operator, pipelineConfig.PipelineId, inputTopics)
 	out, err := json.Marshal(command)
 	if err != nil {
-		panic(err)
+		return err
 	}
-	controlTopic := controlLib.GetConnectorControlTopic(userID)
+	controlTopic := operatorLib.GetStartOperatorCloudTopic(userID)
+	log.Println("publish start command for operator: " + operator.Name + " - " + operator.Id + " to topic: " + controlTopic)
 	publishMessage(controlTopic, string(out))
+	//TODO error handling publish !!!
+	return nil
 }
 
-func stopFogOperator(pipelineId string, input Operator, userID string) {
+func stopFogOperator(pipelineId string, operator Operator, userID string) error {
 	command := &operatorLib.StopOperatorControlCommand{
-		ControlMessage: controlLib.ControlMessage{
-			Command: operatorLib.StopOperatorCommand,
-		},
 		OperatorIDs: operatorLib.OperatorIDs{
-			OperatorId:     input.Id,
+			OperatorId:     operator.Id,
 			PipelineId:     pipelineId,
-			BaseOperatorId: input.OperatorId,
+			BaseOperatorId: operator.OperatorId,
 		},
 	}
 	out, err := json.Marshal(command)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	controlTopic := controlLib.GetConnectorControlTopic(userID)
+	controlTopic := operatorLib.GetStopOperatorCloudTopic(userID)
+	log.Println("publish stop command for operator: " + operator.Name + " - " + operator.Id)
 	publishMessage(controlTopic, string(out))
+	return nil
 }

@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
+	"log"
 	"crypto/tls"
 
 	"encoding/json"
@@ -137,6 +137,11 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 	}
 
 	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads").Send(reqBody).End()
+	if len(e) > 0 {
+		log.Println(e[0])
+		err = errors.New("rancher2 API -  could not create operators - an error occurred")
+		return
+	}
 	if resp.StatusCode != http.StatusCreated {
 		err = errors.New("rancher2 API - could not create operators " + body)
 	}

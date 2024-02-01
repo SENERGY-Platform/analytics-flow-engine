@@ -22,10 +22,11 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"net/url"
 	"time"
-
-	MQTT "github.com/eclipse/paho.mqtt.golang"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
+	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
+	MQTT "github.com/eclipse/paho.mqtt.golang"
 
 )
 
@@ -42,8 +43,11 @@ func ConnectMQTTBroker() {
 	server := flag.String("server", GetEnv("BROKER_ADDRESS", "tcp://127.0.0.1:1883"), "The full url of the MQTT server to connect to ex: tcp://127.0.0.1:1883")
 
 	topics := map[string]byte{
-		operatorLib.OperatorsResultTopic: byte(0),
-	}
+		upstreamLib.GetUpstreamControlSyncTriggerSubTopic(): byte(0),
+		operatorLib.GetOperatorControlSyncTriggerSubTopic(): byte(0),
+	} 
+	log.Printf("Subscribed to topics: %v\n", topics)
+
 	qos = flag.Int("qos", 2, "The QoS to subscribe to messages at")
 	retained = flag.Bool("retained", false, "Are the messages sent with the retained flag")
 	clientId := flag.String("clientid", hostname+strconv.Itoa(time.Now().Second()), "A clientid for the connection")
@@ -51,13 +55,29 @@ func ConnectMQTTBroker() {
 	password := flag.String("password", GetEnv("BROKER_PASSWORD", ""), "Password to match username")
 	flag.Parse()
 
-	connOpts := MQTT.NewClientOptions().AddBroker(*server).SetClientID(*clientId).SetCleanSession(true)
+	connOpts := MQTT.NewClientOptions().
+		AddBroker(*server).
+		SetClientID(*clientId).
+		SetCleanSession(true).
+		SetConnectionLostHandler(func(c MQTT.Client, err error) {
+			log.Printf("Connection Lost!")
+		}).
+		SetConnectionAttemptHandler(func(broker *url.URL, tlsCfg *tls.Config) *tls.Config {
+			log.Printf("Attempt to connect!")
+			return tlsCfg
+		}).
+		SetReconnectingHandler(func(mqttClient MQTT.Client, opt *MQTT.ClientOptions) {
+			log.Printf("Try to reconnect!")
+		}).
+		SetAutoReconnect(true)
+
 	if *username != "" {
 		connOpts.SetUsername(*username)
 		if *password != "" {
 			connOpts.SetPassword(*password)
 		}
 	}
+
 	tlsConfig := &tls.Config{InsecureSkipVerify: true, ClientAuth: tls.NoClientCert}
 	connOpts.SetTLSConfig(tlsConfig)
 
@@ -65,6 +85,7 @@ func ConnectMQTTBroker() {
 		if token := c.SubscribeMultiple(topics, onMessageReceived); token.Wait() && token.Error() != nil {
 			panic(token.Error())
 		}
+		log.Println("Connected successfully to MQTT broker")
 	}
 
 	client = MQTT.NewClient(connOpts)
@@ -75,8 +96,12 @@ func ConnectMQTTBroker() {
 	}
 }
 
-func publishMessage(topic string, message string) {
-	client.Publish(topic, byte(*qos), *retained, message)
+func publishMessage(topic string, message string) error {
+	token := client.Publish(topic, byte(*qos), *retained, message)
+	if token.Wait() && token.Error() != nil {
+		return token.Error()
+	}
+	return nil
 }
 
 func onMessageReceived(client MQTT.Client, message MQTT.Message) {

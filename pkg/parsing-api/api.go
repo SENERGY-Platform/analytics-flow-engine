@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-
 	"github.com/parnurzeal/gorequest"
 	"github.com/pkg/errors"
 )
