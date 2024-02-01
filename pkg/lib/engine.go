@@ -98,12 +98,10 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	}
 	pipeConfig := f.createPipelineConfig(pipeline)
 	pipeConfig.UserId = userId
-	log.Printf("%+v", pipeline.Operators)
 	pipeline.Operators, err = f.startOperators(pipeline, pipeConfig, userId, token)
 	if err != nil {
 		return
 	}
-	log.Printf("%+v", pipeline.Operators)
 	err = updatePipeline(&pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
 	log.Printf("%+v", pipeline)
 	return
@@ -358,7 +356,7 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 				err = err2
 				return 
 			}
-			newOperators = cloudOperatorsWithDownstreamID
+			newOperators = append(newOperators, cloudOperatorsWithDownstreamID...)
 		}
 	}
 	if len(localOperators) > 0 {
