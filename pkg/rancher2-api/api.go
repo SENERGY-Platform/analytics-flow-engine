@@ -191,14 +191,12 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err error) {
 
 	// Delete AutoscalerCheckpoint
-	autoscalerCheckpointId := r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id)
+	autoscalerCheckpointId := r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
 	log.Println("Try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e := request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
-		"/" + autoscalerCheckpointId)
-		.
-		End()
+		"/" + autoscalerCheckpointId).End()
 	if resp.StatusCode != http.StatusNoContent {
 		err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
 		if resp.StatusCode == http.StatusNotFound {
