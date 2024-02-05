@@ -72,7 +72,7 @@ func (api *Kafka2MqttApi) startInstance(instanceConfig Instance, userID, authori
 		return 
 	}
 	if resp.StatusCode != http.StatusOK {
-		log.Println("Received wrong response code at created instance: " + err.Error())
+		log.Println("Received wrong response code at created instance: " + strconv.Itoa(resp.StatusCode))
 		err = errors.New("kafka2mqtt API - could not start instance: " + strconv.Itoa(resp.StatusCode) + " " + body)
 		return 
 	}
