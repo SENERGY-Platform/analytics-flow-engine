@@ -45,6 +45,7 @@ func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	pipelineStatus, err := e.engine.GetPipelineStatus(vars["id"], e.getUserId(req), req.Header.Get("Authorization"))
 	if err != nil {
+		log.Println("Cant get pipeline status of " + vars["id"] + ": " + err.Error())
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
