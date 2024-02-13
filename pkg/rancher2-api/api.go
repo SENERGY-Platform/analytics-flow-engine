@@ -49,7 +49,6 @@ func NewRancher2(url string, accessKey string, secretKey string, stackId string,
 func (r *Rancher2) GetPipelineStatus(pipelineId string) (status lib.PipelineStatus, err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e := request.Get(r.kubeUrl + "apps.deployments/analytics-pipelines/pipeline-" + pipelineId).Send(nil).End()
-	log.Printf("%+v", e)
 	if len(e) > 0 {
 		err = errors.New("rancher2 API -  could not get deployments - " + e[0].Error())
 		return 
