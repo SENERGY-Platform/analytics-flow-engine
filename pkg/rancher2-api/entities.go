@@ -127,3 +127,30 @@ type MaxAllowed struct {
 	CPU    int64  `json:"cpu,omitempty"`
 	Memory string `json:"memory,omitempty"`
 }
+
+type DeploymentMetaDataState struct {
+	Error bool
+	Message string
+	Name string
+	Transitioning bool
+}
+
+type DeploymentStatus struct {
+	Replicas int 
+	ReadyReplicas int
+	UpdatedReplicas int 
+	AvailableReplicas int
+}
+
+type DeploymentMetaData struct {
+	Name string 
+	Namespace string
+	CreationTimestamp string `json:"creationTimestamp"`
+	State DeploymentMetaDataState 
+}
+
+type DeploymentResponse struct {
+	Id string
+	APIType string  `json:"type"`
+	Metadata DeploymentMetaData
+}

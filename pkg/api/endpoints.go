@@ -43,9 +43,14 @@ func (e *Endpoint) getRootEndpoint(w http.ResponseWriter, req *http.Request) {
 
 func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
-	err := e.engine.GetPipelineStatus(vars["id"], e.getUserId(req), req.Header.Get("Authorization"))
+	pipelineStatus, err := e.engine.GetPipelineStatus(vars["id"], e.getUserId(req), req.Header.Get("Authorization"))
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	err = json.NewEncoder(w).Encode(pipelineStatus)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

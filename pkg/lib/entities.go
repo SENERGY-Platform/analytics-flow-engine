@@ -155,3 +155,9 @@ type Claims struct {
 func (c Claims) Valid() error {
 	return nil
 }
+
+type PipelineStatus struct {
+	Running bool
+	Transitioning bool
+	Message string
+}

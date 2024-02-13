@@ -246,13 +246,8 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 	return
 }
 
-func (f *FlowEngine) GetPipelineStatus(id, userId, token string) error {
-	//TODO: Implement method
-	_, err := getPipeline(id, userId, token)
-	if err != nil {
-		return errors.New("Pipeline " + id + " not found")
-	}
-	return nil
+func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (PipelineStatus, error) {
+	return f.driver.GetPipelineStatus(id)
 }
 
 func seperateOperators(pipeline Pipeline) (localOperators []Operator, cloudOperators []Operator) {
