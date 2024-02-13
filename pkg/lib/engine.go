@@ -247,7 +247,8 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 }
 
 func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (PipelineStatus, error) {
-	return f.driver.GetPipelineStatus(id)
+	status, err := f.driver.GetPipelineStatus(id)
+	return status, err
 }
 
 func seperateOperators(pipeline Pipeline) (localOperators []Operator, cloudOperators []Operator) {
