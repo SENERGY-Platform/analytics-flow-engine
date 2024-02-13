@@ -157,7 +157,7 @@ func (c Claims) Valid() error {
 }
 
 type PipelineStatus struct {
-	Running bool
-	Transitioning bool
-	Message string
+	Running bool `json:"running"`
+	Transitioning bool `json:"transitioning"`
+	Message string `json:"message"`
 }
