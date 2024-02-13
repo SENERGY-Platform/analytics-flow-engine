@@ -46,7 +46,7 @@ func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request) {
 	pipelineStatus, err := e.engine.GetPipelineStatus(vars["id"], e.getUserId(req), req.Header.Get("Authorization"))
 	if err != nil {
 		log.Println("Cant get pipeline status of " + vars["id"] + ": " + err.Error())
-		w.WriteHeader(http.StatusNotFound)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	err = json.NewEncoder(w).Encode(pipelineStatus)
