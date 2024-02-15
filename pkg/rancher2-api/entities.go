@@ -35,6 +35,7 @@ type Container struct {
 	Labels          map[string]string  `json:"labels,omitempty"`
 	VolumeMounts    []VolumeMount      `json:"volumeMounts,omitempty"`
 	Resources       ContainerResources `json:"resources,omitempty"`
+	Ports           []ContainerPort    `json:"ports,omitempty"`
 }
 
 type ContainerResources struct {
@@ -129,28 +130,33 @@ type MaxAllowed struct {
 }
 
 type DeploymentMetaDataState struct {
-	Error bool
-	Message string
-	Name string
+	Error         bool
+	Message       string
+	Name          string
 	Transitioning bool
 }
 
 type DeploymentStatus struct {
-	Replicas int 
-	ReadyReplicas int
-	UpdatedReplicas int 
+	Replicas          int
+	ReadyReplicas     int
+	UpdatedReplicas   int
 	AvailableReplicas int
 }
 
 type DeploymentMetaData struct {
-	Name string 
-	Namespace string
+	Name              string
+	Namespace         string
 	CreationTimestamp string `json:"creationTimestamp"`
-	State DeploymentMetaDataState 
+	State             DeploymentMetaDataState
 }
 
 type DeploymentResponse struct {
-	Id string
-	APIType string  `json:"type"`
+	Id       string
+	APIType  string `json:"type"`
 	Metadata DeploymentMetaData
+}
+
+type ContainerPort struct {
+	Name          string `json:"name,omitempty"`
+	ContainerPort int    `json:"containerPort,omitempty"`
 }

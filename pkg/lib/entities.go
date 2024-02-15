@@ -34,33 +34,32 @@ type Pipeline struct {
 	MergeStrategy      string     `json:"mergeStrategy,omitempty"`
 	ConsumeAllMessages bool       `json:"consumeAllMessages,omitempty"`
 	Metrics            bool       `json:"metrics,omitempty"`
-	MetricsData        Metrics    `json:"metricsData,omitempty"`
 	Operators          []Operator `json:"operators,omitempty"`
 }
 
 type UpstreamConfig struct {
-	Enabled bool 
+	Enabled bool
 }
 
 type DownstreamConfig struct {
-	Enabled bool
-	InstanceID string 
+	Enabled    bool
+	InstanceID string
 }
 
 type Operator struct {
-	Id              string            `json:"id,omitempty"`
-	Name            string            `json:"name,omitempty"`
-	ApplicationId   uuid.UUID         `json:"applicationId,omitempty"`
-	ImageId         string            `json:"imageId,omitempty"`
-	DeploymentType  string            `json:"deploymentType,omitempty"`
-	OperatorId      string            `json:"operatorId,omitempty"`
-	Config          map[string]string `json:"config,omitempty"`
-	OutputTopic     string            `json:"outputTopic,omitempty"`
-	PersistData     bool              `json:"persistData,omitempty"`
-	InputTopics     []InputTopic
-	InputSelections []InputSelection `json:"inputSelections,omitempty"`
-	Cost            uint             `json:"cost"`
-	UpstreamConfig UpstreamConfig `json:"upstream,omitempty"`
+	Id               string            `json:"id,omitempty"`
+	Name             string            `json:"name,omitempty"`
+	ApplicationId    uuid.UUID         `json:"applicationId,omitempty"`
+	ImageId          string            `json:"imageId,omitempty"`
+	DeploymentType   string            `json:"deploymentType,omitempty"`
+	OperatorId       string            `json:"operatorId,omitempty"`
+	Config           map[string]string `json:"config,omitempty"`
+	OutputTopic      string            `json:"outputTopic,omitempty"`
+	PersistData      bool              `json:"persistData,omitempty"`
+	InputTopics      []InputTopic
+	InputSelections  []InputSelection `json:"inputSelections,omitempty"`
+	Cost             uint             `json:"cost"`
+	UpstreamConfig   UpstreamConfig   `json:"upstream,omitempty"`
 	DownstreamConfig DownstreamConfig `json:"downstream,omitempty"`
 }
 
@@ -80,15 +79,6 @@ type InputTopic struct {
 type Mapping struct {
 	Dest   string `json:"dest,omitempty"`
 	Source string `json:"source,omitempty"`
-}
-
-type Metrics struct {
-	Database string `json:"database,omitempty"`
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
-	Url      string `json:"url,omitempty"`
-	Interval string `json:"interval,omitempty"`
-	XmlUrl   string `json:"xmlurl,omitempty"`
 }
 
 type PipelineRequest struct {
@@ -140,7 +130,6 @@ type PipelineConfig struct {
 	WindowTime     int
 	MergeStrategy  string
 	Metrics        bool
-	MetricsData    Metrics
 	ConsumerOffset string
 	FlowId         string
 	PipelineId     string
@@ -157,7 +146,7 @@ func (c Claims) Valid() error {
 }
 
 type PipelineStatus struct {
-	Running bool `json:"running"`
-	Transitioning bool `json:"transitioning"`
-	Message string `json:"message"`
+	Running       bool   `json:"running"`
+	Transitioning bool   `json:"transitioning"`
+	Message       string `json:"message"`
 }

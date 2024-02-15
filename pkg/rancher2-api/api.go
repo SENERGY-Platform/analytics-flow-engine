@@ -17,14 +17,14 @@
 package rancher2_api
 
 import (
+	"crypto/tls"
 	"errors"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	"log"
-	"crypto/tls"
 
 	"encoding/json"
 
@@ -51,8 +51,8 @@ func (r *Rancher2) GetPipelineStatus(pipelineId string) (status lib.PipelineStat
 	resp, body, e := request.Get(r.kubeUrl + "apps.deployments/analytics-pipelines/pipeline-" + pipelineId).Send(nil).End()
 	if len(e) > 0 {
 		err = errors.New("rancher2 API - could not request deployment - " + e[0].Error())
-		return 
-	}	
+		return
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New("rancher2 API - deployment response is not ok - " + strconv.Itoa(resp.StatusCode) + " - " + body)
@@ -66,11 +66,11 @@ func (r *Rancher2) GetPipelineStatus(pipelineId string) (status lib.PipelineStat
 		return
 	}
 	status = lib.PipelineStatus{
-		Running: deployment.Metadata.State.Error == false && deployment.Metadata.State.Transitioning == false,
+		Running:       deployment.Metadata.State.Error == false && deployment.Metadata.State.Transitioning == false,
 		Transitioning: deployment.Metadata.State.Transitioning,
-		Message: deployment.Metadata.State.Message,
+		Message:       deployment.Metadata.State.Message,
 	}
-	return 
+	return
 }
 
 func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
@@ -92,11 +92,18 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 			"USER_ID":                           pipeConfig.UserId,
 		}
 
+		container := Container{
+			Image:           operator.ImageId,
+			Name:            operator.OperatorId + "--" + operator.Id,
+			ImagePullPolicy: "Always",
+		}
+
 		if pipeConfig.Metrics {
-			env["METRICS_URL"] = pipeConfig.MetricsData.Url
-			env["METRICS_USER"] = pipeConfig.MetricsData.Username
-			env["METRICS_PASSWORD"] = pipeConfig.MetricsData.Password
-			env["METRICS_INTERVAL"] = pipeConfig.MetricsData.Interval
+			env["METRICS"] = "true"
+			container.Ports = []ContainerPort{{
+				Name:          "metrics",
+				ContainerPort: 5555,
+			}}
 		}
 		if operator.OutputTopic != "" {
 			env["OUTPUT"] = operator.OutputTopic
@@ -109,13 +116,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 				Value: v,
 			})
 		}
-
-		container := Container{
-			Image:           operator.ImageId,
-			Name:            operator.OperatorId + "--" + operator.Id,
-			Env:             r2Env,
-			ImagePullPolicy: "Always",
-		}
+		container.Env = r2Env
 
 		if operator.PersistData {
 			err = r.createPersistentVolumeClaim(r.getOperatorName(pipelineId, operator)[0])
@@ -128,15 +129,6 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 				Name:                  r.getOperatorName(pipelineId, operator)[0],
 				PersistentVolumeClaim: PersistentVolumeClaim{PersistentVolumeClaimId: r.getOperatorName(pipelineId, operator)[0]}},
 			)
-		}
-
-		if pipeConfig.Metrics {
-			container.Command = []string{
-				"java",
-				"-javaagent:/opt/jmxtrans-agent.jar=" + pipeConfig.MetricsData.XmlUrl,
-				"-jar",
-				"/opt/operator.jar",
-			}
 		}
 		container.Resources = ContainerResources{
 			Requests: map[string]string{

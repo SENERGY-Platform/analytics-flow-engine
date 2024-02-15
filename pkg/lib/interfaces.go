@@ -17,11 +17,9 @@
 package lib
 
 import (
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/metrics-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
-
 )
 
 type Driver interface {
@@ -32,11 +30,6 @@ type Driver interface {
 
 type ParsingApiService interface {
 	GetPipeline(id string, userId string, authorization string) (p parsing_api.Pipeline, err error)
-}
-
-type MetricsApiService interface {
-	RegisterPipeline(id string) (metrics_api.MetricsConfig, error)
-	UnregisterPipeline(id string) error
 }
 
 type PermissionApiService interface {

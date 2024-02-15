@@ -22,28 +22,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"encoding/json"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
-	"encoding/json"
-
+	"github.com/google/uuid"
 )
 
 type FlowEngine struct {
 	driver            Driver
 	parsingService    ParsingApiService
-	metricsService    MetricsApiService
 	permissionService PermissionApiService
 	kafak2mqttService Kafka2MqttApiService
 }
 
 func NewFlowEngine(
-	driver Driver, 
+	driver Driver,
 	parsingService ParsingApiService,
-	metricsService MetricsApiService,
 	permissionService PermissionApiService,
 	kafak2mqttService Kafka2MqttApiService) *FlowEngine {
-	return &FlowEngine{driver, parsingService, metricsService, permissionService, kafak2mqttService}
+	return &FlowEngine{driver, parsingService, permissionService, kafak2mqttService}
 }
 
 func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
@@ -90,12 +87,6 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	}
 	pipeline.Operators = addPipelineIDToFogTopic(pipeline.Operators, pipeline.Id.String())
 	pipeline.Metrics = pipelineRequest.Metrics
-	if pipeline.Metrics {
-		err = f.registerMetrics(&pipeline)
-		if err != nil {
-			return
-		}
-	}
 	pipeConfig := f.createPipelineConfig(pipeline)
 	pipeConfig.UserId = userId
 	newOperators, err := f.startOperators(pipeline, pipeConfig, userId, token)
@@ -119,15 +110,14 @@ func addPipelineIDToFogTopic(operators []Operator, pipelineId string) (newOperat
 			operator.OutputTopic = operator.OutputTopic + pipelineIDSuffix
 			for _, operatorInputTopic := range operator.InputTopics {
 				if operatorInputTopic.FilterType == "OperatorId" {
-					operatorInputTopic.Name += pipelineIDSuffix 
-				}			
+					operatorInputTopic.Name += pipelineIDSuffix
+				}
 			}
-		} 
+		}
 		newOperators = append(newOperators, operator)
 	}
 	return
 }
-
 
 func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
 	log.Println("engine - update pipeline: " + pipelineRequest.Id)
@@ -162,21 +152,6 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	pipeline.Description = pipelineRequest.Description
 	pipeline.WindowTime = pipelineRequest.WindowTime
 	pipeline.MergeStrategy = pipelineRequest.MergeStrategy
-
-	if pipeline.Metrics != pipelineRequest.Metrics {
-		pipeline.Metrics = pipelineRequest.Metrics
-		if pipeline.Metrics {
-			err = f.registerMetrics(&pipeline)
-			if err != nil {
-				return
-			}
-		} else {
-			err = f.metricsService.UnregisterPipeline(pipeline.Id.String())
-			if err != nil {
-				return
-			}
-		}
-	}
 
 	err = f.stopOperators(pipeline, userId, token)
 	if err != nil {
@@ -236,12 +211,6 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 	err = deletePipeline(id, userId, token)
 	if err != nil {
 		return
-	}
-	if pipeline.Metrics == true {
-		err = f.metricsService.UnregisterPipeline(pipeline.Id.String())
-		if err != nil {
-			return
-		}
 	}
 	return
 }
@@ -303,14 +272,14 @@ func (f *FlowEngine) stopOperators(pipeline Pipeline, userID, token string) erro
 			if err != nil {
 				return err
 			}
-			err = f.disableFogToCloudForwarding(operator, pipeline.Id.String(), userID, token) 
+			err = f.disableFogToCloudForwarding(operator, pipeline.Id.String(), userID, token)
 			if err != nil {
 				return err
 			}
 		}
 	}
 	return nil
-} 
+}
 
 func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig, userID, token string) (newOperators []Operator, err error) {
 	localOperators, cloudOperators := seperateOperators(pipeline)
@@ -326,14 +295,14 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 		})
 		if err != nil {
 			log.Println(err)
-			return 
+			return
 		} else {
 			log.Println("engine - successfully started cloud operators - " + pipeline.Id.String())
 			cloudOperatorsWithDownstreamID, err2 := f.enableCloudToFogForwarding(cloudOperators, pipeline.Id.String(), userID, token)
 			if err2 != nil {
 				log.Println("engine - cant enable cloud2fog forwarding - " + err2.Error())
 				err = err2
-				return 
+				return
 			}
 			newOperators = append(newOperators, cloudOperatorsWithDownstreamID...)
 		}
@@ -344,11 +313,11 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 			err = startFogOperator(operator, pipeConfig, userID)
 			if err != nil {
 				log.Println("Cant start local operator: " + operator.Name + " for pipeline: " + pipeline.Id.String() + ": " + err.Error())
-				return 
+				return
 			}
 			log.Println("engine - started local operator: " + operator.Name + " for pipeline: " + pipeline.Id.String())
 
-			err = f.enableFogToCloudForwarding(operator, pipeline.Id.String(), userID) 
+			err = f.enableFogToCloudForwarding(operator, pipeline.Id.String(), userID)
 			if err != nil {
 				return
 			}
@@ -366,17 +335,17 @@ func (f *FlowEngine) enableCloudToFogForwarding(operators []Operator, pipelineID
 			if err != nil {
 				log.Printf("Cant enable Cloud2Fog Forwarding for operator %s\n: %s", operator.Id, err.Error())
 				err = err2
-				return 
+				return
 			}
 			operator.DownstreamConfig.InstanceID = createdInstance.Id
-		} 
+		}
 		newOperators = append(newOperators, operator) // operator needs to be appened so that no operator is lost
 	}
-	
-	return 
+
+	return
 }
 
-func (f *FlowEngine) enableFogToCloudForwarding(operator Operator, pipelineID, userID string) (error) {
+func (f *FlowEngine) enableFogToCloudForwarding(operator Operator, pipelineID, userID string) error {
 	if operator.UpstreamConfig.Enabled {
 		log.Printf("Try to enable Fog2Cloud Forwarding for operator %s\n", operator.Id)
 
@@ -386,15 +355,15 @@ func (f *FlowEngine) enableFogToCloudForwarding(operator Operator, pipelineID, u
 		message, err := json.Marshal(command)
 		if err != nil {
 			log.Println("Cant unmarshal enable fog2cloud message for operator: " + operator.Name + " - " + operator.Id + ": " + err.Error())
-			return err 
+			return err
 		}
 		topic := upstreamLib.GetUpstreamEnableCloudTopic(userID)
 		log.Println("try to publish enable forwarding command for operator: " + operator.Name + " - " + operator.Id + " to topic: " + topic)
 		err = publishMessage(topic, string(message))
 		if err != nil {
 			log.Println("Cant publish enable upstream forwarding for " + operator.Id + ": " + err.Error())
-			return err 
-		} 
+			return err
+		}
 		log.Println("published enable forwarding command for operator: " + operator.Name + " - " + operator.Id + " to topic: " + topic + " was successfull")
 	}
 	return nil
@@ -428,16 +397,15 @@ func (f *FlowEngine) disableFogToCloudForwarding(operator Operator, pipelineID, 
 			return err
 		}
 		log.Println("publish disable forwarding command for operator: " + operator.Name + " - " + operator.Id)
-		err = publishMessage(upstreamLib.GetUpstreamDisableCloudTopic(userID), string(message))	
+		err = publishMessage(upstreamLib.GetUpstreamDisableCloudTopic(userID), string(message))
 		if err != nil {
 			log.Println("cant publish disable Fog2Cloud message for operator: " + operator.Name + " - " + operator.Id + ": " + err.Error())
-		}				
+		}
 	} else {
 		log.Println("Operator " + operator.Id + " has no upstream forwarding enabled")
 	}
 	return nil
 }
-
 
 func (f *FlowEngine) createPipelineConfig(pipeline Pipeline) PipelineConfig {
 	var pipeConfig = PipelineConfig{
@@ -447,26 +415,11 @@ func (f *FlowEngine) createPipelineConfig(pipeline Pipeline) PipelineConfig {
 		ConsumerOffset: "latest",
 		Metrics:        pipeline.Metrics,
 		PipelineId:     pipeline.Id.String(),
-		MetricsData:    pipeline.MetricsData,
 	}
 	if pipeline.ConsumeAllMessages {
 		pipeConfig.ConsumerOffset = "earliest"
 	}
 	return pipeConfig
-}
-
-func (f *FlowEngine) registerMetrics(pipeline *Pipeline) (err error) {
-	metricsConfig, err := f.metricsService.RegisterPipeline(pipeline.Id.String())
-	if err != nil {
-		return
-	}
-	pipeline.MetricsData.Database = metricsConfig.Database
-	pipeline.MetricsData.Username = metricsConfig.Username
-	pipeline.MetricsData.Password = metricsConfig.Password
-	pipeline.MetricsData.Url = metricsConfig.Url
-	pipeline.MetricsData.Interval = metricsConfig.Interval
-	pipeline.MetricsData.XmlUrl = metricsConfig.XmlUrl
-	return
 }
 
 func getFilterIdsFromPipelineRequest(pipelineRequest PipelineRequest) ([]string, []string) {

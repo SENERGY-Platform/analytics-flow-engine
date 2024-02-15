@@ -17,12 +17,11 @@
 package api
 
 import (
+	kafka2mqtt_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
-	metrics_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/metrics-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	permission_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/permission-api"
 	rancher2_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/rancher2-api"
-	kafka2mqtt_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
 
 	"log"
 	"net/http"
@@ -45,7 +44,6 @@ func CreateServer() {
 	}
 
 	parser := parsing_api.NewParsingApi(lib.GetEnv("PARSER_API_ENDPOINT", ""))
-	metrics := metrics_api.NewMetricsApi(lib.GetEnv("METRICS_API_ENDPOINT", "http://localhost:5000"))
 	permission := permission_api.NewPermissionApi(lib.GetEnv("PERMISSION_API_ENDPOINT", ""))
 	kafka2mqtt := kafka2mqtt_api.NewKafka2MqttApi(lib.GetEnv("KAFKA2MQTT_API_ENDPOINT", ""))
 
@@ -53,7 +51,7 @@ func CreateServer() {
 	log.Println("Starting Server at port " + port + "\n")
 	router := mux.NewRouter()
 
-	e := NewEndpoint(driver, parser, metrics, permission, kafka2mqtt)
+	e := NewEndpoint(driver, parser, permission, kafka2mqtt)
 	router.HandleFunc("/", e.getRootEndpoint).Methods("GET")
 	router.HandleFunc("/pipeline/{id}", e.getPipelineStatus).Methods("GET")
 	router.HandleFunc("/pipeline", e.startPipeline).Methods("POST")

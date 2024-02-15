@@ -30,8 +30,8 @@ type Endpoint struct {
 	engine *lib.FlowEngine
 }
 
-func NewEndpoint(driver lib.Driver, parsingService lib.ParsingApiService, metricsService lib.MetricsApiService, permissionService lib.PermissionApiService, kafka2mqttService lib.Kafka2MqttApiService) *Endpoint {
-	ret := lib.NewFlowEngine(driver, parsingService, metricsService, permissionService, kafka2mqttService)
+func NewEndpoint(driver lib.Driver, parsingService lib.ParsingApiService, permissionService lib.PermissionApiService, kafka2mqttService lib.Kafka2MqttApiService) *Endpoint {
+	ret := lib.NewFlowEngine(driver, parsingService, permissionService, kafka2mqttService)
 	return &Endpoint{ret}
 }
 
