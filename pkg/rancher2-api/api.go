@@ -76,7 +76,8 @@ func (r *Rancher2) GetPipelineStatus(pipelineId string) (status lib.PipelineStat
 func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
 	var containers []Container
 	var volumes []Volume
-	for _, operator := range inputs {
+	basePort := 8080
+	for i, operator := range inputs {
 		config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
 		labels := map[string]string{"operatorId": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId, "user": pipeConfig.UserId}
 		env := map[string]string{
@@ -99,10 +100,12 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 		}
 
 		if pipeConfig.Metrics {
+			metricsPort := basePort + i
 			env["METRICS"] = "true"
+			env["METRICS_PORT"] = strconv.Itoa(metricsPort)
 			container.Ports = []ContainerPort{{
 				Name:          "metrics",
-				ContainerPort: 5555,
+				ContainerPort: metricsPort,
 			}}
 		}
 		if operator.OutputTopic != "" {
