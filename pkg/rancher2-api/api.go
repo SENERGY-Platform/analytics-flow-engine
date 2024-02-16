@@ -246,7 +246,8 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			err = lib.ErrWorkloadNotFound
+			log.Printf("Cant delete operator %s as it does not exist\n", r.getOperatorName(pipelineId, operator)[1])
+			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator " + body)
 		}
@@ -261,8 +262,14 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e = request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/services/" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
-	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
-		err = errors.New("rancher2 API - could not delete operator service " + body)
+	if resp.StatusCode != http.StatusNoContent {
+		switch {
+		case resp.StatusCode == http.StatusNotFound:
+			log.Printf("Cant delete operator service %s as it does not exist\n", r.getOperatorName(pipelineId, operator)[1])
+			return // dont have to delete whats already deleted
+		default:
+			err = errors.New("rancher2 API - could not delete operator service " + body)
+		}
 		return
 	}
 	if len(e) > 0 {
@@ -277,8 +284,14 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		"/" +
 		r.getOperatorName(pipelineId, operator)[1] + "-vpa").
 		End()
-	if resp.StatusCode != http.StatusNoContent {
-		err = errors.New("rancher2 API - could not delete operator vpa " + body)
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
+		switch {
+		case resp.StatusCode == http.StatusNotFound:
+			log.Printf("Cant delete operator vpa %s as it does not exist\n", r.getOperatorName(pipelineId, operator)[1]+"-vpa")
+			return // dont have to delete whats already deleted
+		default:
+			err = errors.New("rancher2 API - could not delete operator vpa " + body)
+		}
 		return
 	}
 	if len(e) > 0 {
