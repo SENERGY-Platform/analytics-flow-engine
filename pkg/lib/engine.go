@@ -413,7 +413,7 @@ func (f *FlowEngine) createPipelineConfig(pipeline Pipeline) PipelineConfig {
 		MergeStrategy:  pipeline.MergeStrategy,
 		FlowId:         pipeline.FlowId,
 		ConsumerOffset: "latest",
-		Metrics:        pipeline.Metrics,
+		Metrics:        true, // always enable metrics SNRGY-3068 pipeline.Metrics,
 		PipelineId:     pipeline.Id.String(),
 	}
 	if pipeline.ConsumeAllMessages {
