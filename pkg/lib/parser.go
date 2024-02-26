@@ -105,7 +105,7 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline) (
 							// topic of device inputs must be set according to deployment location
 							deviceID := input.FilterIds // TODO send device name and service name in more specific fields
 							serviceID := input.TopicName
-							topicName = deviceLib.GetDeviceOutputTopic(deviceID, serviceID, operator.DeploymentType)
+							topicName, _ = deviceLib.GetDeviceOutputTopic(deviceID, serviceID, operator.DeploymentType)
 
 							t := InputTopic{Name: topicName, FilterType: filterType, FilterValue: filterId}
 							for _, value := range input.Values {
