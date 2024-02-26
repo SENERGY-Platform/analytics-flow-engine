@@ -20,6 +20,7 @@ import (
 	parsingApi "github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	"github.com/google/uuid"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
+	deviceLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/device"
 	"strings"
 )
 
@@ -57,6 +58,7 @@ func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
 }
 
 func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline) (operators []Operator) {
+	// Add operator configs and input topics of the first operators (input topics of later operators are configured by the parser)
 	operatorIds := make([]string, 0)
 	for _, operator := range tmpPipeline.Operators {
 		operatorIds = append(operatorIds, operator.Id)
@@ -78,6 +80,8 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline) (
 			if operator.Id == node.NodeId {
 				operator.PersistData = node.PersistData
 				operator.InputSelections = node.InputSelections
+
+				// only operators at the beginning have node.Inputs
 				if len(node.Inputs) > 0 {
 					for _, input := range node.Inputs {
 						filterId := input.FilterIds
@@ -97,6 +101,12 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline) (
 							} else if input.FilterType == "ImportId" {
 								filterType = "ImportId"
 							}
+
+							// topic of device inputs must be set according to deployment location
+							deviceID := input.FilterIds // TODO send device name and service name in more specific fields
+							serviceID := input.TopicName
+							topicName = deviceLib.GetDeviceOutputTopic(deviceID, serviceID, operator.DeploymentType)
+
 							t := InputTopic{Name: topicName, FilterType: filterType, FilterValue: filterId}
 							for _, value := range input.Values {
 								t.Mappings = append(t.Mappings, Mapping{value.Name, value.Path})
@@ -119,3 +129,4 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline) (
 	}
 	return
 }
+
