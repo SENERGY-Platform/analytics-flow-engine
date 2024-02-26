@@ -1,11 +1,3 @@
-github.com/SENERGY-Platform/analytics-fog-lib v1.0.16 h1:nu3krfGDmBcztUnPmcvtcLXnBP+5ulOpsgwYBwYOOtM=
-github.com/SENERGY-Platform/analytics-fog-lib v1.0.16/go.mod h1:WVm6fWbrcAKJ2V+rUXlKQNnVp8bd+11AYJxSlxA6F+Q=
-github.com/SENERGY-Platform/analytics-fog-lib v1.0.19 h1:1SLldgvP5vWObhkb7Jf3lGNhZ/zG7k3ZlO8jTK5f8tk=
-github.com/SENERGY-Platform/analytics-fog-lib v1.0.19/go.mod h1:WVm6fWbrcAKJ2V+rUXlKQNnVp8bd+11AYJxSlxA6F+Q=
-github.com/SENERGY-Platform/analytics-fog-lib v1.0.20 h1:xssWkKBFWvXrCBcrV/NKivOtlQGpRdGipiOCQCp7xLE=
-github.com/SENERGY-Platform/analytics-fog-lib v1.0.20/go.mod h1:WVm6fWbrcAKJ2V+rUXlKQNnVp8bd+11AYJxSlxA6F+Q=
-github.com/SENERGY-Platform/analytics-fog-lib v1.0.21 h1:PElB3L/MihF3YWCB6oMuUJYc3PdWVizuZUcIdc4/mnQ=
-github.com/SENERGY-Platform/analytics-fog-lib v1.0.21/go.mod h1:WVm6fWbrcAKJ2V+rUXlKQNnVp8bd+11AYJxSlxA6F+Q=
 github.com/SENERGY-Platform/analytics-fog-lib v1.1.5 h1:6e3edovAfg0kVF314tc0PK9u4Ja5n9/fUGtm0w4HEjw=
 github.com/SENERGY-Platform/analytics-fog-lib v1.1.5/go.mod h1:IbFAOaWXaEkLvNyI9QSq9Mw3PtLCONkrY9WHSpqbDQg=
 github.com/SENERGY-Platform/go-service-base/watchdog v0.4.1 h1:DiTETrKnnN8gHfxr0m6A+f8Nd54DD6yZmKL5Oi0qF6E=
@@ -17,8 +9,7 @@ github.com/elazarl/goproxy v0.0.0-20231117061959-7cc037d33fb5/go.mod h1:Ro8st/El
 github.com/elazarl/goproxy/ext v0.0.0-20190711103511-473e67f1d7d2/go.mod h1:gNh8nYJoAm43RfaxurUnxr+N1PwuFV3ZMl/efxlIlY8=
 github.com/golang-jwt/jwt v3.2.2+incompatible h1:IfV12K8xAKAnZqdXVzCZ+TOjboZ2keLg81eXfW3O+oY=
 github.com/golang-jwt/jwt v3.2.2+incompatible/go.mod h1:8pz2t5EyA70fFQQSrl6XZXzqecmYZeUEB8OUGHkxJ+I=
-github.com/google/uuid v1.3.1 h1:KjJaJ9iWZ3jOFZIf1Lqf4laDRCasjl0BCmnEGxkdLb4=
-github.com/google/uuid v1.3.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/google/uuid v1.5.0 h1:1p67kYwdtXjb0gL0BPiP1Av9wiZPo5A8z2cWkTZ+eyU=
 github.com/google/uuid v1.5.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/gopherjs/gopherjs v1.17.2 h1:fQnZVsXk8uxXIStYb0N4bGk7jeyTalG/wsZjQ25dO0g=
 github.com/gopherjs/gopherjs v1.17.2/go.mod h1:pRRIvn/QzFLrKfvEz3qUuEhtE/zLCWfreZ6J5gM2i+k=

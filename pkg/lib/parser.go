@@ -20,7 +20,7 @@ import (
 	parsingApi "github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	"github.com/google/uuid"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
-	deviceLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/device"
+	deviceLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/devices"
 	"strings"
 )
 
