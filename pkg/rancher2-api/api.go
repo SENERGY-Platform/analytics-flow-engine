@@ -333,6 +333,11 @@ func (r *Rancher2) deletePersistentVolumeClaim(name string) (err error) {
 		err = lib.ErrSomethingWentWrong
 		return
 	}
+	if resp.StatusCode == http.StatusNotFound {
+		log.Printf("Cant delete persistent volume claim %s as it does not exist\n", name)
+		err = nil
+		return
+	}
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New("rancher2 API - could not delete PersistentVolumeClaim " + body)
 		return
