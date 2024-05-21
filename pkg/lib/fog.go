@@ -147,8 +147,11 @@ func startFogOperator(operator Operator, pipelineConfig PipelineConfig, userID s
 	}
 	controlTopic := operatorLib.GetStartOperatorCloudTopic(userID)
 	log.Println("publish start command for operator: " + operator.Name + " - " + operator.Id + " to topic: " + controlTopic)
-	publishMessage(controlTopic, string(out))
-	//TODO error handling publish !!!
+	err = publishMessage(controlTopic, string(out))
+	if err != nil {
+		log.Println("cant publish start command for operator: " + operator.Name + " - " + operator.Id + ": " + err.Error())
+		return err
+	}
 	return nil
 }
 
