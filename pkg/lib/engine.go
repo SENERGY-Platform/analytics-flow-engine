@@ -370,9 +370,14 @@ func (f *FlowEngine) enableFogToCloudForwarding(operator Operator, pipelineID, u
 
 func (f *FlowEngine) disableCloudToFogForwarding(operators []Operator, pipelineID, userID, token string) error {
 	for _, operator := range operators {
-		if operator.DownstreamConfig.Enabled {
+		downstreamConfig := operator.DownstreamConfig
+		if downstreamConfig.Enabled {
 			log.Printf("Try to disable Cloud2Fog Forwarding for operator %s\n", operator.Id)
-			err := f.kafak2mqttService.RemoveInstance(operator.DownstreamConfig.InstanceID, pipelineID, userID, token)
+			if downstreamConfig.InstanceID == "" {
+				log.Printf("No instance ID set for operator: %s", operator.Id)
+				continue
+			}
+			err := f.kafak2mqttService.RemoveInstance(downstreamConfig.InstanceID, pipelineID, userID, token)
 			if err != nil {
 				log.Printf("Cant disable Cloud2Fog Forwarding for operator %s: %s\n", operator.Id, err.Error())
 				return err
