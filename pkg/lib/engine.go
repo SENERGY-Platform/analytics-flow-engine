@@ -331,11 +331,10 @@ func (f *FlowEngine) enableCloudToFogForwarding(operators []Operator, pipelineID
 	for _, operator := range operators {
 		if operator.DownstreamConfig.Enabled {
 			log.Printf("Try to enable Cloud2Fog Forwarding for operator %s\n", operator.Id)
-			createdInstance, err2 := f.kafak2mqttService.StartOperatorInstance(operator.Name, operator.Id, pipelineID, userID, token)
+			createdInstance, err := f.kafak2mqttService.StartOperatorInstance(operator.Name, operator.Id, pipelineID, userID, token)
 			if err != nil {
 				log.Printf("Cant enable Cloud2Fog Forwarding for operator %s\n: %s", operator.Id, err.Error())
-				err = err2
-				return
+				return []Operator{}, err
 			}
 			operator.DownstreamConfig.InstanceID = createdInstance.Id
 		}
