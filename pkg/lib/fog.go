@@ -111,6 +111,7 @@ func convertInputTopics(inputTopics []InputTopic) []operatorLib.InputTopic {
 		fogInputTopics = append(fogInputTopics, operatorLib.InputTopic{
 			Name:        v.Name,
 			FilterValue: v.FilterValue,
+			FilterType: v.FilterType,
 			Mappings:    fogMappings,
 		})
 	}
