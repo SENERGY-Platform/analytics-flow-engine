@@ -1,5 +1,7 @@
 github.com/SENERGY-Platform/analytics-fog-lib v1.1.5 h1:6e3edovAfg0kVF314tc0PK9u4Ja5n9/fUGtm0w4HEjw=
 github.com/SENERGY-Platform/analytics-fog-lib v1.1.5/go.mod h1:IbFAOaWXaEkLvNyI9QSq9Mw3PtLCONkrY9WHSpqbDQg=
+github.com/SENERGY-Platform/analytics-fog-lib v1.1.12 h1:FFl9ry9lVPdPFWjVz5wE49zNb+/yGWQsx6cq39mWv+A=
+github.com/SENERGY-Platform/analytics-fog-lib v1.1.12/go.mod h1:IbFAOaWXaEkLvNyI9QSq9Mw3PtLCONkrY9WHSpqbDQg=
 github.com/SENERGY-Platform/go-service-base/watchdog v0.4.1 h1:DiTETrKnnN8gHfxr0m6A+f8Nd54DD6yZmKL5Oi0qF6E=
 github.com/SENERGY-Platform/go-service-base/watchdog v0.4.1/go.mod h1:B28QtfgfMvOGIcQRklRQkPmXArdHyocy8soE7UoSIKU=
 github.com/eclipse/paho.mqtt.golang v1.4.3 h1:2kwcUGn8seMUfWndX0hGbvH8r7crgcJguQNCyp70xik=

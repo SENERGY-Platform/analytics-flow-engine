@@ -77,8 +77,6 @@ func sendTopicsWithEnabledForward(userID string) {
 
 	topics := []string{}
 	for _, pipeline := range(pipelines) {
-		// TODO remove pipeline.Operators = addPipelineIDToFogTopic(pipeline.Operators, pipeline.Id.String())
-
 		for _, operator := range pipeline.Operators {
 			if operator.DeploymentType == "local" {
 				if operator.UpstreamConfig.Enabled {
@@ -103,7 +101,6 @@ func sendTopicsWithEnabledForward(userID string) {
 }
 
 func convertInputTopics(inputTopics []InputTopic) []operatorLib.InputTopic {
-	// TODO external analytics-lib
 	fogInputTopics := []operatorLib.InputTopic{}
 	for _, v := range inputTopics {
 		fogMappings := []operatorLib.Mapping{}
@@ -113,7 +110,6 @@ func convertInputTopics(inputTopics []InputTopic) []operatorLib.InputTopic {
 
 		fogInputTopics = append(fogInputTopics, operatorLib.InputTopic{
 			Name:        v.Name,
-			FilterType:  v.FilterType,
 			FilterValue: v.FilterValue,
 			Mappings:    fogMappings,
 		})

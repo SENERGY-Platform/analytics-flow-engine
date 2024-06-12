@@ -23,16 +23,8 @@ func NewKafka2MqttApi(url string) *Kafka2MqttApi {
 
 func (api *Kafka2MqttApi) StartOperatorInstance(operatorName, operatorID string, pipelineId string, userID, token string) (createdInstance Instance, err error) {
 	mqttBaseTopic := downstreamLib.GetDownstreamOperatorCloudPubTopicPrefix(userID)
-	mqttTopic, err :=  operatorLib.GenerateOperatorOutputTopic(operatorName, "", operatorID, "local")
-	if err != nil {
-		return 
-	}
-	mqttTopic += "/" + pipelineId
-
-	kafkaTopic, err :=  operatorLib.GenerateOperatorOutputTopic(operatorName, "", operatorID, "cloud")
-	if err != nil {
-		return  
-	}
+	mqttTopic :=  operatorLib.GenerateFogOperatorTopic(operatorName, operatorID, pipelineId)
+	kafkaTopic := operatorLib.GenerateCloudOperatorTopic(operatorName)
 
 	brokerAddress := os.Getenv("BROKER_ADDRESS")
 	username := os.Getenv("BROKER_USER")

@@ -20,6 +20,7 @@ import (
 	parsingApi "github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	"github.com/google/uuid"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
+	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
 	deviceLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/devices"
 	"strings"
 )
@@ -27,7 +28,12 @@ import (
 func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
 	for _, operator := range parsedPipeline.Operators {
 		// TODO error handling
-		outputTopicName, _ := operatorLib.GenerateOperatorOutputTopic(operator.Name, operator.OperatorId, operator.Id, operator.DeploymentType)
+		var outputTopicName string
+		if operator.DeploymentType == deploymentLocationLib.Local {
+			outputTopicName = operatorLib.GenerateFogOperatorTopic(operator.Name, operator.Id, "")
+		} else if operator.DeploymentType == deploymentLocationLib.Cloud {
+			outputTopicName = operatorLib.GenerateCloudOperatorTopic(operator.Name)
+		}
 		
 		op := Operator{
 			Id:             operator.Id,

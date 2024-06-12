@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
+	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
 	"github.com/google/uuid"
 )
 
@@ -103,16 +104,19 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 }
 
 func addPipelineIDToFogTopic(operators []Operator, pipelineId string) (newOperators []Operator) {
+	// Input and Output Topics are set during parsing where pipeline ID is not available
 	for _, operator := range operators {
-		if operator.DeploymentType == "local" {
-			// why pipeline id needed in fog operator topics?
-			pipelineIDSuffix := "/" + pipelineId
-			operator.OutputTopic = operator.OutputTopic + pipelineIDSuffix
-			for _, operatorInputTopic := range operator.InputTopics {
-				if operatorInputTopic.FilterType == "OperatorId" {
-					operatorInputTopic.Name += pipelineIDSuffix
+		if operator.DeploymentType == deploymentLocationLib.Local {
+			operator.OutputTopic = operator.OutputTopic + pipelineId
+
+			inputTopicsWithID := []InputTopic{}
+			for _, inputTopic := range operator.InputTopics {
+				if inputTopic.FilterType == "OperatorId" {
+					inputTopic.Name += pipelineId
 				}
+				inputTopicsWithID = append(inputTopicsWithID, inputTopic)
 			}
+			operator.InputTopics = inputTopicsWithID
 		}
 		newOperators = append(newOperators, operator)
 	}
@@ -171,7 +175,12 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 		// if output topic is missing,set it
 		if pipeline.Operators[index].OutputTopic == "" {
 			outputTopicName := pipeline.Operators[index].Name
-			outputTopicName, _ = operatorLib.GenerateOperatorOutputTopic(pipeline.Operators[index].Name, pipeline.Operators[index].OperatorId, pipeline.Operators[index].Id, pipeline.Operators[index].DeploymentType)
+			operator := pipeline.Operators[index]
+			if operator.DeploymentType == deploymentLocationLib.Local {
+				outputTopicName = operatorLib.GenerateFogOperatorTopic(operator.Name, operator.Id, "")
+			} else if operator.DeploymentType == deploymentLocationLib.Cloud {
+				outputTopicName = operatorLib.GenerateCloudOperatorTopic(operator.Name)
+			}
 			pipeline.Operators[index].OutputTopic = outputTopicName
 		}
 	}
@@ -236,7 +245,6 @@ func seperateOperators(pipeline Pipeline) (localOperators []Operator, cloudOpera
 
 func (f *FlowEngine) stopOperators(pipeline Pipeline, userID, token string) error {
 	localOperators, cloudOperators := seperateOperators(pipeline)
-	// TODO remove localOperators = addPipelineIDToFogTopic(localOperators, pipeline.Id.String())
 	log.Printf("%+v\n", localOperators)
 	log.Printf("%+v", cloudOperators)
 
