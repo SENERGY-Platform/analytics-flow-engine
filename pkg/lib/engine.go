@@ -105,6 +105,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 
 func addPipelineIDToFogTopic(operators []Operator, pipelineId string) (newOperators []Operator) {
 	// Input and Output Topics are set during parsing where pipeline ID is not available
+	log.Printf("%+v", operators)
 	for _, operator := range operators {
 		if operator.DeploymentType == deploymentLocationLib.Local {
 			operator.OutputTopic = operator.OutputTopic + pipelineId
@@ -120,6 +121,7 @@ func addPipelineIDToFogTopic(operators []Operator, pipelineId string) (newOperat
 		}
 		newOperators = append(newOperators, operator)
 	}
+	log.Printf("%+v", newOperators)
 	return
 }
 
