@@ -34,14 +34,16 @@ type FlowEngine struct {
 	parsingService    ParsingApiService
 	permissionService PermissionApiService
 	kafak2mqttService Kafka2MqttApiService
+	deviceManagerService DeviceManagerService
 }
 
 func NewFlowEngine(
 	driver Driver,
 	parsingService ParsingApiService,
 	permissionService PermissionApiService,
-	kafak2mqttService Kafka2MqttApiService) *FlowEngine {
-	return &FlowEngine{driver, parsingService, permissionService, kafak2mqttService}
+	kafak2mqttService Kafka2MqttApiService,
+	deviceManagerService DeviceManagerService) *FlowEngine {
+	return &FlowEngine{driver, parsingService, permissionService, kafak2mqttService, deviceManagerService}
 }
 
 func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
@@ -81,7 +83,11 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	tmpPipeline := createPipeline(parsedPipeline)
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
-	pipeline.Operators = addOperatorConfigs(pipelineRequest, tmpPipeline)
+	configuredOperators, err := addOperatorConfigs(pipelineRequest, tmpPipeline, f.deviceManagerService, userId, token)
+	if err != nil {
+		return
+	}
+	pipeline.Operators = configuredOperators
 	pipeline.Id, err = registerPipeline(&pipeline, userId, token)
 	if err != nil {
 		return
@@ -152,8 +158,11 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	if err != nil {
 		return
 	}
-	pipeline.Operators = addOperatorConfigs(pipelineRequest, pipeline)
-
+	configuredOperators, err := addOperatorConfigs(pipelineRequest, pipeline, f.deviceManagerService, userId, token)
+	if err != nil {
+		return
+	}
+	pipeline.Operators = configuredOperators
 	pipeline.Name = pipelineRequest.Name
 	pipeline.Description = pipelineRequest.Description
 	pipeline.WindowTime = pipelineRequest.WindowTime

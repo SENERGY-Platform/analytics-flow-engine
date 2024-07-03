@@ -63,7 +63,27 @@ func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
 	return pipeline
 }
 
-func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline) (operators []Operator) {
+func createLocalDeviceTopic(deviceID, serviceID, userID, token string, deviceManagerService DeviceManagerService) (string, error) {
+	device, err := deviceManagerService.GetDevice(deviceID, userID, token)
+	if err != nil {
+		return "", err
+	}
+	deviceType, err := deviceManagerService.GetDeviceType(device.DeviceTypeId, userID, token)
+	if err != nil {
+		return "", err
+	}
+	localServiceId := ""
+	for _, service := range(deviceType.Services) {
+		if service.Id == serviceID {
+			localServiceId = service.LocalId
+			break
+		}
+	}
+	deviceTopic := deviceLib.GetLocalDeviceOutputTopic(device.LocalId, localServiceId)
+	return deviceTopic, nil
+}
+
+func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline, deviceManagerService DeviceManagerService, userID, token string) (operators []Operator, err error) {
 	// Add operator configs and input topics of the first operators (input topics of later operators are configured by the parser)
 	operatorIds := make([]string, 0)
 	for _, operator := range tmpPipeline.Operators {
@@ -100,6 +120,10 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline) (
 								if len(filterIds) > 0 {
 									filterId = filterIds[topicKey]
 								}
+								topicName, err = createLocalDeviceTopic(filterId, topicName, userID, token, deviceManagerService)
+								if err != nil {
+									return
+								}
 							}
 							filterType := "DeviceId"
 							if input.FilterType == "operatorId" {
@@ -107,11 +131,6 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline) (
 							} else if input.FilterType == "ImportId" {
 								filterType = "ImportId"
 							}
-
-							// topic of device inputs must be set according to deployment location
-							deviceID := input.FilterIds // TODO send device name and service name in more specific fields
-							serviceID := input.TopicName
-							topicName, _ = deviceLib.GetDeviceOutputTopic(deviceID, serviceID, operator.DeploymentType)
 
 							t := InputTopic{Name: topicName, FilterType: filterType, FilterValue: filterId}
 							for _, value := range input.Values {

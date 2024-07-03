@@ -19,14 +19,16 @@ package lib
 import (
 	"encoding/json"
 	"fmt"
-	parsing_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
-	"github.com/google/uuid"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
+
+	parsing_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
+	"github.com/SENERGY-Platform/models/go/models"
+	"github.com/google/uuid"
 )
 
 func TestParser_createPipeline(t *testing.T) {
@@ -113,6 +115,18 @@ func TestParser_createPipeline(t *testing.T) {
 		_ = ioutil.WriteFile("./testdata/test.json", file, 0644)
 		t.Error("structs do not match")
 	}
+}
+
+type MockDeviceManagerService struct {
+
+}
+
+func (m MockDeviceManagerService) GetDevice(deviceID, user, token string) (models.Device, error) {
+	return models.Device{}, nil
+}
+
+func (m MockDeviceManagerService) GetDeviceType(deviceTypeID, user, token string) (models.DeviceType, error) {
+	return models.DeviceType{}, nil
 }
 
 func TestParser_addStartingOperatorConfigs(t *testing.T) {
@@ -230,7 +244,12 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 		fmt.Println(err)
 	}
 	pipeline := createPipeline(parsedPipeline)
-	pipeline.Operators = addOperatorConfigs(pipelineRequest, pipeline)
+	deviceManagerService := MockDeviceManagerService{}
+	configuredOperators, err := addOperatorConfigs(pipelineRequest, pipeline, deviceManagerService, "", "")
+	if err != nil {
+		fmt.Println(err)
+	}
+	pipeline.Operators = configuredOperators
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}
@@ -347,8 +366,16 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 		fmt.Println(err)
 	}
 	pipeline := createPipeline(parsedPipeline)
-	pipeline.Operators = addOperatorConfigs(pipelineRequest, pipeline)
-	pipeline.Operators = addOperatorConfigs(pipelineRequest2, pipeline)
+	configuredOperators, err := addOperatorConfigs(pipelineRequest, pipeline, MockDeviceManagerService{}, "", "")
+	if err != nil {
+		fmt.Println(err)
+	}
+	pipeline.Operators = configuredOperators
+	configuredOperators, err = addOperatorConfigs(pipelineRequest2, pipeline, MockDeviceManagerService{}, "", "")
+	if err != nil {
+		fmt.Println(err)
+	}
+	pipeline.Operators = configuredOperators
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}
@@ -487,8 +514,17 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 		fmt.Println(err)
 	}
 	pipeline := createPipeline(parsedPipeline)
-	pipeline.Operators = addOperatorConfigs(pipelineRequest, pipeline)
-	pipeline.Operators = addOperatorConfigs(pipelineRequest2, pipeline)
+	configuredOperators, err := addOperatorConfigs(pipelineRequest, pipeline, MockDeviceManagerService{}, "", "")
+	if err != nil {
+		fmt.Println(err)
+	}
+	pipeline.Operators = configuredOperators
+	configuredOperators, err = addOperatorConfigs(pipelineRequest2, pipeline, MockDeviceManagerService{}, "", "")
+	if err != nil {
+		fmt.Println(err)
+	}
+	pipeline.Operators = configuredOperators
+
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}

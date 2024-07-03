@@ -18,6 +18,7 @@ package lib
 
 import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
+	"github.com/SENERGY-Platform/models/go/models"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
 )
@@ -39,4 +40,9 @@ type PermissionApiService interface {
 type Kafka2MqttApiService interface {
 	StartOperatorInstance(operatorName, operatorID string, pipelineID, userI, token string) (kafka2mqtt_api.Instance, error)
 	RemoveInstance(id, pipelineID, userID, token string) error
+}
+
+type DeviceManagerService interface {
+	GetDevice(deviceID, userID, token string) (models.Device, error)
+	GetDeviceType(deviceTypeID, userID, token string) (models.DeviceType, error)
 }
