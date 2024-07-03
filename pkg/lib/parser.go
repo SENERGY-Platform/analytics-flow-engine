@@ -74,6 +74,7 @@ func createLocalDeviceTopic(deviceID, serviceID, userID, token string, deviceMan
 	}
 	localServiceId := ""
 	for _, service := range(deviceType.Services) {
+		serviceID = strings.Replace(serviceID, "_", ":",-1)
 		if service.Id == serviceID {
 			localServiceId = service.LocalId
 			break
