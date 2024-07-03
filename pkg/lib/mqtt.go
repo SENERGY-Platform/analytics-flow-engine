@@ -21,6 +21,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"fmt"
 	"strconv"
 	"net/url"
 	"time"
@@ -34,7 +35,7 @@ var client MQTT.Client
 var qos *int
 var retained *bool
 
-func ConnectMQTTBroker() {
+func ConnectMQTTBroker() error {
 	//MQTT.DEBUG = log.New(os.Stdout, "", 0)
 	//MQTT.ERROR = log.New(os.Stdout, "", 0)
 
@@ -90,10 +91,11 @@ func ConnectMQTTBroker() {
 
 	client = MQTT.NewClient(connOpts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		log.Printf("local deployment not working: %s\n", token.Error())
+		return fmt.Errorf("Cant connect to broker %s: %s\n", hostname, token.Error())
 	} else {
 		log.Printf("Connected to %s\n", *server)
 	}
+	return nil
 }
 
 func publishMessage(topic string, message string) error {

@@ -40,7 +40,12 @@ func main() {
 	}
 	watchdog := watchdog.New(syscall.SIGINT, syscall.SIGTERM)
 
-	lib.ConnectMQTTBroker()
+	err = lib.ConnectMQTTBroker()
+	if err != nil {
+		log.Println("Cant connect to MQTT: " + err.Error())
+		ec = 1
+		return
+	}
 
 	watchdog.RegisterStopFunc(func() error {
 		lib.CloseMQTTConnection()
