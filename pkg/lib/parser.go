@@ -17,12 +17,14 @@
 package lib
 
 import (
-	parsingApi "github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
-	"github.com/google/uuid"
-	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
-	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
-	deviceLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/devices"
 	"strings"
+
+	parsingApi "github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
+	deviceLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/devices"
+	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
+	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
+	"github.com/SENERGY-Platform/models/go/models"
+	"github.com/google/uuid"
 )
 
 func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
@@ -63,25 +65,35 @@ func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
 	return pipeline
 }
 
-func createLocalDeviceTopic(deviceID, serviceID, userID, token string, deviceManagerService DeviceManagerService) (string, error) {
+func createLocalDeviceTopic(deviceID, serviceID, userID, token string, deviceManagerService DeviceManagerService) (string, models.Service, error) {
+	// Load local device id and service name as they are used in local mqtt topics of the device
 	device, err := deviceManagerService.GetDevice(deviceID, userID, token)
+	localService := models.Service{}
 	if err != nil {
-		return "", err
+		return "", localService, err
 	}
 	deviceType, err := deviceManagerService.GetDeviceType(device.DeviceTypeId, userID, token)
 	if err != nil {
-		return "", err
+		return "", localService, err
 	}
-	localServiceId := ""
 	for _, service := range(deviceType.Services) {
 		serviceID = strings.Replace(serviceID, "_", ":",-1)
 		if service.Id == serviceID {
-			localServiceId = service.LocalId
+			localService = service
 			break
 		}
 	}
-	deviceTopic := deviceLib.GetLocalDeviceOutputTopic(device.LocalId, localServiceId)
-	return deviceTopic, nil
+	deviceTopic := deviceLib.GetLocalDeviceOutputTopic(device.LocalId, localService.LocalId)
+	return deviceTopic, localService, nil
+}
+
+func createLocalValuePath(service models.Service, path string) (string) {
+	// The path to the selected value is specified by the message structure defined for inside the platform
+	// E.g. devices have an envelope of value.root around the actual device message. This needs to be stripped off
+	// value.root.OBIS -> OBIS for Landys Device Type
+	// one could also use service.Outputs[0].ContentVariable.SubContentVariables to strip all parts until the first "real" device path
+	splittedPath := strings.Split(path, ".")
+	return strings.Join(splittedPath[2:], ".")
 }
 
 func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline, deviceManagerService DeviceManagerService, userID, token string) (operators []Operator, err error) {
@@ -112,6 +124,7 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline, d
 				if len(node.Inputs) > 0 {
 					for _, input := range node.Inputs {
 						filterId := input.FilterIds
+						localService := models.Service{}
 						var filterIds []string
 						if operator.DeploymentType == "local" {
 							filterIds = strings.Split(input.FilterIds, ",")
@@ -121,7 +134,7 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline, d
 								if len(filterIds) > 0 {
 									filterId = filterIds[topicKey]
 								}
-								topicName, err = createLocalDeviceTopic(filterId, topicName, userID, token, deviceManagerService)
+								topicName, localService, err = createLocalDeviceTopic(filterId, topicName, userID, token, deviceManagerService)
 								if err != nil {
 									return
 								}
@@ -135,7 +148,11 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline, d
 
 							t := InputTopic{Name: topicName, FilterType: filterType, FilterValue: filterId}
 							for _, value := range input.Values {
-								t.Mappings = append(t.Mappings, Mapping{value.Name, value.Path})
+								valuePath := value.Path
+								if operator.DeploymentType == "local" {
+									valuePath = createLocalValuePath(localService, value.Path)
+								}
+								t.Mappings = append(t.Mappings, Mapping{value.Name, valuePath})
 							}
 							operator.InputTopics = append(operator.InputTopics, t)
 						}
