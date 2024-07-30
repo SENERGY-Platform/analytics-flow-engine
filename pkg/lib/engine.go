@@ -236,8 +236,14 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 }
 
 func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (PipelineStatus, error) {
-	status, err := f.driver.GetPipelineStatus(id)
-	return status, err
+	//status, err := f.driver.GetPipelineStatus(id)
+	// TODO too many calls to the rancher API
+	return PipelineStatus{
+		Running: true,
+		Message: "",
+		Transitioning: false,
+	}, nil
+	//return status, err
 }
 
 func seperateOperators(pipeline Pipeline) (localOperators []Operator, cloudOperators []Operator) {
