@@ -123,14 +123,12 @@ func GenerateFogOperatorStartCommand(operator Operator, pipelineID string, input
 		ImageId:        operator.ImageId,
 		InputTopics:    inputTopics,
 		OperatorConfig: operator.Config,
-		Config: operatorLib.FogConfig{
-				OperatorIDs: operatorLib.OperatorIDs{
-					OperatorId:     operator.Id,
-					PipelineId:     pipelineID,
-					BaseOperatorId: operator.OperatorId,
-				},
-				OutputTopic: operator.OutputTopic,
+		OperatorIDs: operatorLib.OperatorIDs{
+			OperatorId:     operator.Id,
+			PipelineId:     pipelineID,
+			BaseOperatorId: operator.OperatorId,
 		},
+		OutputTopic: operator.OutputTopic,
 	}
 } 
 
