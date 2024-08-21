@@ -42,7 +42,3 @@ jobs:
           tags: |
             smartenergyplatform/analytics-flow-engine:dev
             ghcr.io/senergy-platform/analytics-flow-engine:dev
-      - name: Deploy
-        uses: wei/curl@v1
-        with:
-          args: -X POST -u ${{ secrets.RANCHER_TOKEN }} ${{ secrets.RANCHER_URL }}${{ secrets.RANCHER_SERVICE }}?action=redeploy
