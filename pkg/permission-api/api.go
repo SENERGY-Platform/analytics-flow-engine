@@ -17,50 +17,27 @@
 package permission_api
 
 import (
-	"encoding/json"
-	"errors"
-	"github.com/parnurzeal/gorequest"
-	"net/http"
-	"strconv"
+	"github.com/SENERGY-Platform/permissions-v2/pkg/client"
 )
 
 type PermissionApi struct {
 	url string
+	c   client.Client
 }
 
 func NewPermissionApi(url string) *PermissionApi {
-	return &PermissionApi{url}
+	return &PermissionApi{url: url, c: client.New(url)}
 }
 
 func (a PermissionApi) UserHasDevicesReadAccess(ids []string, authorization string) (result bool, err error) {
-	result = false
-	var response map[string]bool
-	request := gorequest.New()
-
-	request.Post(a.url+"/query").Set("Authorization", authorization).Send(Check{
-		Resource: "devices",
-		CheckIds: CheckIdsObject{
-			Ids:    ids,
-			Rights: "r",
-		},
-	})
-	resp, body, e := request.End()
-	if resp.StatusCode != http.StatusOK {
-		err = errors.New("permission API - could not check access rights: " + strconv.Itoa(resp.StatusCode) + " " + body)
-		return
+	response, err, _ := a.c.CheckMultiplePermissions(authorization, "devices", ids, client.Read)
+	if err != nil {
+		return false, err
 	}
-	if len(e) > 0 {
-		err = errors.New("permission API - could not check access rights: an error occurred")
-		return
-	}
-	err = json.Unmarshal([]byte(body), &response)
-	if len(response) > 0 {
-		for _, access := range response {
-			if !access {
-				return result, nil
-			}
+	for _, access := range response {
+		if !access {
+			return false, nil
 		}
-		result = true
 	}
-	return result, nil
+	return true, nil
 }
