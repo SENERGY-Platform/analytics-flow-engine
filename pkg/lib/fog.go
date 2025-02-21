@@ -33,22 +33,22 @@ func processMessage(message MQTT.Message) {
 
 	if strings.HasSuffix(topic, "/operator/control/sync/request") {
 		userID := operatorLib.GetUserIDFromOperatorControlSyncTopic(topic)
-		sendActiveOperators(userID)
+		sendActiveOperators(userID, "")
 	}
 
 	if strings.HasSuffix(topic, "/upstream/sync/request") {
 		userID := upstreamLib.GetUserIDFromUpstreamControlSyncTopic(topic)
-		sendTopicsWithEnabledForward(userID)
+		sendTopicsWithEnabledForward(userID, "")
 	}
 }
 
-func sendActiveOperators(userID string) {
-	pipelines, err := getPipelines(userID)
+func sendActiveOperators(userID string, token string) {
+	pipelines, err := getPipelines(userID, token)
 	if err != nil {
 		log.Println("Cant get pipelines: " + err.Error())
 	}
 	startCommands := []operatorLib.StartOperatorControlCommand{}
-	for _, pipeline := range(pipelines) {
+	for _, pipeline := range pipelines {
 		for _, operator := range pipeline.Operators {
 			if operator.DeploymentType == "local" {
 				inputTopics := convertInputTopics(operator.InputTopics)
@@ -66,17 +66,17 @@ func sendActiveOperators(userID string) {
 	err = publishMessage(topic, string(syncMsgStr))
 	if err != nil {
 		log.Println("Cant publish operator sync message: " + err.Error())
-	} 
+	}
 }
 
-func sendTopicsWithEnabledForward(userID string) {
-	pipelines, err := getPipelines(userID)
+func sendTopicsWithEnabledForward(userID string, token string) {
+	pipelines, err := getPipelines(userID, token)
 	if err != nil {
 		log.Println("Cant get pipelines: " + err.Error())
 	}
 
 	topics := []string{}
-	for _, pipeline := range(pipelines) {
+	for _, pipeline := range pipelines {
 		for _, operator := range pipeline.Operators {
 			if operator.DeploymentType == "local" {
 				if operator.UpstreamConfig.Enabled {
@@ -97,7 +97,7 @@ func sendTopicsWithEnabledForward(userID string) {
 	err = publishMessage(topic, string(syncMsgStr))
 	if err != nil {
 		log.Println("Cant publish upstream sync message: " + err.Error())
-	} 
+	}
 }
 
 func convertInputTopics(inputTopics []InputTopic) []operatorLib.InputTopic {
@@ -111,7 +111,7 @@ func convertInputTopics(inputTopics []InputTopic) []operatorLib.InputTopic {
 		fogInputTopics = append(fogInputTopics, operatorLib.InputTopic{
 			Name:        v.Name,
 			FilterValue: v.FilterValue,
-			FilterType: v.FilterType,
+			FilterType:  v.FilterType,
 			Mappings:    fogMappings,
 		})
 	}
@@ -130,7 +130,7 @@ func GenerateFogOperatorStartCommand(operator Operator, pipelineID string, input
 		},
 		OutputTopic: operator.OutputTopic,
 	}
-} 
+}
 
 func startFogOperator(operator Operator, pipelineConfig PipelineConfig, userID string) error {
 	inputTopics := convertInputTopics(operator.InputTopics)

@@ -19,6 +19,7 @@ package lib
 import (
 	"errors"
 	"log"
+	"slices"
 	"strings"
 	"time"
 
@@ -47,28 +48,10 @@ func NewFlowEngine(
 }
 
 func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
-	//Check access
-	deviceIds, operatorIds := getFilterIdsFromPipelineRequest(pipelineRequest)
-	if len(deviceIds) > 0 {
-		hasAccess, e := f.permissionService.UserHasDevicesReadAccess(deviceIds, token)
-		if e != nil {
-			return pipeline, e
-		}
-		if !hasAccess {
-			e = errors.New("engine - user does not have the rights to access the devices")
-			return pipeline, e
-		}
+	err = f.checkAccess(pipelineRequest, userId, token)
+	if err != nil {
+		return
 	}
-	if len(operatorIds) > 0 {
-		for _, operatorId := range operatorIds {
-			_, e := getPipeline(strings.Split(operatorId, ":")[1], userId, token)
-			if e != nil {
-				e = errors.New("engine - user does not have the rights to access the pipeline: " + strings.Split(operatorId, ":")[1])
-				return pipeline, e
-			}
-		}
-	}
-
 	//Get parsed pipeline
 	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, token)
 	if err != nil {
@@ -133,26 +116,9 @@ func addPipelineIDToFogTopic(operators []Operator, pipelineId string) (newOperat
 
 func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
 	log.Println("engine - update pipeline: " + pipelineRequest.Id)
-	//Check access
-	deviceIds, operatorIds := getFilterIdsFromPipelineRequest(pipelineRequest)
-	if len(deviceIds) > 0 {
-		hasAccess, e := f.permissionService.UserHasDevicesReadAccess(deviceIds, token)
-		if e != nil {
-			return pipeline, e
-		}
-		if !hasAccess {
-			e = errors.New("engine - user does not have the rights to access the devices")
-			return pipeline, e
-		}
-	}
-	if len(operatorIds) > 0 {
-		for _, operatorId := range operatorIds {
-			_, e := getPipeline(strings.Split(operatorId, ":")[1], userId, token)
-			if e != nil {
-				e = errors.New("engine - user does not have the rights to access the pipeline: " + strings.Split(operatorId, ":")[1])
-				return pipeline, e
-			}
-		}
+	err = f.checkAccess(pipelineRequest, userId, token)
+	if err != nil {
+		return
 	}
 	pipeline, err = getPipeline(pipelineRequest.Id, userId, token)
 	if err != nil {
@@ -175,7 +141,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	}
 
 	// give the backend some time to delete the operators
-	time.Sleep(3 * time.Second)
+	time.Sleep(15 * time.Second)
 
 	missingUuid, _ := uuid.FromBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
 	for index := range pipeline.Operators {
@@ -216,6 +182,30 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	return
 }
 
+func (f *FlowEngine) checkAccess(pipelineRequest PipelineRequest, token string, userId string) (err error) {
+	deviceIds, operatorIds := getFilterIdsFromPipelineRequest(pipelineRequest)
+	if len(deviceIds) > 0 {
+		hasAccess, e := f.permissionService.UserHasDevicesReadAccess(deviceIds, token)
+		if e != nil {
+			return e
+		}
+		if !hasAccess {
+			e = errors.New("engine - user does not have the rights to access the devices")
+			return e
+		}
+	}
+	if len(operatorIds) > 0 {
+		for _, operatorId := range operatorIds {
+			_, e := getPipeline(strings.Split(operatorId, ":")[1], userId, token)
+			if e != nil {
+				e = errors.New("engine - user does not have the rights to access the pipeline: " + strings.Split(operatorId, ":")[1])
+				return e
+			}
+		}
+	}
+	return
+}
+
 func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err error) {
 	log.Println("engine - delete pipeline: " + id)
 	pipeline, err := getPipeline(id, userId, token)
@@ -235,14 +225,36 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 	return
 }
 
-func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (PipelineStatus, error) {
-	status, err := f.driver.GetPipelineStatus(id)
+func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (status PipelineStatus, err error) {
+	_, err = getPipeline(id, userId, token)
 	if err != nil {
-		log.Println("Cant get status for pipeline: " + id + " - " + err.Error())
+		return
 	}
-	// TODO too many calls to the rancher API
-	return status, nil
-	//return status, err
+	status, err = f.driver.GetPipelineStatus(id)
+	return
+}
+
+func (f *FlowEngine) GetPipelinesStatus(ids []string, userId, token string) (status []PipelineStatus, err error) {
+	statusTemp, err := f.driver.GetPipelinesStatus()
+	pipes, err := getPipelines(userId, token)
+	for _, stat := range statusTemp {
+		idx := slices.IndexFunc(pipes, func(p Pipeline) bool { return "pipeline-"+p.Id.String() == stat.Name })
+		if idx != -1 {
+			stat.Name = strings.Replace(stat.Name, "pipeline-", "", -1)
+			status = append(status, stat)
+		}
+	}
+	if len(ids) > 0 {
+		statusTemp = status
+		status = nil
+		for _, id := range ids {
+			idx := slices.IndexFunc(statusTemp, func(t PipelineStatus) bool { return t.Name == id })
+			if idx != -1 {
+				status = append(status, statusTemp[idx])
+			}
+		}
+	}
+	return
 }
 
 func seperateOperators(pipeline Pipeline) (localOperators []Operator, cloudOperators []Operator) {

@@ -150,6 +150,10 @@ type DeploymentMetaData struct {
 	State             DeploymentMetaDataState
 }
 
+type DeploymentsResponse struct {
+	Data []DeploymentResponse `json:"data"`
+}
+
 type DeploymentResponse struct {
 	Id       string
 	APIType  string `json:"type"`

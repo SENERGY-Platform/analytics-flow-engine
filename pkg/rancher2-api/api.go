@@ -73,6 +73,36 @@ func (r *Rancher2) GetPipelineStatus(pipelineId string) (status lib.PipelineStat
 	return
 }
 
+func (r *Rancher2) GetPipelinesStatus() (status []lib.PipelineStatus, err error) {
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	resp, body, e := request.Get(r.kubeUrl + "apps.deployments/analytics-pipelines").Send(nil).End()
+	if len(e) > 0 {
+		err = errors.New("rancher2 API - could not get pipelines status - " + e[0].Error())
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		err = errors.New("rancher2 API - could not get pipelines status - " + strconv.Itoa(resp.StatusCode) + " - " + body)
+		return
+	}
+
+	var deployments DeploymentsResponse
+	err = json.Unmarshal([]byte(body), &deployments)
+	if err != nil {
+		log.Println("Cant unmarshal deployment response: " + err.Error())
+		return
+	}
+	for _, deployment := range deployments.Data {
+		status = append(status, lib.PipelineStatus{
+			Running:       deployment.Metadata.State.Error == false && deployment.Metadata.State.Transitioning == false,
+			Transitioning: deployment.Metadata.State.Transitioning,
+			Message:       deployment.Metadata.State.Message,
+			Name:          deployment.Metadata.Name,
+		})
+	}
+	return
+}
+
 func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
 	var containers []Container
 	var volumes []Volume

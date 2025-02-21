@@ -57,6 +57,27 @@ func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 }
 
+func (e *Endpoint) getPipelinesStatus(w http.ResponseWriter, req *http.Request) {
+	decoder := json.NewDecoder(req.Body)
+	var pipeReq lib.PipelineStatusRequest
+	err := decoder.Decode(&pipeReq)
+	if err != nil {
+		log.Println(err)
+	}
+	pipelineStatus, err := e.engine.GetPipelinesStatus(pipeReq.Ids, e.getUserId(req), req.Header.Get("Authorization"))
+	if err != nil {
+		log.Println("Cant get pipelines status: " + err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	err = json.NewEncoder(w).Encode(pipelineStatus)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+}
+
 func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(req.Body)
 	var pipeReq lib.PipelineRequest

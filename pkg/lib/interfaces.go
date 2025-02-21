@@ -27,6 +27,7 @@ type Driver interface {
 	CreateOperators(pipelineId string, input []Operator, pipelineConfig PipelineConfig) error
 	DeleteOperator(pipelineId string, input Operator) error
 	GetPipelineStatus(pipelineId string) (PipelineStatus, error)
+	GetPipelinesStatus() ([]PipelineStatus, error)
 }
 
 type ParsingApiService interface {

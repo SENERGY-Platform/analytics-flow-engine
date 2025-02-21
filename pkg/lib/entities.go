@@ -44,7 +44,7 @@ type UpstreamConfig struct {
 type DownstreamConfig struct {
 	Enabled    bool
 	InstanceID string
-	ServiceID string
+	ServiceID  string
 }
 
 type Operator struct {
@@ -92,6 +92,10 @@ type PipelineRequest struct {
 	ConsumeAllMessages bool           `json:"consumeAllMessages,omitempty"`
 	Metrics            bool           `json:"metrics,omitempty"`
 	Nodes              []PipelineNode `json:"nodes,omitempty"`
+}
+
+type PipelineStatusRequest struct {
+	Ids []string `json:"ids,omitempty"`
 }
 
 type PipelineNode struct {
@@ -147,6 +151,7 @@ func (c Claims) Valid() error {
 }
 
 type PipelineStatus struct {
+	Name          string `json:"name,omitempty"`
 	Running       bool   `json:"running"`
 	Transitioning bool   `json:"transitioning"`
 	Message       string `json:"message"`
