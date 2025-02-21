@@ -49,12 +49,12 @@ func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(pipelineStatus)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
 }
 
 func (e *Endpoint) getPipelinesStatus(w http.ResponseWriter, req *http.Request) {
@@ -70,12 +70,12 @@ func (e *Endpoint) getPipelinesStatus(w http.ResponseWriter, req *http.Request) 
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(pipelineStatus)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
 }
 
 func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
