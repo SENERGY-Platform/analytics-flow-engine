@@ -236,13 +236,12 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 }
 
 func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (PipelineStatus, error) {
-	//status, err := f.driver.GetPipelineStatus(id)
+	status, err := f.driver.GetPipelineStatus(id)
+	if err != nil {
+		log.Println("Cant get status for pipeline: " + id + " - " + err.Error())
+	}
 	// TODO too many calls to the rancher API
-	return PipelineStatus{
-		Running:       true,
-		Message:       "",
-		Transitioning: false,
-	}, nil
+	return status, nil
 	//return status, err
 }
 
@@ -311,7 +310,7 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 
 	if len(cloudOperators) > 0 {
 		log.Println("Try to start cloud operators")
-		err = retry(3, 3*time.Second, func() (err error) {
+		err = retry(6, 10*time.Second, func() (err error) {
 			return f.driver.CreateOperators(
 				pipeline.Id.String(),
 				cloudOperators,

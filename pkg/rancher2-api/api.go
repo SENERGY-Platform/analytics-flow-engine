@@ -165,7 +165,14 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 		return
 	}
 	if resp.StatusCode != http.StatusCreated {
-		err = errors.New("rancher2 API - could not create operators " + body)
+		errBody := ErrorBody{}
+		err = json.Unmarshal([]byte(body), &errBody)
+		if err != nil {
+			return err
+		}
+		if errBody.Code != "AlreadyExists" {
+			err = errors.New("rancher2 API - could not create operators " + errBody.Code)
+		}
 	}
 	if len(e) > 0 {
 		err = errors.New("rancher2 API -  could not create operators - an error occurred")
@@ -234,11 +241,6 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		return
 	}
 
-	// Delete Volume
-	if operator.PersistData {
-		err = r.deletePersistentVolumeClaim(r.getOperatorName(pipelineId, operator)[0])
-	}
-
 	//Delete Workload
 	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e = request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
@@ -256,6 +258,11 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	if len(e) > 0 {
 		err = lib.ErrSomethingWentWrong
 		return
+	}
+
+	// Delete Volume
+	if operator.PersistData {
+		err = r.deletePersistentVolumeClaim(r.getOperatorName(pipelineId, operator)[0])
 	}
 
 	// Delete Service
@@ -320,7 +327,12 @@ func (r *Rancher2) createPersistentVolumeClaim(name string) (err error) {
 		return errors.New("rancher2 API - could not create PersistentVolumeClaim: an error occurred")
 	}
 	if resp.StatusCode != http.StatusCreated {
-		return errors.New("could not create PersistentVolumeClaim: " + body)
+		errBody := ErrorBody{}
+		err = json.Unmarshal([]byte(body), &errBody)
+		if err != nil {
+			return err
+		}
+		return errors.New("rancher2 API - could not create PersistentVolumeClaim: " + errBody.Message)
 	}
 	return nil
 }
@@ -341,6 +353,18 @@ func (r *Rancher2) deletePersistentVolumeClaim(name string) (err error) {
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New("rancher2 API - could not delete PersistentVolumeClaim " + body)
 		return
+	}
+	for i := 0; ; i++ {
+		if i >= (24 - 1) {
+			err = errors.New("rancher2 API - could not delete PersistentVolumeClaim in time")
+			break
+		}
+		time.Sleep(15 * time.Second)
+		resp, _, e = request.Get(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/persistentVolumeClaims/" +
+			lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + name).End()
+		if resp.StatusCode == http.StatusNotFound {
+			return
+		}
 	}
 	return
 }

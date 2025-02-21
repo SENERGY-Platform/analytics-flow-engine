@@ -160,3 +160,11 @@ type ContainerPort struct {
 	Name          string `json:"name,omitempty"`
 	ContainerPort int    `json:"containerPort,omitempty"`
 }
+
+type ErrorBody struct {
+	BaseType string `json:"baseType"`
+	Code     string `json:"code"`
+	Status   int    `json:"status"`
+	Message  string `json:"message"`
+	Type     string `json:"type"`
+}
