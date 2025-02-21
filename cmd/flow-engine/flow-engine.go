@@ -38,7 +38,7 @@ func main() {
 	if err != nil {
 		log.Print("Error loading .env file")
 	}
-	watchdog := watchdog.New(syscall.SIGINT, syscall.SIGTERM)
+	wd := watchdog.New(syscall.SIGINT, syscall.SIGTERM)
 
 	err = lib.ConnectMQTTBroker()
 	if err != nil {
@@ -47,14 +47,14 @@ func main() {
 		return
 	}
 
-	watchdog.RegisterStopFunc(func() error {
+	wd.RegisterStopFunc(func() error {
 		lib.CloseMQTTConnection()
 		return nil
 	})
 
 	go api.CreateServer()
 
-	watchdog.Start()
+	wd.Start()
 
-	ec = watchdog.Join()
+	ec = wd.Join()
 }
