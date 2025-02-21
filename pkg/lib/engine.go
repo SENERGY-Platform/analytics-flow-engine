@@ -23,17 +23,17 @@ import (
 	"time"
 
 	"encoding/json"
+	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
-	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
 	"github.com/google/uuid"
 )
 
 type FlowEngine struct {
-	driver            Driver
-	parsingService    ParsingApiService
-	permissionService PermissionApiService
-	kafak2mqttService Kafka2MqttApiService
+	driver               Driver
+	parsingService       ParsingApiService
+	permissionService    PermissionApiService
+	kafak2mqttService    Kafka2MqttApiService
 	deviceManagerService DeviceManagerService
 }
 
@@ -239,8 +239,8 @@ func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (PipelineStatus
 	//status, err := f.driver.GetPipelineStatus(id)
 	// TODO too many calls to the rancher API
 	return PipelineStatus{
-		Running: true,
-		Message: "",
+		Running:       true,
+		Message:       "",
 		Transitioning: false,
 	}, nil
 	//return status, err

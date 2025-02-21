@@ -55,7 +55,6 @@ func (e *Endpoint) getPipelineStatus(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
 }
 
 func (e *Endpoint) startPipeline(w http.ResponseWriter, req *http.Request) {
