@@ -24,6 +24,11 @@ type Response struct {
 	Message string `json:"message,omitempty"`
 }
 
+type PipelinesResponse struct {
+	Data  []Pipeline `json:"data,omitempty"`
+	Total int        `json:"total,omitempty"`
+}
+
 type Pipeline struct {
 	Id                 uuid.UUID  `json:"id,omitempty"`
 	FlowId             string     `json:"flowId,omitempty"`

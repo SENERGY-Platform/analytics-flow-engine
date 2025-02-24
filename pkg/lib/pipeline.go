@@ -109,11 +109,13 @@ func getPipelines(userId string, authorization string) (pipelines []Pipeline, er
 		err = errors.New("pipeline API - could not get pipelines from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
 		return
 	}
-	err = json.Unmarshal([]byte(body), &pipelines)
+	var pResponse PipelinesResponse
+	err = json.Unmarshal([]byte(body), &pResponse)
 	if err != nil {
 		err = errors.New("pipeline API  - could not parse pipelines: " + err.Error())
 		return
 	}
+	pipelines = pResponse.Data
 	return
 }
 
