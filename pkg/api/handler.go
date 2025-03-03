@@ -84,6 +84,7 @@ func CreateServer() {
 		pipelineStatus, err := flowEngine.GetPipelineStatus(id, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
 			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, pipelineStatus)
@@ -98,6 +99,7 @@ func CreateServer() {
 		pipelinesStatus, err := flowEngine.GetPipelinesStatus(request.Ids, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
 			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, pipelinesStatus)
@@ -113,6 +115,7 @@ func CreateServer() {
 		pipe, err := flowEngine.StartPipeline(request, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
 			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, pipe)
@@ -128,6 +131,7 @@ func CreateServer() {
 		pipe, err := flowEngine.UpdatePipeline(request, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
 			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, pipe)
