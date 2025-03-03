@@ -48,7 +48,7 @@ func NewFlowEngine(
 }
 
 func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
-	err = f.checkAccess(pipelineRequest, userId, token)
+	err = f.checkAccess(pipelineRequest, token, userId)
 	if err != nil {
 		return
 	}
@@ -116,7 +116,7 @@ func addPipelineIDToFogTopic(operators []Operator, pipelineId string) (newOperat
 
 func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
 	log.Println("engine - update pipeline: " + pipelineRequest.Id)
-	err = f.checkAccess(pipelineRequest, userId, token)
+	err = f.checkAccess(pipelineRequest, token, userId)
 	if err != nil {
 		return
 	}

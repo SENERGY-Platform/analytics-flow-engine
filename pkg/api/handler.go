@@ -17,6 +17,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	devicemanager_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/device-manager-api"
 	kafka2mqtt_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
@@ -168,6 +169,7 @@ func getUserId(c *gin.Context) (userId string) {
 		if c.GetHeader("Authorization") != "" {
 			claims, err := jwt.Parse(c.GetHeader("Authorization"))
 			if err != nil {
+				err = errors.New("Error parsing token: " + err.Error())
 				return
 			}
 			userId = claims.Sub
