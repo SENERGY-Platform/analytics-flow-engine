@@ -237,6 +237,9 @@ func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (status Pipelin
 func (f *FlowEngine) GetPipelinesStatus(ids []string, userId, token string) (status []PipelineStatus, err error) {
 	statusTemp, err := f.driver.GetPipelinesStatus()
 	pipes, err := getPipelines(userId, token)
+	if err != nil {
+		return
+	}
 	for _, stat := range statusTemp {
 		idx := slices.IndexFunc(pipes, func(p Pipeline) bool { return "pipeline-"+p.Id.String() == stat.Name })
 		if idx != -1 {
