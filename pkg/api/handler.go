@@ -84,7 +84,7 @@ func CreateServer() {
 		pipelineStatus, err := flowEngine.GetPipelineStatus(id, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
 			log.Println(err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
 		c.JSON(http.StatusOK, pipelineStatus)
@@ -93,13 +93,13 @@ func CreateServer() {
 		var request lib.PipelineStatusRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
 			log.Println(err.Error())
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error parsing request"})
 			return
 		}
 		pipelinesStatus, err := flowEngine.GetPipelinesStatus(request.Ids, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
 			log.Println(err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
 		c.JSON(http.StatusOK, pipelinesStatus)
@@ -109,13 +109,13 @@ func CreateServer() {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
 			log.Println(err.Error())
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error parsing request"})
 			return
 		}
 		pipe, err := flowEngine.StartPipeline(request, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
 			log.Println(err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
 		c.JSON(http.StatusOK, pipe)
@@ -125,13 +125,13 @@ func CreateServer() {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
 			log.Println(err.Error())
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "error parsing request"})
 			return
 		}
 		pipe, err := flowEngine.UpdatePipeline(request, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
 			log.Println(err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
 		c.JSON(http.StatusOK, pipe)
@@ -142,7 +142,7 @@ func CreateServer() {
 		err := flowEngine.DeletePipeline(id, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
 			log.Println(err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
 		c.Status(http.StatusNoContent)
