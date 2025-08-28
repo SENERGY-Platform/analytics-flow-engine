@@ -16,7 +16,5 @@
 
 package lib
 
-const PipelineRunning = "running"
-
 const RequestDeviceId = "deviceId"
 const RequestOperatorId = "operatorId"

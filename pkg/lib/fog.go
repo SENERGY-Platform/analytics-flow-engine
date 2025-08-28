@@ -47,7 +47,7 @@ func sendActiveOperators(userID string, token string) {
 	if err != nil {
 		GetLogger().Error("cannot get pipelines", "error", err)
 	}
-	startCommands := []operatorLib.StartOperatorControlCommand{}
+	var startCommands []operatorLib.StartOperatorControlCommand
 	for _, pipeline := range pipelines {
 		for _, operator := range pipeline.Operators {
 			if operator.DeploymentType == "local" {
@@ -75,7 +75,7 @@ func sendTopicsWithEnabledForward(userID string, token string) {
 		GetLogger().Error("cannot get pipelines", "error", err)
 	}
 
-	topics := []string{}
+	var topics []string
 	for _, pipeline := range pipelines {
 		for _, operator := range pipeline.Operators {
 			if operator.DeploymentType == "local" {
@@ -101,9 +101,9 @@ func sendTopicsWithEnabledForward(userID string, token string) {
 }
 
 func convertInputTopics(inputTopics []InputTopic) []operatorLib.InputTopic {
-	fogInputTopics := []operatorLib.InputTopic{}
+	var fogInputTopics []operatorLib.InputTopic
 	for _, v := range inputTopics {
-		fogMappings := []operatorLib.Mapping{}
+		var fogMappings []operatorLib.Mapping
 		for _, mapping := range v.Mappings {
 			fogMappings = append(fogMappings, operatorLib.Mapping(mapping))
 		}

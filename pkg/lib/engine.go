@@ -99,7 +99,7 @@ func addPipelineIDToFogTopic(operators []Operator, pipelineId string) (newOperat
 		if operator.DeploymentType == deploymentLocationLib.Local {
 			operator.OutputTopic = operator.OutputTopic + pipelineId
 
-			inputTopicsWithID := []InputTopic{}
+			var inputTopicsWithID []InputTopic
 			for _, inputTopic := range operator.InputTopics {
 				if inputTopic.FilterType == "OperatorId" {
 					inputTopic.Name += pipelineId
@@ -382,7 +382,7 @@ func (f *FlowEngine) enableCloudToFogForwarding(operators []Operator, pipelineID
 	return
 }
 
-func (f *FlowEngine) enableFogToCloudForwarding(operator Operator, pipelineID, userID string) error {
+func (f *FlowEngine) enableFogToCloudForwarding(operator Operator, _, userID string) error {
 	if operator.UpstreamConfig.Enabled {
 		GetLogger().Debug("Try to enable Fog2Cloud Forwarding for operator: " + operator.Id)
 
@@ -428,7 +428,7 @@ func (f *FlowEngine) disableCloudToFogForwarding(operators []Operator, pipelineI
 	return nil
 }
 
-func (f *FlowEngine) disableFogToCloudForwarding(operator Operator, pipelineID, userID, token string) error {
+func (f *FlowEngine) disableFogToCloudForwarding(operator Operator, _, userID, _ string) error {
 	if operator.UpstreamConfig.Enabled {
 		command := &upstreamLib.UpstreamControlMessage{
 			OperatorOutputTopic: operator.OutputTopic,
