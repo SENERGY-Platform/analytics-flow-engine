@@ -1,12 +1,12 @@
 package devicemanagerapi
 
 import (
-	"errors"
-	"github.com/parnurzeal/gorequest"
-	"strconv"
-	"net/http"
-	"github.com/SENERGY-Platform/models/go/models"
 	"encoding/json"
+	"errors"
+	"github.com/SENERGY-Platform/models/go/models"
+	"github.com/parnurzeal/gorequest"
+	"net/http"
+	"strconv"
 )
 
 type DeviceManagerApi struct {
@@ -26,7 +26,7 @@ func (api *DeviceManagerApi) GetDeviceType(deviceTypeID, userID, authorization s
 	}
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New("device manager API - could not get device type: " + strconv.Itoa(resp.StatusCode) + " " + body)
-		return 
+		return
 	}
 	err = json.Unmarshal([]byte(body), &deviceType)
 	if err != nil {
@@ -45,7 +45,7 @@ func (api *DeviceManagerApi) GetDevice(deviceID, userID, authorization string) (
 	}
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New("device manager API - could not get device: " + strconv.Itoa(resp.StatusCode) + " " + body)
-		return 
+		return
 	}
 	err = json.Unmarshal([]byte(body), &device)
 	if err != nil {

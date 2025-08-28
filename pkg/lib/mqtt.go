@@ -104,7 +104,7 @@ func publishMessage(topic string, message string) error {
 	return nil
 }
 
-func onMessageReceived(client MQTT.Client, message MQTT.Message) {
+func onMessageReceived(_ MQTT.Client, message MQTT.Message) {
 	GetLogger().Debug("Received message on topic: "+message.Topic(), "message", message.Payload())
 	go processMessage(message)
 }

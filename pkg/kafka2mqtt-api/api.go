@@ -1,14 +1,12 @@
 package kafka2mqtt_api
 
 import (
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	downstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/downstream"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 
 	"encoding/json"
 	"errors"
 	"github.com/parnurzeal/gorequest"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -36,7 +34,7 @@ func (api *Kafka2MqttApi) StartOperatorInstance(operatorName, operatorID string,
 		Filter:     pipelineId + ":" + operatorID,
 		UserId:     userID,
 		Values: []Value{
-			Value{
+			{
 				Name: mqttTopic,
 				Path: "", // forward the whole message
 			},
@@ -59,29 +57,26 @@ func (api *Kafka2MqttApi) startInstance(instanceConfig Instance, userID, authori
 
 	resp, body, e := request.Send(string(payload)).End()
 	if len(e) > 0 {
-		lib.GetLogger().Error("kafka2mqtt - could not create instance ", "error", e)
-		err = errors.New("kafka2mqtt API - could not start instance: an error occurred")
+		err = errors.New("kafka2mqtt API - could not start instance: an error occurred" + e[0].Error())
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
-		lib.GetLogger().Error("kafka2mqtt - could not create instance,received wrong response ", "status code", resp.StatusCode, "body", body)
 		err = errors.New("kafka2mqtt API - could not start instance: " + strconv.Itoa(resp.StatusCode) + " " + body)
 		return
 	}
 	err = json.Unmarshal([]byte(body), &createdInstance)
 	if err != nil {
-		lib.GetLogger().Error("kafka2mqtt - cannot unmarshal created instance ", "error", err)
+		return
 	}
 	return
 }
 
-func (api *Kafka2MqttApi) RemoveInstance(id, pipelineID, userID, token string) error {
+func (api *Kafka2MqttApi) RemoveInstance(id, _, userID, token string) error {
 	request := gorequest.New()
 	request.Delete(api.url+"/instances/"+id).Set("X-UserId", userID).Set("Authorization", token)
 	resp, body, e := request.End()
 	if len(e) > 0 {
-		lib.GetLogger().Error("kafka2mqtt - could not delete instance ", "error", e)
-		err := errors.New("kafka2mqtt API - could not delete instance: an error occurred")
+		err := errors.New("kafka2mqtt API - could not delete instance: an error occurred " + e[0].Error())
 		return err
 	}
 	if resp.StatusCode != http.StatusNoContent {

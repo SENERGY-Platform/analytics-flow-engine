@@ -18,10 +18,10 @@ package parsing_api
 
 import (
 	"encoding/json"
-	"net/http"
-	"strconv"
 	"github.com/parnurzeal/gorequest"
 	"github.com/pkg/errors"
+	"net/http"
+	"strconv"
 )
 
 type ParsingApi struct {
