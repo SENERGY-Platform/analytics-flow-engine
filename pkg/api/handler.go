@@ -52,7 +52,7 @@ func CreateServer() {
 	deviceManager := devicemanager_api.NewDeviceManagerApi(lib.GetEnv("DEVICE_MANAGER_API_ENDPOINT", ""))
 	flowEngine := lib.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager)
 
-	port := lib.GetEnv("API_PORT", "8000")
+	port := lib.GetEnv("SERVER_PORT", "8000")
 	lib.GetLogger().Info("Starting api server at port " + port)
 	DEBUG, err := strconv.ParseBool(lib.GetEnv("DEBUG", "false"))
 	if err != nil {
