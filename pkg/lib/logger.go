@@ -17,47 +17,39 @@
 package lib
 
 import (
-	"bytes"
-	"log"
-	"net/http"
+	struct_logger "github.com/SENERGY-Platform/go-service-base/struct-logger"
+	"log/slog"
+	"os"
+	"runtime/debug"
+	"strings"
+	"time"
 )
 
-func NewLogger(handler http.Handler, logLevel string) *LoggerMiddleWare {
-	return &LoggerMiddleWare{handler: handler, logLevel: logLevel}
-}
+var logger *slog.Logger
 
-type LoggerMiddleWare struct {
-	handler  http.Handler
-	logLevel string `DEBUG | CALL | NONE`
-}
-
-func (this *LoggerMiddleWare) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	this.log(r)
-	if this.handler != nil {
-		this.handler.ServeHTTP(w, r)
-	} else {
-		http.Error(w, "Forbidden", 403)
-	}
-}
-
-func (this *LoggerMiddleWare) log(request *http.Request) {
-	if this.logLevel != "NONE" {
-		method := request.Method
-		path := request.URL
-
-		if this.logLevel == "CALL" {
-			log.Printf("[%v] %v \n", method, path)
+func GetLogger() *slog.Logger {
+	if logger == nil {
+		info, ok := debug.ReadBuildInfo()
+		project := ""
+		org := ""
+		if ok {
+			if parts := strings.Split(info.Main.Path, "/"); len(parts) > 2 {
+				project = strings.Join(parts[2:], "/")
+				org = strings.Join(parts[:2], "/")
+			}
 		}
-
-		if this.logLevel == "DEBUG" {
-			buf := new(bytes.Buffer)
-			buf.ReadFrom(request.Body)
-			body := buf.String()
-
-			client := request.RemoteAddr
-
-			log.Printf("%v [%v] %v\n%v\n", client, method, path, body)
-		}
-
+		logger = struct_logger.New(
+			struct_logger.Config{
+				Handler:    struct_logger.JsonHandlerSelector,
+				Level:      GetEnv("LOG_LEVEL", "info"),
+				TimeFormat: time.RFC3339Nano,
+				TimeUtc:    true,
+				AddMeta:    true,
+			},
+			os.Stdout,
+			org,
+			project,
+		)
 	}
+	return logger
 }

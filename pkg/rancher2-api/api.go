@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -62,7 +61,7 @@ func (r *Rancher2) GetPipelineStatus(pipelineId string) (status lib.PipelineStat
 	var deployment DeploymentResponse
 	err = json.Unmarshal([]byte(body), &deployment)
 	if err != nil {
-		log.Println("Cant unmarshal deployment response: " + err.Error())
+		lib.GetLogger().Error("rancher2 API - cannot unmarshal deployment response", "error", err)
 		return
 	}
 	status = lib.PipelineStatus{
@@ -89,7 +88,7 @@ func (r *Rancher2) GetPipelinesStatus() (status []lib.PipelineStatus, err error)
 	var deployments DeploymentsResponse
 	err = json.Unmarshal([]byte(body), &deployments)
 	if err != nil {
-		log.Println("Cant unmarshal deployment response: " + err.Error())
+		lib.GetLogger().Error("rancher2 API - cannot unmarshal deployment response", "error", err)
 		return
 	}
 	for _, deployment := range deployments.Data {
@@ -190,7 +189,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 
 	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads").Send(reqBody).End()
 	if len(e) > 0 {
-		log.Println(e[0])
+		lib.GetLogger().Error("rancher2 API - could not create operators ", "error", e)
 		err = errors.New("rancher2 API -  could not create operators - an error occurred")
 		return
 	}
@@ -251,7 +250,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 
 	// Delete AutoscalerCheckpoint
 	autoscalerCheckpointId := r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
-	log.Println("Try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
+	lib.GetLogger().Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	resp, body, e := request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
@@ -260,7 +259,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
 		// There must no checkpoint exists
 		if resp.StatusCode == http.StatusNotFound {
-			log.Printf("Cant delete vpa checkpoint %s as it does not exist\n", autoscalerCheckpointId)
+			lib.GetLogger().Error("cannot delete autoscaler checkpoint " + autoscalerCheckpointId + " as it does not exist")
 			err = nil
 		} else {
 			return
@@ -278,7 +277,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			log.Printf("Cant delete operator %s as it does not exist\n", r.getOperatorName(pipelineId, operator)[1])
+			lib.GetLogger().Error("cannot delete operator " + r.getOperatorName(pipelineId, operator)[1] + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator " + body)
@@ -302,7 +301,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			log.Printf("Cant delete operator service %s as it does not exist\n", r.getOperatorName(pipelineId, operator)[1])
+			lib.GetLogger().Error("cannot delete operator service " + r.getOperatorName(pipelineId, operator)[1] + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator service " + body)
@@ -324,7 +323,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			log.Printf("Cant delete operator vpa %s as it does not exist\n", r.getOperatorName(pipelineId, operator)[1]+"-vpa")
+			lib.GetLogger().Error("cannot delete operator vpa " + r.getOperatorName(pipelineId, operator)[1] + "-vpa" + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator vpa " + body)
@@ -376,7 +375,7 @@ func (r *Rancher2) deletePersistentVolumeClaim(name string) (err error) {
 		return
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		log.Printf("Cant delete persistent volume claim %s as it does not exist\n", name)
+		lib.GetLogger().Error("Cant delete persistent volume claim as it does not exist", "name", name)
 		err = nil
 		return
 	}

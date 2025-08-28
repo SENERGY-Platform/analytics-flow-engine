@@ -18,7 +18,7 @@ package lib
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 	"strings"
 
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
@@ -29,7 +29,7 @@ import (
 
 func processMessage(message MQTT.Message) {
 	topic := message.Topic()
-	log.Println("Received message on: " + topic)
+	GetLogger().Debug("Received message on: " + topic)
 
 	if strings.HasSuffix(topic, "/operator/control/sync/request") {
 		userID := operatorLib.GetUserIDFromOperatorControlSyncTopic(topic)
@@ -45,7 +45,7 @@ func processMessage(message MQTT.Message) {
 func sendActiveOperators(userID string, token string) {
 	pipelines, err := getPipelines(userID, token)
 	if err != nil {
-		log.Println("Cant get pipelines: " + err.Error())
+		GetLogger().Error("cannot get pipelines", "error", err)
 	}
 	startCommands := []operatorLib.StartOperatorControlCommand{}
 	for _, pipeline := range pipelines {
@@ -60,19 +60,19 @@ func sendActiveOperators(userID string, token string) {
 
 	syncMsgStr, err := json.Marshal(startCommands)
 	if err != nil {
-		log.Println("Cant marshal operator sync message: " + err.Error())
+		GetLogger().Error("cannot marshal operator sync message", "error", err)
 	}
 	topic := operatorLib.GetOperatorControlSyncResponseTopic(userID)
 	err = publishMessage(topic, string(syncMsgStr))
 	if err != nil {
-		log.Println("Cant publish operator sync message: " + err.Error())
+		GetLogger().Error("cannot publish operator sync message", "error", err)
 	}
 }
 
 func sendTopicsWithEnabledForward(userID string, token string) {
 	pipelines, err := getPipelines(userID, token)
 	if err != nil {
-		log.Println("Cant get pipelines: " + err.Error())
+		GetLogger().Error("cannot get pipelines", "error", err)
 	}
 
 	topics := []string{}
@@ -86,17 +86,17 @@ func sendTopicsWithEnabledForward(userID string, token string) {
 		}
 	}
 
-	log.Printf("Sync %+v\n", topics)
+	GetLogger().Debug(fmt.Sprintf("sync %+v", topics))
 
 	syncMsg := upstreamLib.UpstreamSyncMessage{OperatorOutputTopics: topics}
 	syncMsgStr, err := json.Marshal(syncMsg)
 	if err != nil {
-		log.Println("Cant marshal upstream sync message: " + err.Error())
+		GetLogger().Error("cannot marshal upstream sync message", "error", err)
 	}
 	topic := upstreamLib.GetUpstreamControlSyncResponseTopic(userID)
 	err = publishMessage(topic, string(syncMsgStr))
 	if err != nil {
-		log.Println("Cant publish upstream sync message: " + err.Error())
+		GetLogger().Error("cannot publish upstream sync message", "error", err)
 	}
 }
 
@@ -141,10 +141,10 @@ func startFogOperator(operator Operator, pipelineConfig PipelineConfig, userID s
 		return err
 	}
 	controlTopic := operatorLib.GetStartOperatorCloudTopic(userID)
-	log.Println("publish start command for operator: " + operator.Name + " - " + operator.Id + " to topic: " + controlTopic)
+	GetLogger().Debug("publish start command for operator", "operator", operator, "topic", controlTopic)
 	err = publishMessage(controlTopic, string(out))
 	if err != nil {
-		log.Println("cant publish start command for operator: " + operator.Name + " - " + operator.Id + ": " + err.Error())
+		GetLogger().Error("cannot publish start command for operator", "error", err, "operator", operator)
 		return err
 	}
 	return nil
@@ -160,15 +160,15 @@ func stopFogOperator(pipelineId string, operator Operator, userID string) error 
 	}
 	out, err := json.Marshal(command)
 	if err != nil {
-		log.Println("cant unmarshal stop command for operator: " + operator.Name + " - " + operator.Id + ": " + err.Error())
+		GetLogger().Error("cannot unmarshal stop command for operator", "error", err, "operator", operator)
 		return err
 	}
 
 	controlTopic := operatorLib.GetStopOperatorCloudTopic(userID)
-	log.Println("publish stop command for operator: " + operator.Name + " - " + operator.Id)
+	GetLogger().Debug("publish stop command for operator", "operator", operator, "topic", controlTopic)
 	err = publishMessage(controlTopic, string(out))
 	if err != nil {
-		log.Println("cant publish stop command for operator: " + operator.Name + " - " + operator.Id + ": " + err.Error())
+		GetLogger().Error("cannot publish stop command for operator", "error", err, "operator", operator)
 		return err
 	}
 	return nil

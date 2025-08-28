@@ -18,7 +18,6 @@ package api
 
 import (
 	"errors"
-	"fmt"
 	devicemanager_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/device-manager-api"
 	kafka2mqtt_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
@@ -32,8 +31,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-
-	"log"
 )
 
 func CreateServer() {
@@ -56,10 +53,10 @@ func CreateServer() {
 	flowEngine := lib.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager)
 
 	port := lib.GetEnv("API_PORT", "8000")
-	log.Println("Starting Server at port " + port + "\n")
+	lib.GetLogger().Info("Starting api server at port " + port)
 	DEBUG, err := strconv.ParseBool(lib.GetEnv("DEBUG", "false"))
 	if err != nil {
-		log.Print("Error loading debug value")
+		lib.GetLogger().Error("Error loading debug value", "error", err)
 		DEBUG = false
 	}
 	if !DEBUG {
@@ -83,7 +80,7 @@ func CreateServer() {
 		id := c.Param("id")
 		pipelineStatus, err := flowEngine.GetPipelineStatus(id, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
-			log.Println(err)
+			lib.GetLogger().Error("could not get pipeline status", "error", err, "method", "GET", "path", "/pipeline/:id")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
@@ -92,13 +89,13 @@ func CreateServer() {
 	prefix.POST("/pipelines", func(c *gin.Context) {
 		var request lib.PipelineStatusRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			log.Println(err.Error())
+			lib.GetLogger().Error("error parsing request", "error", err, "method", "POST", "path", "/pipelines")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "error parsing request"})
 			return
 		}
 		pipelinesStatus, err := flowEngine.GetPipelinesStatus(request.Ids, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
-			log.Println(err)
+			lib.GetLogger().Error("could not get pipelines status", "error", err, "method", "POST", "path", "/pipelines")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
@@ -108,13 +105,13 @@ func CreateServer() {
 	prefix.POST("/pipeline", func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			log.Println(err.Error())
+			lib.GetLogger().Error("error parsing request", "error", err, "method", "POST", "path", "/pipeline")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "error parsing request"})
 			return
 		}
 		pipe, err := flowEngine.StartPipeline(request, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
-			log.Println(err)
+			lib.GetLogger().Error("could not start pipeline", "error", err, "method", "POST", "path", "/pipeline")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
@@ -124,13 +121,13 @@ func CreateServer() {
 	prefix.PUT("/pipeline", func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			log.Println(err.Error())
+			lib.GetLogger().Error("error parsing request", "error", err, "method", "PUT", "path", "/pipeline")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "error parsing request"})
 			return
 		}
 		pipe, err := flowEngine.UpdatePipeline(request, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
-			log.Println(err)
+			lib.GetLogger().Error("could not update pipeline", "error", err, "method", "PUT", "path", "/pipeline")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
@@ -141,7 +138,7 @@ func CreateServer() {
 		id := c.Param("id")
 		err := flowEngine.DeletePipeline(id, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
-			log.Println(err)
+			lib.GetLogger().Error("could not delete pipeline", "error", err, "method", "DELETE", "path", "/pipeline/:id")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
@@ -154,7 +151,7 @@ func CreateServer() {
 		err = r.Run("127.0.0.1:" + port)
 	}
 	if err == nil {
-		fmt.Printf("Starting api server failed: %s \n", err)
+		lib.GetLogger().Error("could not start api server", "error", err)
 	}
 }
 

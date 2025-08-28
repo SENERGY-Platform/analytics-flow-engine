@@ -19,16 +19,14 @@ package lib
 import (
 	"crypto/tls"
 	"flag"
-	"log"
-	"os"
 	"fmt"
-	"strconv"
-	"net/url"
-	"time"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
-
+	"net/url"
+	"os"
+	"strconv"
+	"time"
 )
 
 var client MQTT.Client
@@ -46,8 +44,8 @@ func ConnectMQTTBroker() error {
 	topics := map[string]byte{
 		upstreamLib.GetUpstreamControlSyncTriggerSubTopic(): byte(0),
 		operatorLib.GetOperatorControlSyncTriggerSubTopic(): byte(0),
-	} 
-	log.Printf("Subscribed to topics: %v\n", topics)
+	}
+	GetLogger().Info("subscribing to topics: " + fmt.Sprintf("%v", topics))
 
 	qos = flag.Int("qos", 2, "The QoS to subscribe to messages at")
 	retained = flag.Bool("retained", false, "Are the messages sent with the retained flag")
@@ -61,14 +59,14 @@ func ConnectMQTTBroker() error {
 		SetClientID(*clientId).
 		SetCleanSession(true).
 		SetConnectionLostHandler(func(c MQTT.Client, err error) {
-			log.Printf("Connection Lost!")
+			GetLogger().Error("mqtt connection lost: ", "error", err)
 		}).
 		SetConnectionAttemptHandler(func(broker *url.URL, tlsCfg *tls.Config) *tls.Config {
-			log.Printf("Attempt to connect!")
+			GetLogger().Info("connecting to broker "+broker.String(), "broker", broker.String())
 			return tlsCfg
 		}).
 		SetReconnectingHandler(func(mqttClient MQTT.Client, opt *MQTT.ClientOptions) {
-			log.Printf("Try to reconnect!")
+			GetLogger().Info("reconnecting to broker "+opt.Servers[0].String(), "broker", opt.Servers[0].String())
 		}).
 		SetAutoReconnect(true)
 
@@ -86,14 +84,14 @@ func ConnectMQTTBroker() error {
 		if token := c.SubscribeMultiple(topics, onMessageReceived); token.Wait() && token.Error() != nil {
 			panic(token.Error())
 		}
-		log.Println("Connected successfully to MQTT broker")
+		GetLogger().Info("Subscribed to topics: " + fmt.Sprintf("%v", topics))
 	}
 
 	client = MQTT.NewClient(connOpts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return fmt.Errorf("Cant connect to broker %s: %s\n", hostname, token.Error())
 	} else {
-		log.Printf("Connected to %s\n", *server)
+		GetLogger().Info("Connected to broker " + *server)
 	}
 	return nil
 }
@@ -107,7 +105,7 @@ func publishMessage(topic string, message string) error {
 }
 
 func onMessageReceived(client MQTT.Client, message MQTT.Message) {
-	log.Printf("Received message on topic: %s\nMessage: %s\n", message.Topic(), message.Payload())
+	GetLogger().Debug("Received message on topic: "+message.Topic(), "message", message.Payload())
 	go processMessage(message)
 }
 

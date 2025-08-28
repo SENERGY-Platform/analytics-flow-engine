@@ -1,13 +1,14 @@
 module github.com/SENERGY-Platform/analytics-flow-engine
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.23.4
+toolchain go1.24.6
 
 //replace github.com/SENERGY-Platform/analytics-fog-lib => ../analytics-fog/analytics-fog-lib
 
 require (
 	github.com/SENERGY-Platform/analytics-fog-lib v1.1.26
+	github.com/SENERGY-Platform/go-service-base/struct-logger v0.4.1
 	github.com/SENERGY-Platform/go-service-base/watchdog v0.4.1
 	github.com/SENERGY-Platform/models/go v0.0.0-20240627082833-157bd627a94f
 	github.com/SENERGY-Platform/permissions-v2 v0.0.27
@@ -15,9 +16,7 @@ require (
 	github.com/eclipse/paho.mqtt.golang v1.4.3
 	github.com/gin-contrib/cors v1.7.3
 	github.com/gin-gonic/gin v1.10.0
-	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.6.0
-	github.com/gorilla/mux v1.8.0
 	github.com/joho/godotenv v1.5.1
 	github.com/parnurzeal/gorequest v0.2.16
 	github.com/pkg/errors v0.9.1
@@ -40,6 +39,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.25.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
+	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

@@ -21,7 +21,6 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	"github.com/SENERGY-Platform/go-service-base/watchdog"
 
-	"log"
 	"os"
 	"syscall"
 
@@ -36,13 +35,13 @@ func main() {
 
 	err := godotenv.Load()
 	if err != nil {
-		log.Print("Error loading .env file")
+		lib.GetLogger().Debug("error loading .env file")
 	}
 	wd := watchdog.New(syscall.SIGINT, syscall.SIGTERM)
 
 	err = lib.ConnectMQTTBroker()
 	if err != nil {
-		log.Println("Cant connect to MQTT: " + err.Error())
+		lib.GetLogger().Error("error connecting to mqtt broker", "error", err)
 		ec = 1
 		return
 	}

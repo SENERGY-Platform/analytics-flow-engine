@@ -19,7 +19,6 @@ package lib
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"time"
 )
@@ -69,7 +68,7 @@ func retry(attempts int, sleep time.Duration, f func() error) (err error) {
 
 		time.Sleep(sleep)
 
-		log.Println("retrying after error:", err)
+		GetLogger().Error("retrying after error", "error", err, "attempt", i+1, "of", attempts)
 	}
 	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
 }
