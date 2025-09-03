@@ -301,7 +301,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			lib.GetLogger().Error("cannot delete operator service " + r.getOperatorName(pipelineId, operator)[1] + " as it does not exist")
+			lib.GetLogger().Debug("cannot delete operator service " + r.getOperatorName(pipelineId, operator)[1] + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator service " + body)
@@ -323,7 +323,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			lib.GetLogger().Error("cannot delete operator vpa " + r.getOperatorName(pipelineId, operator)[1] + "-vpa" + " as it does not exist")
+			lib.GetLogger().Debug("cannot delete operator vpa " + r.getOperatorName(pipelineId, operator)[1] + "-vpa" + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator vpa " + body)
