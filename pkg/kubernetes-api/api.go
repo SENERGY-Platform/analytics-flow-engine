@@ -255,17 +255,6 @@ func (k *Kubernetes) DeleteOperators(pipelineId string, operators []lib.Operator
 	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
 	verticalAutoscalerCheckpointClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalerCheckpoints(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
 
-	lib.GetLogger().Debug("deleting deployment " + pipelineId)
-	deletePolicy := metav1.DeletePropagationForeground
-
-	err = deploymentsClient.Delete(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1], metav1.DeleteOptions{
-		PropagationPolicy: &deletePolicy,
-	})
-	if err != nil {
-		return
-	}
-	lib.GetLogger().Debug(fmt.Sprintf("deleted deployment %s", pipelineId))
-
 	for _, operator := range operators {
 		if operator.PersistData {
 			volumeName := getOperatorName(pipelineId, operator)[0]
@@ -281,6 +270,17 @@ func (k *Kubernetes) DeleteOperators(pipelineId string, operators []lib.Operator
 		}
 	}
 
+	lib.GetLogger().Debug("deleting deployment " + pipelineId)
+	deletePolicy := metav1.DeletePropagationForeground
+
+	err = deploymentsClient.Delete(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1], metav1.DeleteOptions{
+		PropagationPolicy: &deletePolicy,
+	})
+	if err != nil {
+		return
+	}
+	lib.GetLogger().Debug(fmt.Sprintf("deleted deployment %s", pipelineId))
+
 	lib.GetLogger().Debug("deleting autoscaler " + pipelineId)
 	err = verticalAutoscalerClient.Delete(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]+"-vpa", metav1.DeleteOptions{})
 	lib.GetLogger().Debug(fmt.Sprintf("deleted autoscaler %s", pipelineId))
@@ -288,6 +288,24 @@ func (k *Kubernetes) DeleteOperators(pipelineId string, operators []lib.Operator
 		return
 	}
 	return
+}
+
+func (k *Kubernetes) GetPipelineStatus(pipelineId string) (pipeStatus lib.PipelineStatus, err error) {
+	deploymentsClient := k.clientset.AppsV1().Deployments(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
+	pipe, err := deploymentsClient.Get(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1], metav1.GetOptions{})
+	if err != nil {
+		return
+	}
+	pipeStatus = lib.PipelineStatus{
+		Running:       pipe.Status.AvailableReplicas > 0 && pipe.Status.UnavailableReplicas == 0,
+		Transitioning: pipe.Status.UnavailableReplicas > 0,
+		Message:       "",
+	}
+	return pipeStatus, err
+}
+
+func (k *Kubernetes) GetPipelinesStatus() ([]lib.PipelineStatus, error) {
+	return []lib.PipelineStatus{}, nil
 }
 
 func getOperatorName(pipelineId string, operator lib.Operator) []string {
