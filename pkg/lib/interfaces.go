@@ -25,7 +25,12 @@ import (
 
 type Driver interface {
 	CreateOperators(pipelineId string, input []Operator, pipelineConfig PipelineConfig) error
+	/*
+		DeleteOperator deletes an operator in the given pipeline
+		Deprecated: Use DeleteOperators instead.
+	*/
 	DeleteOperator(pipelineId string, input Operator) error
+	DeleteOperators(pipelineId string, inputs []Operator) error
 	GetPipelineStatus(pipelineId string) (PipelineStatus, error)
 	GetPipelinesStatus() ([]PipelineStatus, error)
 }

@@ -246,6 +246,98 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 	return
 }
 
+func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) (err error) {
+	//Delete Workload
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
+		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]).End()
+	if resp.StatusCode != http.StatusNoContent {
+		switch {
+		case resp.StatusCode == http.StatusNotFound:
+			lib.GetLogger().Error("cannot delete operator " + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + " as it does not exist")
+			return // dont have to delete whats already deleted
+		default:
+			err = errors.New("rancher2 API - could not delete operator " + body)
+		}
+		return
+	}
+	if len(e) > 0 {
+		err = lib.ErrSomethingWentWrong
+		return
+	}
+
+	// Delete Service
+	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	resp, body, e = request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/services/" +
+		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]).End()
+	if resp.StatusCode != http.StatusNoContent {
+		switch {
+		case resp.StatusCode == http.StatusNotFound:
+			lib.GetLogger().Debug("cannot delete operator service " + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + " as it does not exist")
+			return // dont have to delete whats already deleted
+		default:
+			err = errors.New("rancher2 API - could not delete operator service " + body)
+		}
+		return
+	}
+	if len(e) > 0 {
+		err = lib.ErrSomethingWentWrong
+		return
+	}
+
+	// Delete Autoscaler
+	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers/" +
+		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
+		"/" +
+		r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + "-vpa").
+		End()
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
+		switch {
+		case resp.StatusCode == http.StatusNotFound:
+			lib.GetLogger().Debug("cannot delete operator vpa " + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + "-vpa" + " as it does not exist")
+			return // dont have to delete whats already deleted
+		default:
+			err = errors.New("rancher2 API - could not delete operator vpa " + body)
+		}
+		return
+	}
+	if len(e) > 0 {
+		err = lib.ErrSomethingWentWrong
+		return
+	}
+
+	for _, operator := range operators {
+		// Delete Volume
+		if operator.PersistData {
+			err = r.deletePersistentVolumeClaim(r.getOperatorName(pipelineId, operator)[0])
+		}
+		// Delete AutoscalerCheckpoint
+		autoscalerCheckpointId := r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
+		lib.GetLogger().Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
+		request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+		resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
+			lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
+			"/" + autoscalerCheckpointId).End()
+		if resp.StatusCode != http.StatusNoContent {
+			err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
+			// There must no checkpoint exists
+			if resp.StatusCode == http.StatusNotFound {
+				lib.GetLogger().Error("cannot delete autoscaler checkpoint " + autoscalerCheckpointId + " as it does not exist")
+				err = nil
+			} else {
+				return
+			}
+		}
+		if len(e) > 0 {
+			err = lib.ErrSomethingWentWrong
+			return
+		}
+	}
+
+	return
+}
+
 func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err error) {
 
 	// Delete AutoscalerCheckpoint

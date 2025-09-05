@@ -279,23 +279,12 @@ func (f *FlowEngine) stopOperators(pipeline Pipeline, userID, token string) erro
 	GetLogger().Debug("engine - stop operators for pipeline: "+pipeline.Id.String(), "localOperators", localOperators, "cloudOperators", cloudOperators)
 
 	if len(cloudOperators) > 0 {
-		counter := 0
-		for _, operator := range cloudOperators {
-			err := f.driver.DeleteOperator(pipeline.Id.String(), operator)
-			if err != nil {
-				GetLogger().Error("cannot delete operator", "error", err)
-				switch {
-				// When first operator is deleted -> the whole pod gets removed, so all following operators wont exists anymore
-				case errors.Is(err, ErrWorkloadNotFound) && counter > 0:
-				default:
-					log.Println(err.Error())
-					return err
-				}
-			}
-			GetLogger().Debug("Removed operator: " + operator.Id + " of pipeline: " + pipeline.Id.String())
-			counter++
+		err := f.driver.DeleteOperators(pipeline.Id.String(), cloudOperators)
+		if err != nil {
+			GetLogger().Error("cannot delete operators", "error", err)
+			return err
 		}
-		err := f.disableCloudToFogForwarding(cloudOperators, pipeline.Id.String(), userID, token)
+		err = f.disableCloudToFogForwarding(cloudOperators, pipeline.Id.String(), userID, token)
 		if err != nil {
 			GetLogger().Error("cannot disable cloud2fog forwarding", "error", err)
 			return err

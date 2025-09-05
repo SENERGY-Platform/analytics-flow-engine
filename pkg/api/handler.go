@@ -33,6 +33,8 @@ import (
 	"strings"
 )
 
+var DEBUG bool
+
 func CreateServer() {
 	var driver lib.Driver
 	switch selectedDriver := lib.GetEnv("DRIVER", "rancher"); selectedDriver {
