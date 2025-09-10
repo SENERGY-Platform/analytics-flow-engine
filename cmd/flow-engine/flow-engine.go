@@ -51,7 +51,14 @@ func main() {
 		return nil
 	})
 
-	go api.CreateServer()
+	go func() {
+		err = api.CreateServer()
+		if err != nil {
+			lib.GetLogger().Error("error starting server", "error", err)
+		}
+		ec = 1
+		return
+	}()
 
 	wd.Start()
 

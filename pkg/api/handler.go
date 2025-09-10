@@ -33,9 +33,8 @@ import (
 	"strings"
 )
 
-func CreateServer() {
+func CreateServer() (err error) {
 	var driver lib.Driver
-	var err error
 	switch selectedDriver := lib.GetEnv("DRIVER", "kubernetes"); selectedDriver {
 	case "rancher":
 		driver = rancher2_api.NewRancher2(
@@ -156,6 +155,7 @@ func CreateServer() {
 	if err == nil {
 		lib.GetLogger().Error("could not start api server", "error", err)
 	}
+	return
 }
 
 func getUserId(c *gin.Context) (userId string) {
