@@ -65,7 +65,7 @@ func NewKubernetes() (kube *Kubernetes, err error) {
 	}
 	lib.GetLogger().Debug("loaded clientset")
 
-	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+	pods, err := clientset.CoreV1().Pods(lib.GetEnv("RANCHER2_NAMESPACE_ID", "")).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
