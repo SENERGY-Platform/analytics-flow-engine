@@ -245,7 +245,7 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []lib.Operator, p
 	return
 }
 
-func (k *Kubernetes) DeleteOperator(pipelineId string, operator lib.Operator) (err error) {
+func (k *Kubernetes) DeleteOperator(string, lib.Operator) (err error) {
 	return
 }
 
