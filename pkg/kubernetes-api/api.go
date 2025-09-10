@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v1"
 	apiv1 "k8s.io/api/core/v1"
+	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
@@ -32,7 +32,7 @@ type Kubernetes struct {
 func NewKubernetes() (kube *Kubernetes, err error) {
 	var config *rest.Config
 
-	if api.DEBUG {
+	if lib.DebugMode() {
 		var kubeconfig *string
 		lib.GetLogger().Debug("HomeDir" + homedir.HomeDir())
 		if home := homedir.HomeDir(); home != "" {
@@ -77,12 +77,12 @@ func NewKubernetes() (kube *Kubernetes, err error) {
 func (k *Kubernetes) CreateOperators(pipelineId string, inputs []lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
 	var containers []apiv1.Container
 	var volumes []apiv1.Volume
-	var ports []apiv1.ContainerPort
 	metricsBasePort := 8080
 	deploymentsClient := k.clientset.AppsV1().Deployments(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
 	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
 
 	for i, operator := range inputs {
+		var ports []apiv1.ContainerPort
 		var volumeMounts []apiv1.VolumeMount
 		config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
 		envs := []apiv1.EnvVar{
@@ -132,7 +132,7 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []lib.Operator, p
 			metricsPort := metricsBasePort + i
 			envs = append(envs, apiv1.EnvVar{Name: "METRICS", Value: "true"}, apiv1.EnvVar{Name: "METRICS_PORT", Value: strconv.Itoa(metricsPort)})
 			ports = append(ports, apiv1.ContainerPort{
-				Name:          "metrics",
+				Name:          "metrics-" + strconv.Itoa(i),
 				ContainerPort: int32(metricsPort),
 			})
 		}
@@ -266,7 +266,13 @@ func (k *Kubernetes) DeleteOperators(pipelineId string, operators []lib.Operator
 		lib.GetLogger().Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
 		err = verticalAutoscalerCheckpointClient.Delete(context.TODO(), autoscalerCheckpointId, metav1.DeleteOptions{})
 		if err != nil {
-			return
+			if k8s_errors.IsNotFound(err) {
+				lib.GetLogger().Debug("autoscaler checkpoint not found: " + autoscalerCheckpointId)
+			} else {
+				return
+			}
+		} else {
+			lib.GetLogger().Debug("deleted autoscaler checkpoint: " + autoscalerCheckpointId)
 		}
 	}
 
@@ -304,8 +310,22 @@ func (k *Kubernetes) GetPipelineStatus(pipelineId string) (pipeStatus lib.Pipeli
 	return pipeStatus, err
 }
 
-func (k *Kubernetes) GetPipelinesStatus() ([]lib.PipelineStatus, error) {
-	return []lib.PipelineStatus{}, nil
+func (k *Kubernetes) GetPipelinesStatus() (pipeStatus []lib.PipelineStatus, err error) {
+	deploymentsClient := k.clientset.AppsV1().Deployments(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
+	pipes, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return
+	}
+
+	for _, deployment := range pipes.Items {
+		pipeStatus = append(pipeStatus, lib.PipelineStatus{
+			Running:       deployment.Status.AvailableReplicas > 0 && deployment.Status.UnavailableReplicas == 0,
+			Transitioning: deployment.Status.UnavailableReplicas > 0,
+			Message:       "",
+			Name:          deployment.Name,
+		})
+	}
+	return
 }
 
 func getOperatorName(pipelineId string, operator lib.Operator) []string {

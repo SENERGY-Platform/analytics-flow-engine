@@ -18,7 +18,6 @@ package lib
 
 import (
 	"errors"
-	"log"
 	"slices"
 	"strings"
 	"time"
@@ -86,7 +85,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	pipeline.Operators = newOperators
 	err = updatePipeline(&pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
 	if err != nil {
-		log.Println("Cant update pipeline")
+		GetLogger().Error("cant update pipeline", "error", err)
 	}
 	GetLogger().Debug("started pipeline: "+pipeline.Id.String(), "pipeline", pipeline)
 	return
@@ -94,7 +93,6 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 
 func addPipelineIDToFogTopic(operators []Operator, pipelineId string) (newOperators []Operator) {
 	// Input and Output Topics are set during parsing where pipeline ID is not available
-	log.Printf("%+v", operators)
 	for _, operator := range operators {
 		if operator.DeploymentType == deploymentLocationLib.Local {
 			operator.OutputTopic = operator.OutputTopic + pipelineId
@@ -110,12 +108,11 @@ func addPipelineIDToFogTopic(operators []Operator, pipelineId string) (newOperat
 		}
 		newOperators = append(newOperators, operator)
 	}
-	log.Printf("%+v", newOperators)
 	return
 }
 
 func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
-	log.Println("engine - update pipeline: " + pipelineRequest.Id)
+	GetLogger().Debug("engine - update pipeline: " + pipelineRequest.Id)
 	err = f.checkAccess(pipelineRequest, token, userId)
 	if err != nil {
 		return
@@ -136,7 +133,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 
 	err = f.stopOperators(pipeline, userId, token)
 	if err != nil {
-		log.Println("Cant stop operators: " + err.Error())
+		GetLogger().Error("cant stop operators", "error", err)
 		return
 	}
 

@@ -20,6 +20,7 @@ import (
 	"errors"
 	devicemanager_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/device-manager-api"
 	kafka2mqtt_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
+	kubernetes_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kubernetes-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	permission_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/permission-api"
@@ -29,16 +30,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
 )
 
-var DEBUG bool
-
 func CreateServer() {
 	var driver lib.Driver
-	switch selectedDriver := lib.GetEnv("DRIVER", "rancher"); selectedDriver {
-	default:
+	var err error
+	switch selectedDriver := lib.GetEnv("DRIVER", "kubernetes"); selectedDriver {
+	case "rancher":
 		driver = rancher2_api.NewRancher2(
 			lib.GetEnv("RANCHER2_ENDPOINT", ""),
 			lib.GetEnv("RANCHER2_ACCESS_KEY", ""),
@@ -46,6 +45,13 @@ func CreateServer() {
 			lib.GetEnv("RANCHER2_STACK_ID", ""),
 			lib.GetEnv("ZOOKEEPER", ""),
 		)
+		break
+	default:
+		driver, err = kubernetes_api.NewKubernetes()
+		if err != nil {
+			lib.GetLogger().Error("Error creating driver", "error", err)
+			return
+		}
 	}
 
 	parser := parsing_api.NewParsingApi(lib.GetEnv("PARSER_API_ENDPOINT", ""))
@@ -56,12 +62,7 @@ func CreateServer() {
 
 	port := lib.GetEnv("SERVER_PORT", "8000")
 	lib.GetLogger().Info("Starting api server at port " + port)
-	DEBUG, err := strconv.ParseBool(lib.GetEnv("DEBUG", "false"))
-	if err != nil {
-		lib.GetLogger().Error("Error loading debug value", "error", err)
-		DEBUG = false
-	}
-	if !DEBUG {
+	if !lib.DebugMode() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	r := gin.Default()
@@ -147,7 +148,7 @@ func CreateServer() {
 		c.Status(http.StatusNoContent)
 	})
 
-	if !DEBUG {
+	if !lib.DebugMode() {
 		err = r.Run(":" + port)
 	} else {
 		err = r.Run("127.0.0.1:" + port)
