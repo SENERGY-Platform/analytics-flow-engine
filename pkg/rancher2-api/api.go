@@ -39,6 +39,15 @@ type Rancher2 struct {
 	zookeeper string
 }
 
+/* <<<<<<<<<<<<<<  ✨ Windsurf Command ⭐ >>>>>>>>>>>>>>>> */
+// NewRancher2 creates a new Rancher2 object, that can be used to interact with
+// the Rancher2 API. It takes the Rancher2 API URL, the access key, the secret
+// key, the stackId and the zookeeper URL as parameters.
+//
+// The kubeUrl is constructed by removing the "/v3/" path from the url and
+// appending "/k8s/clusters/" and the first part of the RANCHER2_PROJECT_ID
+// environment variable (before the ":").
+/* <<<<<<<<<<  8c5839d1-759d-41a4-b2a8-94451ae17fc1  >>>>>>>>>>> */
 func NewRancher2(url string, accessKey string, secretKey string, stackId string, zookeeper string) *Rancher2 {
 	kubeUrl := strings.TrimSuffix(url, "v3/") + "k8s/clusters/" +
 		strings.Split(lib.GetEnv("RANCHER2_PROJECT_ID", "_:_"), ":")[0] + "/v1/"
@@ -46,7 +55,7 @@ func NewRancher2(url string, accessKey string, secretKey string, stackId string,
 }
 
 func (r *Rancher2) GetPipelineStatus(pipelineId string) (status lib.PipelineStatus, err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e := request.Get(r.kubeUrl + "apps.deployments/analytics-pipelines/pipeline-" + pipelineId).Send(nil).End()
 	if len(e) > 0 {
 		err = errors.New("rancher2 API - could not request deployment - " + e[0].Error())
@@ -73,7 +82,7 @@ func (r *Rancher2) GetPipelineStatus(pipelineId string) (status lib.PipelineStat
 }
 
 func (r *Rancher2) GetPipelinesStatus() (status []lib.PipelineStatus, err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e := request.Get(r.kubeUrl + "apps.deployments/analytics-pipelines").Send(nil).End()
 	if len(e) > 0 {
 		err = errors.New("rancher2 API - could not get pipelines status - " + e[0].Error())
@@ -176,7 +185,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 		containers = append(containers, container)
 	}
 	time.Sleep(3 * time.Second)
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	reqBody := &WorkloadRequest{
 		Name:        r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1],
 		NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
@@ -234,7 +243,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 			},
 		},
 	}
-	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e = request.Post(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers").
 		Send(autoscaleRequest).End()
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
@@ -248,7 +257,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 
 func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) (err error) {
 	//Delete Workload
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]).End()
 	if resp.StatusCode != http.StatusNoContent {
@@ -267,7 +276,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 	}
 
 	// Delete Service
-	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e = request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/services/" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]).End()
 	if resp.StatusCode != http.StatusNoContent {
@@ -286,7 +295,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 	}
 
 	// Delete Autoscaler
-	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers/" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
 		"/" +
@@ -315,7 +324,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 		// Delete AutoscalerCheckpoint
 		autoscalerCheckpointId := r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
 		lib.GetLogger().Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
-		request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+		request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 		resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
 			lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
 			"/" + autoscalerCheckpointId).End()
@@ -343,7 +352,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	// Delete AutoscalerCheckpoint
 	autoscalerCheckpointId := r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
 	lib.GetLogger().Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e := request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
 		"/" + autoscalerCheckpointId).End()
@@ -363,7 +372,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	}
 
 	//Delete Workload
-	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e = request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
 	if resp.StatusCode != http.StatusNoContent {
@@ -387,7 +396,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	}
 
 	// Delete Service
-	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e = request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/services/" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
 	if resp.StatusCode != http.StatusNoContent {
@@ -406,7 +415,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	}
 
 	// Delete Autoscaler
-	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers/" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
 		"/" +
@@ -435,7 +444,7 @@ func (r *Rancher2) getOperatorName(pipelineId string, operator lib.Operator) []s
 }
 
 func (r *Rancher2) createPersistentVolumeClaim(name string) (err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	reqBody := &VolumeClaimRequest{
 		Name:           name,
 		NamespaceId:    lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
@@ -459,7 +468,7 @@ func (r *Rancher2) createPersistentVolumeClaim(name string) (err error) {
 }
 
 func (r *Rancher2) deletePersistentVolumeClaim(name string) (err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/persistentVolumeClaims/" +
 		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + name).End()
 	if len(e) > 0 {
