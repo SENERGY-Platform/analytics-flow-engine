@@ -19,6 +19,7 @@ package main
 import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
+	"github.com/SENERGY-Platform/go-service-base/srv-info-hdl"
 	"github.com/SENERGY-Platform/go-service-base/watchdog"
 
 	"os"
@@ -27,7 +28,11 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var version = "dev"
+
 func main() {
+	_ = srv_info_hdl.New("analytics-flow-engine", version)
+
 	ec := 0
 	defer func() {
 		os.Exit(ec)

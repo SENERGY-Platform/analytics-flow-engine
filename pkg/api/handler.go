@@ -73,7 +73,7 @@ func CreateServer() (err error) {
 		AllowCredentials: true,
 	}))
 	prefix := r.Group(lib.GetEnv("ROUTE_PREFIX", ""))
-	prefix.GET("/", func(c *gin.Context) {
+	prefix.GET("/health-check", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
 		})

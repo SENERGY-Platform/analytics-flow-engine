@@ -8,6 +8,7 @@ toolchain go1.24.6
 
 require (
 	github.com/SENERGY-Platform/analytics-fog-lib v1.1.26
+	github.com/SENERGY-Platform/go-service-base/srv-info-hdl v0.2.0
 	github.com/SENERGY-Platform/go-service-base/struct-logger v0.4.1
 	github.com/SENERGY-Platform/go-service-base/watchdog v0.4.2
 	github.com/SENERGY-Platform/models/go v0.0.0-20250417103129-d12164244f83
