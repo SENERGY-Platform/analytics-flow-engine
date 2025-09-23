@@ -1,11 +1,11 @@
 /*
- * Copyright 2018 InfAI (CC SES)
+ * Copyright 2025 InfAI (CC SES)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,193 +17,148 @@
 package api
 
 import (
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
-	devicemanager_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/device-manager-api"
-	kafka2mqtt_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
-	kubernetes_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kubernetes-api"
+	"errors"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
-	permission_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/permission-api"
-	rancher2_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/rancher2-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
-	gin_mw "github.com/SENERGY-Platform/gin-middleware"
-	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
-	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/requestid"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"slices"
-	"strconv"
-	"strings"
+	"os"
 )
 
-func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (r *gin.Engine, err error) {
-	var driver lib.Driver
-	switch selectedDriver := cfg.Driver; selectedDriver {
-	case "rancher":
-		driver = rancher2_api.NewRancher2(
-			cfg.Rancher2.Endpoint,
-			cfg.Rancher2.AccessKey,
-			cfg.Rancher2.SecretKey,
-			cfg.Rancher2.StackId,
-			&cfg.Rancher2,
-		)
-		break
-	default:
-		driver, err = kubernetes_api.NewKubernetes(&cfg.Rancher2, cfg.Debug)
-		if err != nil {
-			util.Logger.Error("Error creating driver", "error", err)
-			return
-		}
-	}
-
-	parser := parsing_api.NewParsingApi(cfg.ParserApiEndpoint)
-	permission := permission_api.NewPermissionApi(cfg.PermissionApiEndpoint)
-	kafka2mqtt := kafka2mqtt_api.NewKafka2MqttApi(cfg.Kafka2MqttApiEndpoint, &cfg.Mqtt)
-	deviceManager := devicemanager_api.NewDeviceManagerApi(cfg.DeviceManagerApiEndpoint)
-	flowEngine := lib.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService)
-
-	port := strconv.FormatInt(int64(cfg.ServerPort), 10)
-	util.Logger.Info("Starting api server at port " + port)
-	if !cfg.Debug {
-		gin.SetMode(gin.ReleaseMode)
-	}
-	r = gin.New()
-	r.RedirectTrailingSlash = false
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"GET", "POST", "DELETE", "OPTIONS", "PUT"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
-	var middleware []gin.HandlerFunc
-	middleware = append(
-		middleware,
-		gin_mw.StructLoggerHandlerWithDefaultGenerators(
-			util.Logger.With(attributes.LogRecordTypeKey, attributes.HttpAccessLogRecordTypeVal),
-			attributes.Provider,
-			[]string{HealthCheckPath},
-			nil,
-		),
-	)
-	middleware = append(middleware,
-		requestid.New(requestid.WithCustomHeaderStrKey(HeaderRequestID)),
-		gin_mw.StructRecoveryHandler(util.Logger, gin_mw.DefaultRecoveryFunc),
-		AuthMiddleware(),
-	)
-	r.Use(middleware...)
-	r.UseRawPath = true
-	prefix := r.Group(cfg.URLPrefix)
-
-	prefix.GET(HealthCheckPath, func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	prefix.GET("/pipeline/:id", func(c *gin.Context) {
+// getPipeline godoc
+// @Summary Get pipeline status
+// @Description	Gets a single pipeline status
+// @Tags Pipeline
+// @Produce json
+// @Param id path string true "Pipeline ID"
+// @Success	200 {object} lib.PipelineStatus
+// @Failure	500 {string} str
+// @Router /pipeline/{id} [get]
+func getPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
+	return http.MethodGet, "/pipeline/:id", func(c *gin.Context) {
 		id := c.Param("id")
 		pipelineStatus, err := flowEngine.GetPipelineStatus(id, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not get pipeline status", "error", err, "method", "GET", "path", "/pipeline/:id")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
+			_ = c.Error(errors.New("something went wrong"))
 			return
 		}
 		c.JSON(http.StatusOK, pipelineStatus)
-	})
-	prefix.POST("/pipelines", func(c *gin.Context) {
+	}
+}
+
+// postPipelines godoc
+// @Summary Get pipelines status
+// @Description	Gets the status of all pipelines
+// @Tags Pipeline
+// @Produce json
+// @Success	200 {array} lib.PipelineStatus
+// @Failure	500 {string} str
+// @Router /pipelines [post]
+func postPipelines(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
+	return http.MethodPost, "/pipelines", func(c *gin.Context) {
 		var request lib.PipelineStatusRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
 			util.Logger.Error("error parsing request", "error", err, "method", "POST", "path", "/pipelines")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "error parsing request"})
+			_ = c.Error(errors.New("something went wrong"))
 			return
 		}
 		pipelinesStatus, err := flowEngine.GetPipelinesStatus(request.Ids, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not get pipelines status", "error", err, "method", "POST", "path", "/pipelines")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
+			_ = c.Error(errors.New("something went wrong"))
 			return
 		}
 		c.JSON(http.StatusOK, pipelinesStatus)
-	})
+	}
+}
 
-	prefix.POST("/pipeline", func(c *gin.Context) {
+// postPipeline godoc
+// @Summary Start a pipeline
+// @Description	Starts a pipeline
+// @Tags Pipeline
+// @Produce json
+// @Success	200 {object} lib.Pipeline
+// @Failure	500 {string} str
+// @Router /pipeline [post]
+func postPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
+	return http.MethodPost, "/pipeline", func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
 			util.Logger.Error("error parsing request", "error", err, "method", "POST", "path", "/pipeline")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "error parsing request"})
+			_ = c.Error(errors.New("something went wrong"))
 			return
 		}
 		pipe, err := flowEngine.StartPipeline(request, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not start pipeline", "error", err, "method", "POST", "path", "/pipeline")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
+			_ = c.Error(errors.New("something went wrong"))
 			return
 		}
 		c.JSON(http.StatusOK, pipe)
-	})
+	}
+}
 
-	prefix.PUT("/pipeline", func(c *gin.Context) {
+// putPipeline godoc
+// @Summary Update a pipeline
+// @Description	Updates a pipeline
+// @Tags Pipeline
+// @Produce json
+// @Success	200 {object} lib.Pipeline
+// @Failure	500 {string} str
+// @Router /pipeline [put]
+func putPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
+	return http.MethodPut, "/pipeline", func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
 			util.Logger.Error("error parsing request", "error", err, "method", "PUT", "path", "/pipeline")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "error parsing request"})
+			_ = c.Error(errors.New("something went wrong"))
 			return
 		}
 		pipe, err := flowEngine.UpdatePipeline(request, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not update pipeline", "error", err, "method", "PUT", "path", "/pipeline")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
+			_ = c.Error(errors.New("something went wrong"))
 			return
 		}
 		c.JSON(http.StatusOK, pipe)
-	})
+	}
+}
 
-	prefix.DELETE("/pipeline/:id", func(c *gin.Context) {
+// deletePipeline godoc
+// @Summary Delete pipeline
+// @Description	Delete a single pipeline
+// @Tags Pipeline
+// @Param id path string true "Pipeline ID"
+// @Success	204
+// @Failure	500 {string} str
+// @Router /pipeline/{id} [delete]
+func deletePipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
+	return http.MethodDelete, "/pipeline/:id", func(c *gin.Context) {
 		id := c.Param("id")
 		err := flowEngine.DeletePipeline(id, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not delete pipeline", "error", err, "method", "DELETE", "path", "/pipeline/:id")
-			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
+			_ = c.Error(errors.New("something went wrong"))
 			return
 		}
 		c.Status(http.StatusNoContent)
-	})
-	return r, nil
+	}
 }
 
-func AuthMiddleware() gin.HandlerFunc {
-	return func(gc *gin.Context) {
-		userId, err := getUserId(gc)
-		if err != nil {
-			util.Logger.Error("could not get user id", "error", err)
-			gc.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+func getHealthCheckH(_ lib.FlowEngine) (string, string, gin.HandlerFunc) {
+	return http.MethodGet, HealthCheckPath, func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	}
+}
+
+func getSwaggerDocH(_ lib.FlowEngine) (string, string, gin.HandlerFunc) {
+	return http.MethodGet, "/doc", func(gc *gin.Context) {
+		if _, err := os.Stat("docs/swagger.json"); err != nil {
+			_ = gc.Error(err)
 			return
 		}
-		gc.Set(UserIdKey, userId)
-		gc.Next()
+		gc.Header("Content-Type", gin.MIMEJSON)
+		gc.File("docs/swagger.json")
 	}
-}
-
-func getUserId(c *gin.Context) (userId string, err error) {
-	forUser := c.Query("for_user")
-	if forUser != "" {
-		roles := strings.Split(c.GetHeader("X-User-Roles"), ", ")
-		if slices.Contains[[]string](roles, "admin") {
-			return forUser, nil
-		}
-	}
-
-	userId = c.GetHeader("X-UserId")
-	if userId == "" {
-		if c.GetHeader("Authorization") != "" {
-			var claims jwt.Token
-			claims, err = jwt.Parse(c.GetHeader("Authorization"))
-			if err != nil {
-				return
-			}
-			userId = claims.Sub
-		}
-	}
-	return
 }

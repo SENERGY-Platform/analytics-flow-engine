@@ -36,7 +36,7 @@ import (
 	"time"
 )
 
-var version = "dev"
+var version = "0.0.47"
 
 func main() {
 	ec := 0
