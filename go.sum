@@ -20,6 +20,8 @@ github.com/SENERGY-Platform/go-service-base/srv-info-hdl v0.2.0 h1:EQbMcWBVgzArb
 github.com/SENERGY-Platform/go-service-base/srv-info-hdl v0.2.0/go.mod h1:mgNdIRGzrn3Vey2d0j/OtGSt8APIp5Io54MD80UorPs=
 github.com/SENERGY-Platform/go-service-base/struct-logger v0.4.1 h1:FF4jhIpxYbXkBQRm4oV/1KiTq1U7a5EQ0x5jqGhZDoY=
 github.com/SENERGY-Platform/go-service-base/struct-logger v0.4.1/go.mod h1:WuvuHGXhnLtXn2ry2kfTaQwco3EY3XTCefLeNqUT+jg=
+github.com/SENERGY-Platform/go-service-base/util v1.1.0 h1:dsfWSfv+k0xr1kgasjIfw1UrvYL2G4QUmMvEwwNJi7c=
+github.com/SENERGY-Platform/go-service-base/util v1.1.0/go.mod h1:/gs/BaaSNwC+jbjsSgWDPoeMhfq8uJsf0WVQtyjP+wM=
 github.com/SENERGY-Platform/go-service-base/watchdog v0.4.2 h1:y88XOKuUbJdwvtDgUj9h2vTI+gwZvyB1giwoMvStrGI=
 github.com/SENERGY-Platform/go-service-base/watchdog v0.4.2/go.mod h1:g3L+QFVvGghsnOsB4V1dkoq4egiFGUoD1x83g2H6Imw=
 github.com/SENERGY-Platform/models/go v0.0.0-20250417103129-d12164244f83 h1:tV0gu66SvhPoeGWiuDtw0r/K13zMpuyOlgAo0EUsnfM=

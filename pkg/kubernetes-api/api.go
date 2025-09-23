@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -35,21 +36,21 @@ func NewKubernetes(r2cfg *config.Rancher2Config, debug bool) (kube *Kubernetes, 
 
 	if debug {
 		var kubeconfig *string
-		lib.GetLogger().Debug("HomeDir" + homedir.HomeDir())
+		util.Logger.Debug("HomeDir" + homedir.HomeDir())
 		if home := homedir.HomeDir(); home != "" {
 			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
 		} else {
 			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 		}
 		flag.Parse()
-		lib.GetLogger().Debug("kube config path: " + *kubeconfig)
+		util.Logger.Debug("kube config path: " + *kubeconfig)
 
 		// use the current context in kubeconfig
 		restConfig, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
 		if err != nil {
 			return nil, err
 		}
-		lib.GetLogger().Debug("loaded kube config", "host", restConfig.Host)
+		util.Logger.Debug("loaded kube config", "host", restConfig.Host)
 	} else {
 		// creates the in-cluster config
 		restConfig, err = rest.InClusterConfig()
@@ -64,13 +65,13 @@ func NewKubernetes(r2cfg *config.Rancher2Config, debug bool) (kube *Kubernetes, 
 	if err != nil {
 		return nil, err
 	}
-	lib.GetLogger().Debug("loaded clientset")
+	util.Logger.Debug("loaded clientset")
 
 	pods, err := clientset.CoreV1().Pods(r2cfg.NamespaceId).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	lib.GetLogger().Debug("succesfully tested connection", "pods", len(pods.Items))
+	util.Logger.Debug("succesfully tested connection", "pods", len(pods.Items))
 
 	return &Kubernetes{clientset: clientset, autoscalerClientset: autoscalerClientSet, r2cfg: r2cfg}, nil
 }
@@ -209,12 +210,12 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []lib.Operator, p
 	}
 
 	// Create Deployment
-	lib.GetLogger().Debug("creating deployment")
+	util.Logger.Debug("creating deployment")
 	result, err := deploymentsClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
 	if err != nil {
 		return
 	}
-	lib.GetLogger().Debug(fmt.Sprintf("created deployment %s", result.GetObjectMeta().GetName()))
+	util.Logger.Debug(fmt.Sprintf("created deployment %s", result.GetObjectMeta().GetName()))
 
 	// Create Vertical Pod Autoscaler
 	updateAutoMode := v1.UpdateModeAuto
@@ -236,13 +237,13 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []lib.Operator, p
 		},
 	}
 
-	lib.GetLogger().Debug("creating autoscaler")
+	util.Logger.Debug("creating autoscaler")
 	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(k.r2cfg.NamespaceId)
 	vpaResult, err := verticalAutoscalerClient.Create(context.TODO(), vpa, metav1.CreateOptions{})
 	if err != nil {
 		return
 	}
-	lib.GetLogger().Debug(fmt.Sprintf("created vpa %s", vpaResult.GetObjectMeta().GetName()))
+	util.Logger.Debug(fmt.Sprintf("created vpa %s", vpaResult.GetObjectMeta().GetName()))
 	return
 }
 
@@ -259,25 +260,25 @@ func (k *Kubernetes) DeleteOperators(pipelineId string, operators []lib.Operator
 	for _, operator := range operators {
 		if operator.PersistData {
 			volumeName := getOperatorName(pipelineId, operator)[0]
-			lib.GetLogger().Debug("deleting volume " + volumeName)
+			util.Logger.Debug("deleting volume " + volumeName)
 			err = pvcClient.Delete(context.TODO(), volumeName, metav1.DeleteOptions{})
-			lib.GetLogger().Debug(fmt.Sprintf("deleted volume %s", volumeName))
+			util.Logger.Debug(fmt.Sprintf("deleted volume %s", volumeName))
 		}
 		autoscalerCheckpointId := getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
-		lib.GetLogger().Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
+		util.Logger.Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
 		err = verticalAutoscalerCheckpointClient.Delete(context.TODO(), autoscalerCheckpointId, metav1.DeleteOptions{})
 		if err != nil {
 			if k8s_errors.IsNotFound(err) {
-				lib.GetLogger().Debug("autoscaler checkpoint not found: " + autoscalerCheckpointId)
+				util.Logger.Debug("autoscaler checkpoint not found: " + autoscalerCheckpointId)
 			} else {
 				return
 			}
 		} else {
-			lib.GetLogger().Debug("deleted autoscaler checkpoint: " + autoscalerCheckpointId)
+			util.Logger.Debug("deleted autoscaler checkpoint: " + autoscalerCheckpointId)
 		}
 	}
 
-	lib.GetLogger().Debug("deleting deployment " + pipelineId)
+	util.Logger.Debug("deleting deployment " + pipelineId)
 	deletePolicy := metav1.DeletePropagationForeground
 
 	err = deploymentsClient.Delete(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1], metav1.DeleteOptions{
@@ -286,11 +287,11 @@ func (k *Kubernetes) DeleteOperators(pipelineId string, operators []lib.Operator
 	if err != nil {
 		return
 	}
-	lib.GetLogger().Debug(fmt.Sprintf("deleted deployment %s", pipelineId))
+	util.Logger.Debug(fmt.Sprintf("deleted deployment %s", pipelineId))
 
-	lib.GetLogger().Debug("deleting autoscaler " + pipelineId)
+	util.Logger.Debug("deleting autoscaler " + pipelineId)
 	err = verticalAutoscalerClient.Delete(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]+"-vpa", metav1.DeleteOptions{})
-	lib.GetLogger().Debug(fmt.Sprintf("deleted autoscaler %s", pipelineId))
+	util.Logger.Debug(fmt.Sprintf("deleted autoscaler %s", pipelineId))
 	if err != nil {
 		return
 	}

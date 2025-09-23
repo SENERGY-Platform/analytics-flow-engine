@@ -26,6 +26,7 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	permission_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/permission-api"
 	rancher2_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/rancher2-api"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -50,7 +51,7 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (e
 	default:
 		driver, err = kubernetes_api.NewKubernetes(&cfg.Rancher2, cfg.Debug)
 		if err != nil {
-			lib.GetLogger().Error("Error creating driver", "error", err)
+			util.Logger.Error("Error creating driver", "error", err)
 			return
 		}
 	}
@@ -62,7 +63,7 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (e
 	flowEngine := lib.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService)
 
 	port := strconv.FormatInt(int64(cfg.ServerPort), 10)
-	lib.GetLogger().Info("Starting api server at port " + port)
+	util.Logger.Info("Starting api server at port " + port)
 	if !cfg.Debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -84,7 +85,7 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (e
 		id := c.Param("id")
 		pipelineStatus, err := flowEngine.GetPipelineStatus(id, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
-			lib.GetLogger().Error("could not get pipeline status", "error", err, "method", "GET", "path", "/pipeline/:id")
+			util.Logger.Error("could not get pipeline status", "error", err, "method", "GET", "path", "/pipeline/:id")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
@@ -93,13 +94,13 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (e
 	prefix.POST("/pipelines", func(c *gin.Context) {
 		var request lib.PipelineStatusRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			lib.GetLogger().Error("error parsing request", "error", err, "method", "POST", "path", "/pipelines")
+			util.Logger.Error("error parsing request", "error", err, "method", "POST", "path", "/pipelines")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "error parsing request"})
 			return
 		}
 		pipelinesStatus, err := flowEngine.GetPipelinesStatus(request.Ids, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
-			lib.GetLogger().Error("could not get pipelines status", "error", err, "method", "POST", "path", "/pipelines")
+			util.Logger.Error("could not get pipelines status", "error", err, "method", "POST", "path", "/pipelines")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
@@ -109,13 +110,13 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (e
 	prefix.POST("/pipeline", func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			lib.GetLogger().Error("error parsing request", "error", err, "method", "POST", "path", "/pipeline")
+			util.Logger.Error("error parsing request", "error", err, "method", "POST", "path", "/pipeline")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "error parsing request"})
 			return
 		}
 		pipe, err := flowEngine.StartPipeline(request, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
-			lib.GetLogger().Error("could not start pipeline", "error", err, "method", "POST", "path", "/pipeline")
+			util.Logger.Error("could not start pipeline", "error", err, "method", "POST", "path", "/pipeline")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
@@ -125,13 +126,13 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (e
 	prefix.PUT("/pipeline", func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			lib.GetLogger().Error("error parsing request", "error", err, "method", "PUT", "path", "/pipeline")
+			util.Logger.Error("error parsing request", "error", err, "method", "PUT", "path", "/pipeline")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "error parsing request"})
 			return
 		}
 		pipe, err := flowEngine.UpdatePipeline(request, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
-			lib.GetLogger().Error("could not update pipeline", "error", err, "method", "PUT", "path", "/pipeline")
+			util.Logger.Error("could not update pipeline", "error", err, "method", "PUT", "path", "/pipeline")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
@@ -142,7 +143,7 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (e
 		id := c.Param("id")
 		err := flowEngine.DeletePipeline(id, getUserId(c), c.GetHeader("Authorization"))
 		if err != nil {
-			lib.GetLogger().Error("could not delete pipeline", "error", err, "method", "DELETE", "path", "/pipeline/:id")
+			util.Logger.Error("could not delete pipeline", "error", err, "method", "DELETE", "path", "/pipeline/:id")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "something went wrong"})
 			return
 		}
@@ -155,7 +156,7 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (e
 		err = r.Run("127.0.0.1:" + port)
 	}
 	if err == nil {
-		lib.GetLogger().Error("could not start api server", "error", err)
+		util.Logger.Error("could not start api server", "error", err)
 	}
 	return
 }

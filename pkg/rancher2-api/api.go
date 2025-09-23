@@ -21,6 +21,7 @@ import (
 	"errors"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	"net/http"
 	"strconv"
 	"strings"
@@ -62,7 +63,7 @@ func (r *Rancher2) GetPipelineStatus(pipelineId string) (status lib.PipelineStat
 	var deployment DeploymentResponse
 	err = json.Unmarshal([]byte(body), &deployment)
 	if err != nil {
-		lib.GetLogger().Error("rancher2 API - cannot unmarshal deployment response", "error", err)
+		util.Logger.Error("rancher2 API - cannot unmarshal deployment response", "error", err)
 		return
 	}
 	status = lib.PipelineStatus{
@@ -89,7 +90,7 @@ func (r *Rancher2) GetPipelinesStatus() (status []lib.PipelineStatus, err error)
 	var deployments DeploymentsResponse
 	err = json.Unmarshal([]byte(body), &deployments)
 	if err != nil {
-		lib.GetLogger().Error("rancher2 API - cannot unmarshal deployment response", "error", err)
+		util.Logger.Error("rancher2 API - cannot unmarshal deployment response", "error", err)
 		return
 	}
 	for _, deployment := range deployments.Data {
@@ -190,7 +191,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 
 	resp, body, e := request.Post(r.url + "projects/" + r.r2cfg.ProjectId + "/workloads").Send(reqBody).End()
 	if len(e) > 0 {
-		lib.GetLogger().Error("rancher2 API - could not create operators ", "error", e)
+		util.Logger.Error("rancher2 API - could not create operators ", "error", e)
 		err = errors.New("rancher2 API -  could not create operators - an error occurred")
 		return
 	}
@@ -255,7 +256,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			lib.GetLogger().Error("cannot delete operator " + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + " as it does not exist")
+			util.Logger.Error("cannot delete operator " + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator " + body)
@@ -274,7 +275,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			lib.GetLogger().Debug("cannot delete operator service " + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + " as it does not exist")
+			util.Logger.Debug("cannot delete operator service " + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator service " + body)
@@ -296,7 +297,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			lib.GetLogger().Debug("cannot delete operator vpa " + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + "-vpa" + " as it does not exist")
+			util.Logger.Debug("cannot delete operator vpa " + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + "-vpa" + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator vpa " + body)
@@ -315,7 +316,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 		}
 		// Delete AutoscalerCheckpoint
 		autoscalerCheckpointId := r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
-		lib.GetLogger().Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
+		util.Logger.Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
 		request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 		resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
 			r.r2cfg.NamespaceId +
@@ -324,7 +325,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 			err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
 			// There must no checkpoint exists
 			if resp.StatusCode == http.StatusNotFound {
-				lib.GetLogger().Error("cannot delete autoscaler checkpoint " + autoscalerCheckpointId + " as it does not exist")
+				util.Logger.Error("cannot delete autoscaler checkpoint " + autoscalerCheckpointId + " as it does not exist")
 				err = nil
 			} else {
 				return
@@ -343,7 +344,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 
 	// Delete AutoscalerCheckpoint
 	autoscalerCheckpointId := r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
-	lib.GetLogger().Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
+	util.Logger.Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e := request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
 		r.r2cfg.NamespaceId +
@@ -352,7 +353,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
 		// There must no checkpoint exists
 		if resp.StatusCode == http.StatusNotFound {
-			lib.GetLogger().Error("cannot delete autoscaler checkpoint " + autoscalerCheckpointId + " as it does not exist")
+			util.Logger.Error("cannot delete autoscaler checkpoint " + autoscalerCheckpointId + " as it does not exist")
 			err = nil
 		} else {
 			return
@@ -370,7 +371,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			lib.GetLogger().Error("cannot delete operator " + r.getOperatorName(pipelineId, operator)[1] + " as it does not exist")
+			util.Logger.Error("cannot delete operator " + r.getOperatorName(pipelineId, operator)[1] + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator " + body)
@@ -394,7 +395,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			lib.GetLogger().Debug("cannot delete operator service " + r.getOperatorName(pipelineId, operator)[1] + " as it does not exist")
+			util.Logger.Debug("cannot delete operator service " + r.getOperatorName(pipelineId, operator)[1] + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator service " + body)
@@ -416,7 +417,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			lib.GetLogger().Debug("cannot delete operator vpa " + r.getOperatorName(pipelineId, operator)[1] + "-vpa" + " as it does not exist")
+			util.Logger.Debug("cannot delete operator vpa " + r.getOperatorName(pipelineId, operator)[1] + "-vpa" + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator vpa " + body)
@@ -468,7 +469,7 @@ func (r *Rancher2) deletePersistentVolumeClaim(name string) (err error) {
 		return
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		lib.GetLogger().Error("Cant delete persistent volume claim as it does not exist", "name", name)
+		util.Logger.Error("Cant delete persistent volume claim as it does not exist", "name", name)
 		err = nil
 		return
 	}

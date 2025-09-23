@@ -1,11 +1,11 @@
 /*
- * Copyright 2018 InfAI (CC SES)
+ * Copyright 2025 InfAI (CC SES)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package lib
+package util
 
 import (
-	struct_logger "github.com/SENERGY-Platform/go-service-base/struct-logger"
+	structlogger "github.com/SENERGY-Platform/go-service-base/struct-logger"
 	"log/slog"
 	"os"
 	"runtime/debug"
@@ -25,10 +25,10 @@ import (
 	"time"
 )
 
-var logger *slog.Logger
+var Logger *slog.Logger
 
-func GetLogger() *slog.Logger {
-	if logger == nil {
+func InitStructLogger(level string) {
+	if Logger == nil {
 		info, ok := debug.ReadBuildInfo()
 		project := ""
 		org := ""
@@ -38,10 +38,10 @@ func GetLogger() *slog.Logger {
 				org = strings.Join(parts[:2], "/")
 			}
 		}
-		logger = struct_logger.New(
-			struct_logger.Config{
-				Handler:    struct_logger.JsonHandlerSelector,
-				Level:      "debug",
+		Logger = structlogger.New(
+			structlogger.Config{
+				Handler:    structlogger.JsonHandlerSelector,
+				Level:      level,
 				TimeFormat: time.RFC3339Nano,
 				TimeUtc:    true,
 				AddMeta:    true,
@@ -51,5 +51,4 @@ func GetLogger() *slog.Logger {
 			project,
 		)
 	}
-	return logger
 }

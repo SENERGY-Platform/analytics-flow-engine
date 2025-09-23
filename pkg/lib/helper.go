@@ -18,6 +18,7 @@ package lib
 
 import (
 	"fmt"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	"time"
 )
 
@@ -43,7 +44,7 @@ func retry(attempts int, sleep time.Duration, f func() error) (err error) {
 
 		time.Sleep(sleep)
 
-		GetLogger().Error("retrying after error", "error", err, "attempt", i+1, "of", attempts)
+		util.Logger.Error("retrying after error", "error", err, "attempt", i+1, "of", attempts)
 	}
 	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
 }

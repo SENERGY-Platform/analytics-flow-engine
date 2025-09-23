@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -47,7 +48,7 @@ func ConnectMQTTBroker(config config.MqttConfig, pipelineService PipelineApiServ
 		upstreamLib.GetUpstreamControlSyncTriggerSubTopic(): byte(0),
 		operatorLib.GetOperatorControlSyncTriggerSubTopic(): byte(0),
 	}
-	GetLogger().Info("subscribing to topics: " + fmt.Sprintf("%v", topics))
+	util.Logger.Info("subscribing to topics: " + fmt.Sprintf("%v", topics))
 
 	qos = flag.Int("qos", 2, "The QoS to subscribe to messages at")
 	retained = flag.Bool("retained", false, "Are the messages sent with the retained flag")
@@ -61,14 +62,14 @@ func ConnectMQTTBroker(config config.MqttConfig, pipelineService PipelineApiServ
 		SetClientID(*clientId).
 		SetCleanSession(true).
 		SetConnectionLostHandler(func(c MQTT.Client, err error) {
-			GetLogger().Error("mqtt connection lost: ", "error", err)
+			util.Logger.Error("mqtt connection lost: ", "error", err)
 		}).
 		SetConnectionAttemptHandler(func(broker *url.URL, tlsCfg *tls.Config) *tls.Config {
-			GetLogger().Info("connecting to broker "+broker.String(), "broker", broker.String())
+			util.Logger.Info("connecting to broker "+broker.String(), "broker", broker.String())
 			return tlsCfg
 		}).
 		SetReconnectingHandler(func(mqttClient MQTT.Client, opt *MQTT.ClientOptions) {
-			GetLogger().Info("reconnecting to broker "+opt.Servers[0].String(), "broker", opt.Servers[0].String())
+			util.Logger.Info("reconnecting to broker "+opt.Servers[0].String(), "broker", opt.Servers[0].String())
 		}).
 		SetAutoReconnect(true)
 
@@ -86,14 +87,14 @@ func ConnectMQTTBroker(config config.MqttConfig, pipelineService PipelineApiServ
 		if token := c.SubscribeMultiple(topics, onMessageReceived); token.Wait() && token.Error() != nil {
 			panic(token.Error())
 		}
-		GetLogger().Info("Subscribed to topics: " + fmt.Sprintf("%v", topics))
+		util.Logger.Info("Subscribed to topics: " + fmt.Sprintf("%v", topics))
 	}
 
 	client = MQTT.NewClient(connOpts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return fmt.Errorf("Cant connect to broker %s: %s\n", hostname, token.Error())
 	} else {
-		GetLogger().Info("Connected to broker " + *server)
+		util.Logger.Info("Connected to broker " + *server)
 		fogClient = NewFogClient(pipelineService)
 	}
 	return nil
@@ -108,7 +109,7 @@ func publishMessage(topic string, message string) error {
 }
 
 func onMessageReceived(_ MQTT.Client, message MQTT.Message) {
-	GetLogger().Debug("Received message on topic: "+message.Topic(), "message", message.Payload())
+	util.Logger.Debug("Received message on topic: "+message.Topic(), "message", message.Payload())
 	go fogClient.processMessage(message)
 }
 

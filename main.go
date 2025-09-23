@@ -22,7 +22,9 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	pipeline_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/pipeline-api"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	"github.com/SENERGY-Platform/go-service-base/srv-info-hdl"
+	sb_util "github.com/SENERGY-Platform/go-service-base/util"
 	"github.com/SENERGY-Platform/go-service-base/watchdog"
 
 	"os"
@@ -37,7 +39,7 @@ func main() {
 		os.Exit(ec)
 	}()
 
-	_ = srv_info_hdl.New("analytics-flow-engine", version)
+	srvInfoHdl := srv_info_hdl.New("analytics-flow-engine", version)
 
 	config.ParseFlags()
 
@@ -48,13 +50,18 @@ func main() {
 		return
 	}
 
+	util.InitStructLogger(cfg.Logger.Level)
+
+	util.Logger.Info(srvInfoHdl.Name(), "version", srvInfoHdl.Version())
+	util.Logger.Info("config: " + sb_util.ToJsonStr(cfg))
+
 	wd := watchdog.New(syscall.SIGINT, syscall.SIGTERM)
 
 	pipelineService := pipeline_api.NewPipelineApi(cfg.PipelineApiEndpoint)
 
 	err = lib.ConnectMQTTBroker(cfg.Mqtt, pipelineService)
 	if err != nil {
-		lib.GetLogger().Error("error connecting to mqtt broker", "error", err)
+		util.Logger.Error("error connecting to mqtt broker", "error", err)
 		ec = 1
 		return
 	}
@@ -66,7 +73,7 @@ func main() {
 
 	err = api.CreateServer(cfg, pipelineService)
 	if err != nil {
-		lib.GetLogger().Error("error starting server", "error", err)
+		util.Logger.Error("error starting server", "error", err)
 		ec = 1
 		return
 	}
