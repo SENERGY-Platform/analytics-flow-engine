@@ -1,0 +1,341 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "contact": {}
+    },
+    "paths": {
+        "/pipeline": {
+            "put": {
+                "description": "Updates a pipeline",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Pipeline"
+                ],
+                "summary": "Update a pipeline",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/lib.Pipeline"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Starts a pipeline",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Pipeline"
+                ],
+                "summary": "Start a pipeline",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/lib.Pipeline"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/{id}": {
+            "get": {
+                "description": "Gets a single pipeline status",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Pipeline"
+                ],
+                "summary": "Get pipeline status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pipeline ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/lib.PipelineStatus"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Delete a single pipeline",
+                "tags": [
+                    "Pipeline"
+                ],
+                "summary": "Delete pipeline",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pipeline ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipelines": {
+            "post": {
+                "description": "Gets the status of all pipelines",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Pipeline"
+                ],
+                "summary": "Get pipelines status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/lib.PipelineStatus"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "lib.DownstreamConfig": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "instanceID": {
+                    "type": "string"
+                },
+                "serviceID": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.InputSelection": {
+            "type": "object",
+            "properties": {
+                "aspectId": {
+                    "type": "string"
+                },
+                "characteristicIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "functionId": {
+                    "type": "string"
+                },
+                "inputName": {
+                    "type": "string"
+                },
+                "selectableId": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.InputTopic": {
+            "type": "object",
+            "properties": {
+                "filterType": {
+                    "type": "string"
+                },
+                "filterValue": {
+                    "type": "string"
+                },
+                "filterValue2": {
+                    "type": "string"
+                },
+                "mappings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/lib.Mapping"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.Mapping": {
+            "type": "object",
+            "properties": {
+                "dest": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.Operator": {
+            "type": "object",
+            "properties": {
+                "applicationId": {
+                    "type": "string"
+                },
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "cost": {
+                    "type": "integer"
+                },
+                "deploymentType": {
+                    "type": "string"
+                },
+                "downstream": {
+                    "$ref": "#/definitions/lib.DownstreamConfig"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "imageId": {
+                    "type": "string"
+                },
+                "inputSelections": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/lib.InputSelection"
+                    }
+                },
+                "inputTopics": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/lib.InputTopic"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "operatorId": {
+                    "type": "string"
+                },
+                "outputTopic": {
+                    "type": "string"
+                },
+                "persistData": {
+                    "type": "boolean"
+                },
+                "upstream": {
+                    "$ref": "#/definitions/lib.UpstreamConfig"
+                }
+            }
+        },
+        "lib.Pipeline": {
+            "type": "object",
+            "properties": {
+                "consumeAllMessages": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "flowId": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "mergeStrategy": {
+                    "type": "string"
+                },
+                "metrics": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "operators": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/lib.Operator"
+                    }
+                },
+                "windowTime": {
+                    "type": "integer"
+                }
+            }
+        },
+        "lib.PipelineStatus": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "running": {
+                    "type": "boolean"
+                },
+                "transitioning": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "lib.UpstreamConfig": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
+        }
+    }
+}
