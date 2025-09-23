@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
@@ -32,14 +33,15 @@ import (
 var client MQTT.Client
 var qos *int
 var retained *bool
+var fogClient *FogClient
 
-func ConnectMQTTBroker() error {
+func ConnectMQTTBroker(config config.MqttConfig, pipelineService PipelineApiService) error {
 	//MQTT.DEBUG = log.New(os.Stdout, "", 0)
 	//MQTT.ERROR = log.New(os.Stdout, "", 0)
 
 	hostname, _ := os.Hostname()
 
-	server := flag.String("server", GetEnv("BROKER_ADDRESS", "tcp://127.0.0.1:1883"), "The full url of the MQTT server to connect to ex: tcp://127.0.0.1:1883")
+	server := flag.String("server", config.BrokerAddress, "The full url of the MQTT server to connect to ex: tcp://127.0.0.1:1883")
 
 	topics := map[string]byte{
 		upstreamLib.GetUpstreamControlSyncTriggerSubTopic(): byte(0),
@@ -50,8 +52,8 @@ func ConnectMQTTBroker() error {
 	qos = flag.Int("qos", 2, "The QoS to subscribe to messages at")
 	retained = flag.Bool("retained", false, "Are the messages sent with the retained flag")
 	clientId := flag.String("clientid", hostname+strconv.Itoa(time.Now().Second()), "A clientid for the connection")
-	username := flag.String("username", GetEnv("BROKER_USER", ""), "A username to authenticate to the MQTT server")
-	password := flag.String("password", GetEnv("BROKER_PASSWORD", ""), "Password to match username")
+	username := flag.String("username", config.BrokerUser, "A username to authenticate to the MQTT server")
+	password := flag.String("password", config.BrokerPassword, "Password to match username")
 	flag.Parse()
 
 	connOpts := MQTT.NewClientOptions().
@@ -92,6 +94,7 @@ func ConnectMQTTBroker() error {
 		return fmt.Errorf("Cant connect to broker %s: %s\n", hostname, token.Error())
 	} else {
 		GetLogger().Info("Connected to broker " + *server)
+		fogClient = NewFogClient(pipelineService)
 	}
 	return nil
 }
@@ -106,7 +109,7 @@ func publishMessage(topic string, message string) error {
 
 func onMessageReceived(_ MQTT.Client, message MQTT.Message) {
 	GetLogger().Debug("Received message on topic: "+message.Topic(), "message", message.Payload())
-	go processMessage(message)
+	go fogClient.processMessage(message)
 }
 
 func CloseMQTTConnection() {

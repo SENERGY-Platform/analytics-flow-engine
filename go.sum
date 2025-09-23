@@ -12,6 +12,10 @@ github.com/SENERGY-Platform/analytics-fog-lib v1.1.26 h1:xBS+FwCN0xAw72NQDCT7O7g
 github.com/SENERGY-Platform/analytics-fog-lib v1.1.26/go.mod h1:IbFAOaWXaEkLvNyI9QSq9Mw3PtLCONkrY9WHSpqbDQg=
 github.com/SENERGY-Platform/developer-notifications v0.0.4 h1:SmblhfWavNhE1mDxzrkhmWl2AoPPqKD+7YcZCQ7a5Tg=
 github.com/SENERGY-Platform/developer-notifications v0.0.4/go.mod h1:8yJrYnAYMtPEPy89ULw8ivgG8orVhSnaLgyfDt0bdgg=
+github.com/SENERGY-Platform/go-env-loader v0.5.3 h1:sNM/psxYBs3DeDCw8P8gWM2hvySijwy9t2DdSGdhF1c=
+github.com/SENERGY-Platform/go-env-loader v0.5.3/go.mod h1:vdEOp4x1VIzmCR+5u/4/GmO8bUOkYsP6NQaLy/46AVE=
+github.com/SENERGY-Platform/go-service-base/config-hdl v1.2.0 h1:OST21YZ0/Or10Ey2woQbaN5OVJHr+2Ix84pCygx5S3o=
+github.com/SENERGY-Platform/go-service-base/config-hdl v1.2.0/go.mod h1:+YKSlnOc5NNeZuVA5HE8hmrKCRQwb5FlMvgmpMw2FWk=
 github.com/SENERGY-Platform/go-service-base/srv-info-hdl v0.2.0 h1:EQbMcWBVgzArb/OJi0LbNXcE48oIRWngw0ChnWzd8KM=
 github.com/SENERGY-Platform/go-service-base/srv-info-hdl v0.2.0/go.mod h1:mgNdIRGzrn3Vey2d0j/OtGSt8APIp5Io54MD80UorPs=
 github.com/SENERGY-Platform/go-service-base/struct-logger v0.4.1 h1:FF4jhIpxYbXkBQRm4oV/1KiTq1U7a5EQ0x5jqGhZDoY=

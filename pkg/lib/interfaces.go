@@ -19,6 +19,7 @@ package lib
 import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	"github.com/SENERGY-Platform/models/go/models"
+	"github.com/google/uuid"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
 )
@@ -51,4 +52,12 @@ type Kafka2MqttApiService interface {
 type DeviceManagerService interface {
 	GetDevice(deviceID, userID, token string) (models.Device, error)
 	GetDeviceType(deviceTypeID, userID, token string) (models.DeviceType, error)
+}
+
+type PipelineApiService interface {
+	RegisterPipeline(pipeline *Pipeline, userId string, authorization string) (id uuid.UUID, err error)
+	UpdatePipeline(pipeline *Pipeline, userId string, authorization string) (err error)
+	GetPipeline(id string, userId string, authorization string) (pipe Pipeline, err error)
+	GetPipelines(userId string, authorization string) (pipelines []Pipeline, err error)
+	DeletePipeline(id string, userId string, authorization string) (err error)
 }

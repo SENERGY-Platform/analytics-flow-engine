@@ -35,6 +35,7 @@ type FlowEngine struct {
 	permissionService    PermissionApiService
 	kafak2mqttService    Kafka2MqttApiService
 	deviceManagerService DeviceManagerService
+	pipelineService      PipelineApiService
 }
 
 func NewFlowEngine(
@@ -42,8 +43,9 @@ func NewFlowEngine(
 	parsingService ParsingApiService,
 	permissionService PermissionApiService,
 	kafak2mqttService Kafka2MqttApiService,
-	deviceManagerService DeviceManagerService) *FlowEngine {
-	return &FlowEngine{driver, parsingService, permissionService, kafak2mqttService, deviceManagerService}
+	deviceManagerService DeviceManagerService,
+	pipelineService PipelineApiService) *FlowEngine {
+	return &FlowEngine{driver, parsingService, permissionService, kafak2mqttService, deviceManagerService, pipelineService}
 }
 
 func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
@@ -70,7 +72,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 		return
 	}
 	pipeline.Operators = configuredOperators
-	pipeline.Id, err = registerPipeline(&pipeline, userId, token)
+	pipeline.Id, err = f.pipelineService.RegisterPipeline(&pipeline, userId, token)
 	if err != nil {
 		return
 	}
@@ -83,7 +85,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 		return
 	}
 	pipeline.Operators = newOperators
-	err = updatePipeline(&pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
+	err = f.pipelineService.UpdatePipeline(&pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
 	if err != nil {
 		GetLogger().Error("cant update pipeline", "error", err)
 	}
@@ -117,7 +119,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	if err != nil {
 		return
 	}
-	pipeline, err = getPipeline(pipelineRequest.Id, userId, token)
+	pipeline, err = f.pipelineService.GetPipeline(pipelineRequest.Id, userId, token)
 	if err != nil {
 		return
 	}
@@ -174,7 +176,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	}
 	pipeline.Operators = newOperators
 
-	err = updatePipeline(&pipeline, userId, token)
+	err = f.pipelineService.UpdatePipeline(&pipeline, userId, token)
 
 	return
 }
@@ -193,7 +195,7 @@ func (f *FlowEngine) checkAccess(pipelineRequest PipelineRequest, token string, 
 	}
 	if len(operatorIds) > 0 {
 		for _, operatorId := range operatorIds {
-			_, e := getPipeline(strings.Split(operatorId, ":")[1], userId, token)
+			_, e := f.pipelineService.GetPipeline(strings.Split(operatorId, ":")[1], userId, token)
 			if e != nil {
 				e = errors.New("engine - user does not have the rights to access the pipeline: " + strings.Split(operatorId, ":")[1])
 				return e
@@ -205,7 +207,7 @@ func (f *FlowEngine) checkAccess(pipelineRequest PipelineRequest, token string, 
 
 func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err error) {
 	GetLogger().Debug("engine - delete pipeline: " + id)
-	pipeline, err := getPipeline(id, userId, token)
+	pipeline, err := f.pipelineService.GetPipeline(id, userId, token)
 	if err != nil {
 		return
 	}
@@ -215,7 +217,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 	}
 	GetLogger().Debug("removed all operators for pipeline: " + id)
 
-	err = deletePipeline(id, userId, token)
+	err = f.pipelineService.DeletePipeline(id, userId, token)
 	if err != nil {
 		return
 	}
@@ -223,7 +225,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 }
 
 func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (status PipelineStatus, err error) {
-	_, err = getPipeline(id, userId, token)
+	_, err = f.pipelineService.GetPipeline(id, userId, token)
 	if err != nil {
 		return
 	}
@@ -233,7 +235,7 @@ func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (status Pipelin
 
 func (f *FlowEngine) GetPipelinesStatus(ids []string, userId, token string) (status []PipelineStatus, err error) {
 	statusTemp, err := f.driver.GetPipelinesStatus()
-	pipes, err := getPipelines(userId, token)
+	pipes, err := f.pipelineService.GetPipelines(userId, token)
 	if err != nil {
 		return
 	}

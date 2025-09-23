@@ -19,6 +19,7 @@ package rancher2_api
 import (
 	"crypto/tls"
 	"errors"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	"net/http"
 	"strconv"
@@ -36,22 +37,13 @@ type Rancher2 struct {
 	accessKey string
 	secretKey string
 	stackId   string
-	zookeeper string
+	r2cfg     *config.Rancher2Config
 }
 
-/* <<<<<<<<<<<<<<  ✨ Windsurf Command ⭐ >>>>>>>>>>>>>>>> */
-// NewRancher2 creates a new Rancher2 object, that can be used to interact with
-// the Rancher2 API. It takes the Rancher2 API URL, the access key, the secret
-// key, the stackId and the zookeeper URL as parameters.
-//
-// The kubeUrl is constructed by removing the "/v3/" path from the url and
-// appending "/k8s/clusters/" and the first part of the RANCHER2_PROJECT_ID
-// environment variable (before the ":").
-/* <<<<<<<<<<  8c5839d1-759d-41a4-b2a8-94451ae17fc1  >>>>>>>>>>> */
-func NewRancher2(url string, accessKey string, secretKey string, stackId string, zookeeper string) *Rancher2 {
+func NewRancher2(url string, accessKey string, secretKey string, stackId string, r2cfg *config.Rancher2Config) *Rancher2 {
 	kubeUrl := strings.TrimSuffix(url, "v3/") + "k8s/clusters/" +
-		strings.Split(lib.GetEnv("RANCHER2_PROJECT_ID", "_:_"), ":")[0] + "/v1/"
-	return &Rancher2{url, kubeUrl, accessKey, secretKey, stackId, zookeeper}
+		strings.Split(r2cfg.ProjectId, ":")[0] + "/v1/"
+	return &Rancher2{url, kubeUrl, accessKey, secretKey, stackId, r2cfg}
 }
 
 func (r *Rancher2) GetPipelineStatus(pipelineId string) (status lib.PipelineStatus, err error) {
@@ -116,16 +108,16 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 	var volumes []Volume
 	basePort := 8080
 	for i, operator := range inputs {
-		config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
+		operatorRequestConfig, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
 		labels := map[string]string{"operatorId": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId, "user": pipeConfig.UserId}
 		env := map[string]string{
-			"ZK_QUORUM":                         r.zookeeper,
+			"ZK_QUORUM":                         r.r2cfg.Zookeeper,
 			"CONFIG_APPLICATION_ID":             "analytics-" + operator.ApplicationId.String(),
 			"PIPELINE_ID":                       pipelineId,
 			"OPERATOR_ID":                       operator.Id,
 			"WINDOW_TIME":                       strconv.Itoa(pipeConfig.WindowTime),
 			"JOIN_STRATEGY":                     pipeConfig.MergeStrategy,
-			"CONFIG":                            string(config),
+			"CONFIG":                            string(operatorRequestConfig),
 			"DEVICE_ID_PATH":                    "device_id",
 			"CONSUMER_AUTO_OFFSET_RESET_CONFIG": pipeConfig.ConsumerOffset,
 			"USER_ID":                           pipeConfig.UserId,
@@ -188,7 +180,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	reqBody := &WorkloadRequest{
 		Name:        r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1],
-		NamespaceId: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
+		NamespaceId: r.r2cfg.NamespaceId,
 		Volumes:     volumes,
 		Containers:  containers,
 		Scheduling:  Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
@@ -196,7 +188,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 		Selector:    Selector{MatchLabels: map[string]string{"pipelineId": pipelineId}},
 	}
 
-	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads").Send(reqBody).End()
+	resp, body, e := request.Post(r.url + "projects/" + r.r2cfg.ProjectId + "/workloads").Send(reqBody).End()
 	if len(e) > 0 {
 		lib.GetLogger().Error("rancher2 API - could not create operators ", "error", e)
 		err = errors.New("rancher2 API -  could not create operators - an error occurred")
@@ -221,7 +213,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 		Kind:       "VerticalPodAutoscaler",
 		Metadata: AutoscalingRequestMetadata{
 			Name:      r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + "-vpa",
-			Namespace: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
+			Namespace: r.r2cfg.NamespaceId,
 		},
 		Spec: AutoscalingRequestSpec{
 			TargetRef: AutoscalingRequestTargetRef{
@@ -258,8 +250,8 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) (err error) {
 	//Delete Workload
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
-		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]).End()
+	resp, body, e := request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/workloads/deployment:" +
+		r.r2cfg.NamespaceId + ":" + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]).End()
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
@@ -277,8 +269,8 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 
 	// Delete Service
 	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e = request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/services/" +
-		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]).End()
+	resp, body, e = request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/services/" +
+		r.r2cfg.NamespaceId + ":" + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]).End()
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
@@ -297,7 +289,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 	// Delete Autoscaler
 	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers/" +
-		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
+		r.r2cfg.NamespaceId +
 		"/" +
 		r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + "-vpa").
 		End()
@@ -326,7 +318,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 		lib.GetLogger().Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
 		request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 		resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
-			lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
+			r.r2cfg.NamespaceId +
 			"/" + autoscalerCheckpointId).End()
 		if resp.StatusCode != http.StatusNoContent {
 			err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
@@ -354,7 +346,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	lib.GetLogger().Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e := request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
-		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
+		r.r2cfg.NamespaceId +
 		"/" + autoscalerCheckpointId).End()
 	if resp.StatusCode != http.StatusNoContent {
 		err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
@@ -373,8 +365,8 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 
 	//Delete Workload
 	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e = request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/workloads/deployment:" +
-		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
+	resp, body, e = request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/workloads/deployment:" +
+		r.r2cfg.NamespaceId + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
@@ -397,8 +389,8 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 
 	// Delete Service
 	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e = request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/services/" +
-		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
+	resp, body, e = request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/services/" +
+		r.r2cfg.NamespaceId + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
@@ -417,7 +409,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	// Delete Autoscaler
 	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers/" +
-		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") +
+		r.r2cfg.NamespaceId +
 		"/" +
 		r.getOperatorName(pipelineId, operator)[1] + "-vpa").
 		End()
@@ -447,12 +439,12 @@ func (r *Rancher2) createPersistentVolumeClaim(name string) (err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	reqBody := &VolumeClaimRequest{
 		Name:           name,
-		NamespaceId:    lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
+		NamespaceId:    r.r2cfg.NamespaceId,
 		AccessModes:    []string{"ReadWriteOnce"},
 		Resources:      Resources{Requests: map[string]string{"storage": "50M"}},
-		StorageClassId: lib.GetEnv("RANCHER2_STORAGE_DRIVER", "nfs-client"),
+		StorageClassId: r.r2cfg.StorageDriver,
 	}
-	resp, body, e := request.Post(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/persistentvolumeclaims").Send(reqBody).End()
+	resp, body, e := request.Post(r.url + "projects/" + r.r2cfg.ProjectId + "/persistentvolumeclaims").Send(reqBody).End()
 	if len(e) > 0 {
 		return errors.New("rancher2 API - could not create PersistentVolumeClaim: an error occurred")
 	}
@@ -469,8 +461,8 @@ func (r *Rancher2) createPersistentVolumeClaim(name string) (err error) {
 
 func (r *Rancher2) deletePersistentVolumeClaim(name string) (err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e := request.Delete(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/persistentVolumeClaims/" +
-		lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + name).End()
+	resp, body, e := request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/persistentVolumeClaims/" +
+		r.r2cfg.NamespaceId + ":" + name).End()
 	if len(e) > 0 {
 		err = lib.ErrSomethingWentWrong
 		return
@@ -490,8 +482,8 @@ func (r *Rancher2) deletePersistentVolumeClaim(name string) (err error) {
 			break
 		}
 		time.Sleep(15 * time.Second)
-		resp, _, e = request.Get(r.url + "projects/" + lib.GetEnv("RANCHER2_PROJECT_ID", "") + "/persistentVolumeClaims/" +
-			lib.GetEnv("RANCHER2_NAMESPACE_ID", "") + ":" + name).End()
+		resp, _, e = request.Get(r.url + "projects/" + r.r2cfg.ProjectId + "/persistentVolumeClaims/" +
+			r.r2cfg.NamespaceId + ":" + name).End()
 		if resp.StatusCode == http.StatusNotFound {
 			return
 		}

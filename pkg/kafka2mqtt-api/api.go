@@ -1,6 +1,7 @@
 package kafka2mqtt_api
 
 import (
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	downstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/downstream"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 
@@ -8,16 +9,16 @@ import (
 	"errors"
 	"github.com/parnurzeal/gorequest"
 	"net/http"
-	"os"
 	"strconv"
 )
 
 type Kafka2MqttApi struct {
-	url string
+	url     string
+	mqttCfg *config.MqttConfig
 }
 
-func NewKafka2MqttApi(url string) *Kafka2MqttApi {
-	return &Kafka2MqttApi{url}
+func NewKafka2MqttApi(url string, mqttCfg *config.MqttConfig) *Kafka2MqttApi {
+	return &Kafka2MqttApi{url, mqttCfg}
 }
 
 func (api *Kafka2MqttApi) StartOperatorInstance(operatorName, operatorID string, pipelineId string, userID, token string) (createdInstance Instance, err error) {
@@ -25,9 +26,9 @@ func (api *Kafka2MqttApi) StartOperatorInstance(operatorName, operatorID string,
 	mqttTopic := operatorLib.GenerateFogOperatorTopic(operatorName, operatorID, pipelineId)
 	kafkaTopic := operatorLib.GenerateCloudOperatorTopic(operatorName)
 
-	brokerAddress := os.Getenv("BROKER_ADDRESS")
-	username := os.Getenv("BROKER_USER")
-	password := os.Getenv("BROKER_PASSWORD")
+	brokerAddress := api.mqttCfg.BrokerAddress
+	username := api.mqttCfg.BrokerUser
+	password := api.mqttCfg.BrokerPassword
 	instanceConfig := Instance{
 		Topic:      kafkaTopic,
 		FilterType: "operatorId",

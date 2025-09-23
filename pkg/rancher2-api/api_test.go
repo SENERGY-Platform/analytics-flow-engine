@@ -17,24 +17,25 @@
 package rancher2_api
 
 import (
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
-	"github.com/joho/godotenv"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"testing"
 	"time"
 )
 
 func TestRancher2_createPersistentVolumeClaim(t *testing.T) {
-	err := godotenv.Load("../../.env")
+	config.ParseFlags()
+
+	cfg, err := config.New(config.ConfPath)
 	if err != nil {
-		t.Skip("missing .env file")
+		t.Skip(err)
 		return
 	}
 	driver := NewRancher2(
-		lib.GetEnv("RANCHER2_ENDPOINT", ""),
-		lib.GetEnv("RANCHER2_ACCESS_KEY", ""),
-		lib.GetEnv("RANCHER2_SECRET_KEY", ""),
-		lib.GetEnv("RANCHER2_STACK_ID", ""),
-		lib.GetEnv("ZOOKEEPER", ""),
+		cfg.Rancher2.Endpoint,
+		cfg.Rancher2.AccessKey,
+		cfg.Rancher2.SecretKey,
+		cfg.Rancher2.StackId,
+		&cfg.Rancher2,
 	)
 	name := "test"
 	err = driver.createPersistentVolumeClaim(name)

@@ -3,3 +3,4 @@ vendor
 .env
 __debug*
 .vscode
+config.json

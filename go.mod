@@ -8,6 +8,7 @@ toolchain go1.24.6
 
 require (
 	github.com/SENERGY-Platform/analytics-fog-lib v1.1.26
+	github.com/SENERGY-Platform/go-service-base/config-hdl v1.2.0
 	github.com/SENERGY-Platform/go-service-base/srv-info-hdl v0.2.0
 	github.com/SENERGY-Platform/go-service-base/struct-logger v0.4.1
 	github.com/SENERGY-Platform/go-service-base/watchdog v0.4.2
@@ -31,6 +32,7 @@ require (
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/SENERGY-Platform/developer-notifications v0.0.4 // indirect
+	github.com/SENERGY-Platform/go-env-loader v0.5.3 // indirect
 	github.com/bytedance/sonic v1.13.3 // indirect
 	github.com/bytedance/sonic/loader v0.2.4 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect

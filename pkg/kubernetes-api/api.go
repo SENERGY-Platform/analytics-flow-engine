@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v1"
@@ -26,13 +27,13 @@ import (
 type Kubernetes struct {
 	clientset           *kubernetes.Clientset
 	autoscalerClientset *autoscaler.Clientset
-	zookeeper           string
+	r2cfg               *config.Rancher2Config
 }
 
-func NewKubernetes() (kube *Kubernetes, err error) {
-	var config *rest.Config
+func NewKubernetes(r2cfg *config.Rancher2Config, debug bool) (kube *Kubernetes, err error) {
+	var restConfig *rest.Config
 
-	if lib.DebugMode() {
+	if debug {
 		var kubeconfig *string
 		lib.GetLogger().Debug("HomeDir" + homedir.HomeDir())
 		if home := homedir.HomeDir(); home != "" {
@@ -44,51 +45,51 @@ func NewKubernetes() (kube *Kubernetes, err error) {
 		lib.GetLogger().Debug("kube config path: " + *kubeconfig)
 
 		// use the current context in kubeconfig
-		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		restConfig, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
 		if err != nil {
 			return nil, err
 		}
-		lib.GetLogger().Debug("loaded kube config", "host", config.Host)
+		lib.GetLogger().Debug("loaded kube config", "host", restConfig.Host)
 	} else {
 		// creates the in-cluster config
-		config, err = rest.InClusterConfig()
+		restConfig, err = rest.InClusterConfig()
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// create the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	autoscalerClientSet, err := autoscaler.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	autoscalerClientSet, err := autoscaler.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
 	}
 	lib.GetLogger().Debug("loaded clientset")
 
-	pods, err := clientset.CoreV1().Pods(lib.GetEnv("RANCHER2_NAMESPACE_ID", "")).List(context.TODO(), metav1.ListOptions{})
+	pods, err := clientset.CoreV1().Pods(r2cfg.NamespaceId).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 	lib.GetLogger().Debug("succesfully tested connection", "pods", len(pods.Items))
 
-	return &Kubernetes{clientset: clientset, autoscalerClientset: autoscalerClientSet, zookeeper: lib.GetEnv("ZOOKEEPER", "")}, nil
+	return &Kubernetes{clientset: clientset, autoscalerClientset: autoscalerClientSet, r2cfg: r2cfg}, nil
 }
 
 func (k *Kubernetes) CreateOperators(pipelineId string, inputs []lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
 	var containers []apiv1.Container
 	var volumes []apiv1.Volume
 	metricsBasePort := 8080
-	deploymentsClient := k.clientset.AppsV1().Deployments(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
-	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
+	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
+	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(k.r2cfg.NamespaceId)
 
 	for i, operator := range inputs {
 		var ports []apiv1.ContainerPort
 		var volumeMounts []apiv1.VolumeMount
-		config, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
+		operatorRequestConfig, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
 		envs := []apiv1.EnvVar{
 			{
 				Name:  "ZK_QUORUM",
-				Value: k.zookeeper,
+				Value: k.r2cfg.Zookeeper,
 			},
 			{
 				Name:  "CONFIG_APPLICATION_ID",
@@ -112,7 +113,7 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []lib.Operator, p
 			},
 			{
 				Name:  "CONFIG",
-				Value: string(config),
+				Value: string(operatorRequestConfig),
 			},
 			{
 				Name:  "DEVICE_ID_PATH",
@@ -142,7 +143,7 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []lib.Operator, p
 
 		if operator.PersistData {
 			volumeName := getOperatorName(pipelineId, operator)[0]
-			pvc := makePVC(volumeName, "50M")
+			pvc := k.makePVC(volumeName, "50M")
 			_, err = pvcClient.Create(context.TODO(), pvc, metav1.CreateOptions{})
 			volumeMounts = append(volumeMounts, apiv1.VolumeMount{
 				Name:      volumeName,
@@ -236,7 +237,7 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []lib.Operator, p
 	}
 
 	lib.GetLogger().Debug("creating autoscaler")
-	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
+	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(k.r2cfg.NamespaceId)
 	vpaResult, err := verticalAutoscalerClient.Create(context.TODO(), vpa, metav1.CreateOptions{})
 	if err != nil {
 		return
@@ -250,10 +251,10 @@ func (k *Kubernetes) DeleteOperator(string, lib.Operator) (err error) {
 }
 
 func (k *Kubernetes) DeleteOperators(pipelineId string, operators []lib.Operator) (err error) {
-	deploymentsClient := k.clientset.AppsV1().Deployments(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
-	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
-	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
-	verticalAutoscalerCheckpointClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalerCheckpoints(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
+	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
+	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(k.r2cfg.NamespaceId)
+	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(k.r2cfg.NamespaceId)
+	verticalAutoscalerCheckpointClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalerCheckpoints(k.r2cfg.NamespaceId)
 
 	for _, operator := range operators {
 		if operator.PersistData {
@@ -297,7 +298,7 @@ func (k *Kubernetes) DeleteOperators(pipelineId string, operators []lib.Operator
 }
 
 func (k *Kubernetes) GetPipelineStatus(pipelineId string) (pipeStatus lib.PipelineStatus, err error) {
-	deploymentsClient := k.clientset.AppsV1().Deployments(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
+	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
 	pipe, err := deploymentsClient.Get(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1], metav1.GetOptions{})
 	if err != nil {
 		return
@@ -311,7 +312,7 @@ func (k *Kubernetes) GetPipelineStatus(pipelineId string) (pipeStatus lib.Pipeli
 }
 
 func (k *Kubernetes) GetPipelinesStatus() (pipeStatus []lib.PipelineStatus, err error) {
-	deploymentsClient := k.clientset.AppsV1().Deployments(lib.GetEnv("RANCHER2_NAMESPACE_ID", ""))
+	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
 	pipes, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return
@@ -332,13 +333,13 @@ func getOperatorName(pipelineId string, operator lib.Operator) []string {
 	return []string{"operator-" + pipelineId + "-" + operator.Id[0:8], "pipeline-" + pipelineId}
 }
 
-func makePVC(name string, size string) *apiv1.PersistentVolumeClaim {
+func (k *Kubernetes) makePVC(name string, size string) *apiv1.PersistentVolumeClaim {
 	fs := apiv1.PersistentVolumeFilesystem
-	storageClass := lib.GetEnv("RANCHER2_STORAGE_DRIVER", "nfs-client")
+	storageClass := k.r2cfg.StorageDriver
 	pvc := apiv1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: lib.GetEnv("RANCHER2_NAMESPACE_ID", ""),
+			Namespace: k.r2cfg.NamespaceId,
 		},
 		Spec: apiv1.PersistentVolumeClaimSpec{
 			AccessModes: []apiv1.PersistentVolumeAccessMode{apiv1.ReadWriteOnce},

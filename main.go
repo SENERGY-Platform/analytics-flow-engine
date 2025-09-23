@@ -17,34 +17,42 @@
 package main
 
 import (
+	"fmt"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/api"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
+	pipeline_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/pipeline-api"
 	"github.com/SENERGY-Platform/go-service-base/srv-info-hdl"
 	"github.com/SENERGY-Platform/go-service-base/watchdog"
 
 	"os"
 	"syscall"
-
-	"github.com/joho/godotenv"
 )
 
 var version = "dev"
 
 func main() {
-	_ = srv_info_hdl.New("analytics-flow-engine", version)
-
 	ec := 0
 	defer func() {
 		os.Exit(ec)
 	}()
 
-	err := godotenv.Load()
+	_ = srv_info_hdl.New("analytics-flow-engine", version)
+
+	config.ParseFlags()
+
+	cfg, err := config.New(config.ConfPath)
 	if err != nil {
-		lib.GetLogger().Debug("error loading .env file")
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		ec = 1
+		return
 	}
+
 	wd := watchdog.New(syscall.SIGINT, syscall.SIGTERM)
 
-	err = lib.ConnectMQTTBroker()
+	pipelineService := pipeline_api.NewPipelineApi(cfg.PipelineApiEndpoint)
+
+	err = lib.ConnectMQTTBroker(cfg.Mqtt, pipelineService)
 	if err != nil {
 		lib.GetLogger().Error("error connecting to mqtt broker", "error", err)
 		ec = 1
@@ -56,14 +64,12 @@ func main() {
 		return nil
 	})
 
-	go func() {
-		err = api.CreateServer()
-		if err != nil {
-			lib.GetLogger().Error("error starting server", "error", err)
-		}
+	err = api.CreateServer(cfg, pipelineService)
+	if err != nil {
+		lib.GetLogger().Error("error starting server", "error", err)
 		ec = 1
 		return
-	}()
+	}
 
 	wd.Start()
 

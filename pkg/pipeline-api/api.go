@@ -1,11 +1,11 @@
 /*
- * Copyright 2019 InfAI (CC SES)
+ * Copyright 2025 InfAI (CC SES)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,28 +14,35 @@
  * limitations under the License.
  */
 
-package lib
+package pipeline_api
 
 import (
 	"encoding/json"
-	"net/http"
-
+	"errors"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	"github.com/google/uuid"
-
-	"strconv"
-
 	"github.com/parnurzeal/gorequest"
-	"github.com/pkg/errors"
+	"net/http"
+	"strconv"
 )
 
 type PipelineResponse struct {
 	Id uuid.UUID `json:"id,omitempty"`
 }
 
-func registerPipeline(pipeline *Pipeline, userId string, authorization string) (id uuid.UUID, err error) {
-	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
+var ErrNotFound = errors.New("not found")
+
+type PipelineApi struct {
+	url string
+}
+
+func NewPipelineApi(url string) *PipelineApi {
+	return &PipelineApi{url}
+}
+
+func (p *PipelineApi) RegisterPipeline(pipeline *lib.Pipeline, userId string, authorization string) (id uuid.UUID, err error) {
 	request := gorequest.New()
-	request.Post(pipelineServiceUrl+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization).Send(pipeline)
+	request.Post(p.url+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization).Send(pipeline)
 	resp, body, e := request.End()
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New("pipeline API - could not register pipeline at pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
@@ -54,10 +61,9 @@ func registerPipeline(pipeline *Pipeline, userId string, authorization string) (
 	return
 }
 
-func updatePipeline(pipeline *Pipeline, userId string, authorization string) (err error) {
-	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
+func (p *PipelineApi) UpdatePipeline(pipeline *lib.Pipeline, userId string, authorization string) (err error) {
 	request := gorequest.New()
-	request.Put(pipelineServiceUrl+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization).Send(pipeline)
+	request.Put(p.url+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization).Send(pipeline)
 	resp, body, e := request.End()
 	if resp.StatusCode != http.StatusOK {
 		err = errors.New("pipeline API - could not register pipeline at pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
@@ -68,12 +74,9 @@ func updatePipeline(pipeline *Pipeline, userId string, authorization string) (er
 	return
 }
 
-var ErrNotFound = errors.New("not found")
-
-func getPipeline(id string, userId string, authorization string) (pipe Pipeline, err error) {
-	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
+func (p *PipelineApi) GetPipeline(id string, userId string, authorization string) (pipe lib.Pipeline, err error) {
 	request := gorequest.New()
-	request.Get(pipelineServiceUrl+"/pipeline/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
+	request.Get(p.url+"/pipeline/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
 	resp, body, e := request.End()
 	if len(e) > 0 {
 		return pipe, errors.New("pipeline API - could not get pipeline from pipeline registry: an error occurred")
@@ -92,10 +95,9 @@ func getPipeline(id string, userId string, authorization string) (pipe Pipeline,
 	return
 }
 
-func getPipelines(userId string, authorization string) (pipelines []Pipeline, err error) {
-	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
+func (p *PipelineApi) GetPipelines(userId string, authorization string) (pipelines []lib.Pipeline, err error) {
 	request := gorequest.New()
-	request.Get(pipelineServiceUrl+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization)
+	request.Get(p.url+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization)
 	resp, body, e := request.End()
 	if len(e) > 0 {
 		err = errors.New("pipeline API - could not get pipelines from pipeline registry: an error occurred")
@@ -109,7 +111,7 @@ func getPipelines(userId string, authorization string) (pipelines []Pipeline, er
 		err = errors.New("pipeline API - could not get pipelines from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
 		return
 	}
-	var pResponse PipelinesResponse
+	var pResponse lib.PipelinesResponse
 	err = json.Unmarshal([]byte(body), &pResponse)
 	if err != nil {
 		err = errors.New("pipeline API  - could not parse pipelines: " + err.Error())
@@ -119,10 +121,9 @@ func getPipelines(userId string, authorization string) (pipelines []Pipeline, er
 	return
 }
 
-func deletePipeline(id string, userId string, authorization string) (err error) {
-	var pipelineServiceUrl = GetEnv("PIPELINE_API_ENDPOINT", "")
+func (p *PipelineApi) DeletePipeline(id string, userId string, authorization string) (err error) {
 	request := gorequest.New()
-	request.Delete(pipelineServiceUrl+"/pipeline/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
+	request.Delete(p.url+"/pipeline/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
 	resp, body, e := request.End()
 	if resp.StatusCode != 200 {
 		err = errors.New("pipeline API - could not delete pipeline from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)

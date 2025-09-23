@@ -27,23 +27,31 @@ import (
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 )
 
-func processMessage(message MQTT.Message) {
+type FogClient struct {
+	pipelineService PipelineApiService
+}
+
+func NewFogClient(pipelineService PipelineApiService) *FogClient {
+	return &FogClient{pipelineService}
+}
+
+func (f *FogClient) processMessage(message MQTT.Message) {
 	topic := message.Topic()
 	GetLogger().Debug("Received message on: " + topic)
 
 	if strings.HasSuffix(topic, "/operator/control/sync/request") {
 		userID := operatorLib.GetUserIDFromOperatorControlSyncTopic(topic)
-		sendActiveOperators(userID, "")
+		f.sendActiveOperators(userID, "")
 	}
 
 	if strings.HasSuffix(topic, "/upstream/sync/request") {
 		userID := upstreamLib.GetUserIDFromUpstreamControlSyncTopic(topic)
-		sendTopicsWithEnabledForward(userID, "")
+		f.sendTopicsWithEnabledForward(userID, "")
 	}
 }
 
-func sendActiveOperators(userID string, token string) {
-	pipelines, err := getPipelines(userID, token)
+func (f *FogClient) sendActiveOperators(userID string, token string) {
+	pipelines, err := f.pipelineService.GetPipelines(userID, token)
 	if err != nil {
 		GetLogger().Error("cannot get pipelines", "error", err)
 	}
@@ -69,8 +77,8 @@ func sendActiveOperators(userID string, token string) {
 	}
 }
 
-func sendTopicsWithEnabledForward(userID string, token string) {
-	pipelines, err := getPipelines(userID, token)
+func (f *FogClient) sendTopicsWithEnabledForward(userID string, token string) {
+	pipelines, err := f.pipelineService.GetPipelines(userID, token)
 	if err != nil {
 		GetLogger().Error("cannot get pipelines", "error", err)
 	}

@@ -18,6 +18,7 @@ package api
 
 import (
 	"errors"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	devicemanager_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/device-manager-api"
 	kafka2mqtt_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
 	kubernetes_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kubernetes-api"
@@ -30,38 +31,39 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 )
 
-func CreateServer() (err error) {
+func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (err error) {
 	var driver lib.Driver
-	switch selectedDriver := lib.GetEnv("DRIVER", "kubernetes"); selectedDriver {
+	switch selectedDriver := cfg.Driver; selectedDriver {
 	case "rancher":
 		driver = rancher2_api.NewRancher2(
-			lib.GetEnv("RANCHER2_ENDPOINT", ""),
-			lib.GetEnv("RANCHER2_ACCESS_KEY", ""),
-			lib.GetEnv("RANCHER2_SECRET_KEY", ""),
-			lib.GetEnv("RANCHER2_STACK_ID", ""),
-			lib.GetEnv("ZOOKEEPER", ""),
+			cfg.Rancher2.Endpoint,
+			cfg.Rancher2.AccessKey,
+			cfg.Rancher2.SecretKey,
+			cfg.Rancher2.StackId,
+			&cfg.Rancher2,
 		)
 		break
 	default:
-		driver, err = kubernetes_api.NewKubernetes()
+		driver, err = kubernetes_api.NewKubernetes(&cfg.Rancher2, cfg.Debug)
 		if err != nil {
 			lib.GetLogger().Error("Error creating driver", "error", err)
 			return
 		}
 	}
 
-	parser := parsing_api.NewParsingApi(lib.GetEnv("PARSER_API_ENDPOINT", ""))
-	permission := permission_api.NewPermissionApi(lib.GetEnv("PERMISSION_API_ENDPOINT", ""))
-	kafka2mqtt := kafka2mqtt_api.NewKafka2MqttApi(lib.GetEnv("KAFKA2MQTT_API_ENDPOINT", ""))
-	deviceManager := devicemanager_api.NewDeviceManagerApi(lib.GetEnv("DEVICE_MANAGER_API_ENDPOINT", ""))
-	flowEngine := lib.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager)
+	parser := parsing_api.NewParsingApi(cfg.ParserApiEndpoint)
+	permission := permission_api.NewPermissionApi(cfg.PermissionApiEndpoint)
+	kafka2mqtt := kafka2mqtt_api.NewKafka2MqttApi(cfg.Kafka2MqttApiEndpoint, &cfg.Mqtt)
+	deviceManager := devicemanager_api.NewDeviceManagerApi(cfg.DeviceManagerApiEndpoint)
+	flowEngine := lib.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService)
 
-	port := lib.GetEnv("SERVER_PORT", "8000")
+	port := strconv.FormatInt(int64(cfg.ServerPort), 10)
 	lib.GetLogger().Info("Starting api server at port " + port)
-	if !lib.DebugMode() {
+	if !cfg.Debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	r := gin.Default()
@@ -72,7 +74,7 @@ func CreateServer() (err error) {
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
-	prefix := r.Group(lib.GetEnv("ROUTE_PREFIX", ""))
+	prefix := r.Group(cfg.URLPrefix)
 	prefix.GET("/health-check", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
@@ -147,7 +149,7 @@ func CreateServer() (err error) {
 		c.Status(http.StatusNoContent)
 	})
 
-	if !lib.DebugMode() {
+	if !cfg.Debug {
 		err = r.Run(":" + port)
 	} else {
 		err = r.Run("127.0.0.1:" + port)

@@ -18,26 +18,8 @@ package lib
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"time"
 )
-
-func DebugMode() bool {
-	DEBUG, err := strconv.ParseBool(GetEnv("DEBUG", "false"))
-	if err != nil {
-		GetLogger().Error("Error loading debug value", "error", err)
-		return false
-	}
-	return DEBUG
-}
-func GetEnv(key, fallback string) string {
-	value := os.Getenv(key)
-	if len(value) == 0 {
-		return fallback
-	}
-	return value
-}
 
 func StringInSlice(a string, list []string) bool {
 	for _, b := range list {

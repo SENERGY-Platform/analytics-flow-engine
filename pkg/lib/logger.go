@@ -41,7 +41,7 @@ func GetLogger() *slog.Logger {
 		logger = struct_logger.New(
 			struct_logger.Config{
 				Handler:    struct_logger.JsonHandlerSelector,
-				Level:      GetEnv("LOG_LEVEL", "info"),
+				Level:      "debug",
 				TimeFormat: time.RFC3339Nano,
 				TimeUtc:    true,
 				AddMeta:    true,
