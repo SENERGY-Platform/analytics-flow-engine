@@ -38,7 +38,7 @@ import (
 	"strings"
 )
 
-func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (err error) {
+func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (r *gin.Engine, err error) {
 	var driver lib.Driver
 	switch selectedDriver := cfg.Driver; selectedDriver {
 	case "rancher":
@@ -69,7 +69,7 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (e
 	if !cfg.Debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
-	r := gin.New()
+	r = gin.New()
 	r.RedirectTrailingSlash = false
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
@@ -169,16 +169,7 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (e
 		}
 		c.Status(http.StatusNoContent)
 	})
-
-	if !cfg.Debug {
-		err = r.Run(":" + port)
-	} else {
-		err = r.Run("127.0.0.1:" + port)
-	}
-	if err == nil {
-		util.Logger.Error("could not start api server", "error", err)
-	}
-	return
+	return r, nil
 }
 
 func AuthMiddleware() gin.HandlerFunc {

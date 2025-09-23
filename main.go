@@ -17,6 +17,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
@@ -24,11 +26,14 @@ import (
 	pipeline_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/pipeline-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	"github.com/SENERGY-Platform/go-service-base/srv-info-hdl"
+	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
 	sb_util "github.com/SENERGY-Platform/go-service-base/util"
-	"github.com/SENERGY-Platform/go-service-base/watchdog"
-
+	"net/http"
 	"os"
+	"strconv"
+	"sync"
 	"syscall"
+	"time"
 )
 
 var version = "dev"
@@ -55,8 +60,6 @@ func main() {
 	util.Logger.Info(srvInfoHdl.Name(), "version", srvInfoHdl.Version())
 	util.Logger.Info("config: " + sb_util.ToJsonStr(cfg))
 
-	wd := watchdog.New(syscall.SIGINT, syscall.SIGTERM)
-
 	pipelineService := pipeline_api.NewPipelineApi(cfg.PipelineApiEndpoint)
 
 	err = lib.ConnectMQTTBroker(cfg.Mqtt, pipelineService)
@@ -66,19 +69,62 @@ func main() {
 		return
 	}
 
-	wd.RegisterStopFunc(func() error {
-		lib.CloseMQTTConnection()
-		return nil
-	})
-
-	err = api.CreateServer(cfg, pipelineService)
+	httpHandler, err := api.CreateServer(cfg, pipelineService)
 	if err != nil {
-		util.Logger.Error("error starting server", "error", err)
+		util.Logger.Error("error creating http engine", "error", err)
 		ec = 1
 		return
 	}
 
-	wd.Start()
+	bindAddress := ":" + strconv.FormatInt(int64(cfg.ServerPort), 10)
 
-	ec = wd.Join()
+	if cfg.Debug {
+		bindAddress = "127.0.0.1:" + strconv.FormatInt(int64(cfg.ServerPort), 10)
+	}
+
+	httpServer := &http.Server{
+		Addr:    bindAddress,
+		Handler: httpHandler}
+
+	ctx, cf := context.WithCancel(context.Background())
+
+	go func() {
+		util.Wait(ctx, util.Logger, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+		cf()
+	}()
+
+	wg := &sync.WaitGroup{}
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		util.Logger.Info("starting http server")
+		if err = httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			util.Logger.Error("starting server failed", attributes.ErrorKey, err)
+			ec = 1
+		}
+		cf()
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-ctx.Done()
+		util.Logger.Info("stopping http server")
+		ctxWt, cf2 := context.WithTimeout(context.Background(), time.Second*5)
+		defer cf2()
+		if err := httpServer.Shutdown(ctxWt); err != nil {
+			util.Logger.Error("stopping server failed", attributes.ErrorKey, err)
+			ec = 1
+		} else {
+			util.Logger.Info("http server stopped")
+		}
+
+		util.Logger.Info("closing mqtt connection")
+		lib.CloseMQTTConnection()
+		util.Logger.Info("mqtt connection closed")
+	}()
+
+	wg.Wait()
 }
