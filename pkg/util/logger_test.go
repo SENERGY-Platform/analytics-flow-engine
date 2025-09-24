@@ -19,5 +19,6 @@ package util
 import "testing"
 
 func TestNewLogger(t *testing.T) {
+	InitStructLogger("debug")
 	Logger.Info("test")
 }
