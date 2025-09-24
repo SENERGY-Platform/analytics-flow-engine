@@ -1,8 +1,16 @@
 {
     "swagger": "2.0",
     "info": {
-        "contact": {}
+        "description": "For the administration of analytics pipelines.",
+        "title": "Analytics-Flow-Engine API",
+        "contact": {},
+        "license": {
+            "name": "Apache-2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "0.0.48"
     },
+    "basePath": "/",
     "paths": {
         "/pipeline": {
             "put": {

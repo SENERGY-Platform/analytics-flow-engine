@@ -20,6 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"strconv"
+	"sync"
+	"syscall"
+	"time"
+
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
@@ -28,15 +35,9 @@ import (
 	"github.com/SENERGY-Platform/go-service-base/srv-info-hdl"
 	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
 	sb_util "github.com/SENERGY-Platform/go-service-base/util"
-	"net/http"
-	"os"
-	"strconv"
-	"sync"
-	"syscall"
-	"time"
 )
 
-var version = "0.0.47"
+var version = "0.0.48"
 
 func main() {
 	ec := 0

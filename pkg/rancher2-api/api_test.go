@@ -17,15 +17,14 @@
 package rancher2_api
 
 import (
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"testing"
 	"time"
+
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 )
 
 func TestRancher2_createPersistentVolumeClaim(t *testing.T) {
-	config.ParseFlags()
-
-	cfg, err := config.New(config.ConfPath)
+	cfg, err := config.New("../../config.json")
 	if err != nil {
 		t.Skip(err)
 		return

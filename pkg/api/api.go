@@ -17,6 +17,11 @@
 package api
 
 import (
+	"net/http"
+	"slices"
+	"strconv"
+	"strings"
+
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	devicemanager_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/device-manager-api"
 	kafka2mqtt_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
@@ -32,15 +37,11 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/requestid"
 	"github.com/gin-gonic/gin"
-	"net/http"
-	"slices"
-	"strconv"
-	"strings"
 )
 
 // CreateServer godoc
 // @title Analytics-Flow-Engine API
-// @version 0.0.47
+// @version 0.0.48
 // @description For the administration of analytics pipelines.
 // @license.name Apache-2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html

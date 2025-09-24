@@ -1,20 +1,23 @@
 package kubernetes_api
 
 import (
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
-	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 	"testing"
+
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
+	"github.com/google/uuid"
 )
 
 var testPipeId = "test-pipe-12345678"
 
 func getClient() (client *Kubernetes, err error) {
-	err = godotenv.Load("../../.env")
+	cfg, err := config.New("../../config.json")
 	if err != nil {
 		return
 	}
-	client, err = NewKubernetes()
+	util.InitStructLogger("debug")
+	client, err = NewKubernetes(&cfg.Rancher2, true)
 	if err != nil {
 		return
 	}
@@ -22,12 +25,13 @@ func getClient() (client *Kubernetes, err error) {
 }
 
 func TestKubernetes_createClient(t *testing.T) {
-	err := godotenv.Load("../../.env")
+	cfg, err := config.New("../../config.json")
 	if err != nil {
-		t.Skip("missing .env file")
+		t.Skip(err)
 		return
 	}
-	_, err = NewKubernetes()
+	util.InitStructLogger("debug")
+	_, err = NewKubernetes(&cfg.Rancher2, true)
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -37,7 +41,7 @@ func TestKubernetes_createClient(t *testing.T) {
 func TestKubernetes_CreateOperators(t *testing.T) {
 	driver, err := getClient()
 	if err != nil {
-		t.Skip(err.Error())
+		t.Skip(err)
 		return
 	}
 	id, _ := uuid.Parse("00000000-0000-0000-0000-000000000000")
@@ -78,7 +82,7 @@ func TestKubernetes_CreateOperators(t *testing.T) {
 func TestKubernetes_DeleteOperators(t *testing.T) {
 	driver, err := getClient()
 	if err != nil {
-		t.Skip(err.Error())
+		t.Skip(err)
 		return
 	}
 	pipelineId := testPipeId
@@ -111,7 +115,7 @@ func TestKubernetes_DeleteOperators(t *testing.T) {
 func TestKubernetes_GetPipelineStatus(t *testing.T) {
 	driver, err := getClient()
 	if err != nil {
-		t.Skip(err.Error())
+		t.Skip(err)
 		return
 	}
 	pipelineId := testPipeId

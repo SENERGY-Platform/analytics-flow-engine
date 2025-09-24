@@ -1,6 +1,6 @@
 FROM golang:1.24 AS builder
 
-ARG VERSION=0.0.47
+ARG VERSION=0.0.48
 
 COPY . /go/src/app
 WORKDIR /go/src/app
