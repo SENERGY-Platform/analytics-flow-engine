@@ -18,11 +18,12 @@ package api
 
 import (
 	"errors"
+	"net/http"
+	"os"
+
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	"github.com/gin-gonic/gin"
-	"net/http"
-	"os"
 )
 
 // getPipeline godoc
@@ -35,12 +36,12 @@ import (
 // @Failure	500 {string} str
 // @Router /pipeline/{id} [get]
 func getPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
-	return http.MethodGet, "/pipeline/:id", func(c *gin.Context) {
+	return http.MethodGet, PipelineIdPath, func(c *gin.Context) {
 		id := c.Param("id")
 		pipelineStatus, err := flowEngine.GetPipelineStatus(id, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
-			util.Logger.Error("could not get pipeline status", "error", err, "method", "GET", "path", "/pipeline/:id")
-			_ = c.Error(errors.New("something went wrong"))
+			util.Logger.Error("could not get pipeline status", "error", err, "method", "GET", "path", PipelineIdPath)
+			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
 		c.JSON(http.StatusOK, pipelineStatus)
@@ -48,25 +49,27 @@ func getPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
 }
 
 // postPipelines godoc
-// @Summary Get pipelines status
-// @Description	Gets the status of all pipelines
+// @Summary Get multiple pipelines status
+// @Description	Gets multiple pipelines status
 // @Tags Pipeline
+// @Accept json
 // @Produce json
-// @Success	200 {array} lib.PipelineStatus
+// @Param request body lib.PipelineStatusRequest true "Pipeline status request"
+// @Success	200 {object} lib.PipelinesStatus
 // @Failure	500 {string} str
 // @Router /pipelines [post]
 func postPipelines(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
-	return http.MethodPost, "/pipelines", func(c *gin.Context) {
+	return http.MethodPost, PipelinesPath, func(c *gin.Context) {
 		var request lib.PipelineStatusRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			util.Logger.Error("error parsing request", "error", err, "method", "POST", "path", "/pipelines")
-			_ = c.Error(errors.New("something went wrong"))
+			util.Logger.Error("error parsing request", "error", err, "method", "POST", "path", PipelinesPath)
+			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
 		pipelinesStatus, err := flowEngine.GetPipelinesStatus(request.Ids, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
-			util.Logger.Error("could not get pipelines status", "error", err, "method", "POST", "path", "/pipelines")
-			_ = c.Error(errors.New("something went wrong"))
+			util.Logger.Error("could not get pipelines status", "error", err, "method", "POST", "path", PipelinesPath)
+			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
 		c.JSON(http.StatusOK, pipelinesStatus)
@@ -82,17 +85,17 @@ func postPipelines(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) 
 // @Failure	500 {string} str
 // @Router /pipeline [post]
 func postPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
-	return http.MethodPost, "/pipeline", func(c *gin.Context) {
+	return http.MethodPost, PipelinePath, func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			util.Logger.Error("error parsing request", "error", err, "method", "POST", "path", "/pipeline")
-			_ = c.Error(errors.New("something went wrong"))
+			util.Logger.Error("error parsing request", "error", err, "method", "POST", "path", PipelinePath)
+			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
 		pipe, err := flowEngine.StartPipeline(request, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
-			util.Logger.Error("could not start pipeline", "error", err, "method", "POST", "path", "/pipeline")
-			_ = c.Error(errors.New("something went wrong"))
+			util.Logger.Error("could not start pipeline", "error", err, "method", "POST", "path", PipelinePath)
+			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
 		c.JSON(http.StatusOK, pipe)
@@ -108,17 +111,17 @@ func postPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
 // @Failure	500 {string} str
 // @Router /pipeline [put]
 func putPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
-	return http.MethodPut, "/pipeline", func(c *gin.Context) {
+	return http.MethodPut, PipelinePath, func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			util.Logger.Error("error parsing request", "error", err, "method", "PUT", "path", "/pipeline")
-			_ = c.Error(errors.New("something went wrong"))
+			util.Logger.Error("error parsing request", "error", err, "method", "PUT", "path", PipelinePath)
+			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
 		pipe, err := flowEngine.UpdatePipeline(request, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
-			util.Logger.Error("could not update pipeline", "error", err, "method", "PUT", "path", "/pipeline")
-			_ = c.Error(errors.New("something went wrong"))
+			util.Logger.Error("could not update pipeline", "error", err, "method", "PUT", "path", PipelinePath)
+			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
 		c.JSON(http.StatusOK, pipe)
@@ -134,12 +137,12 @@ func putPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
 // @Failure	500 {string} str
 // @Router /pipeline/{id} [delete]
 func deletePipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
-	return http.MethodDelete, "/pipeline/:id", func(c *gin.Context) {
+	return http.MethodDelete, PipelineIdPath, func(c *gin.Context) {
 		id := c.Param("id")
 		err := flowEngine.DeletePipeline(id, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
-			util.Logger.Error("could not delete pipeline", "error", err, "method", "DELETE", "path", "/pipeline/:id")
-			_ = c.Error(errors.New("something went wrong"))
+			util.Logger.Error("could not delete pipeline", "error", err, "method", "DELETE", "path", PipelineIdPath)
+			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
 		c.Status(http.StatusNoContent)
