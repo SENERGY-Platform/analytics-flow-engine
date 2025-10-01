@@ -8,7 +8,7 @@
             "name": "Apache-2.0",
             "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
         },
-        "version": "0.0.48"
+        "version": "0.0.51"
     },
     "basePath": "/",
     "paths": {
@@ -126,14 +126,28 @@
         },
         "/pipelines": {
             "post": {
-                "description": "Gets the status of all pipelines",
+                "description": "Gets multiple pipelines status",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Pipeline"
                 ],
-                "summary": "Get pipelines status",
+                "summary": "Get multiple pipelines status",
+                "parameters": [
+                    {
+                        "description": "Pipeline status request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/lib.PipelineStatusRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -334,6 +348,17 @@
                 },
                 "transitioning": {
                     "type": "boolean"
+                }
+            }
+        },
+        "lib.PipelineStatusRequest": {
+            "type": "object",
+            "properties": {
+                "ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },

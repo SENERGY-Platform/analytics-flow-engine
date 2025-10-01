@@ -55,7 +55,7 @@ func getPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
 // @Accept json
 // @Produce json
 // @Param request body lib.PipelineStatusRequest true "Pipeline status request"
-// @Success	200 {object} lib.PipelinesStatus
+// @Success	200 {array} lib.PipelineStatus
 // @Failure	500 {string} str
 // @Router /pipelines [post]
 func postPipelines(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {

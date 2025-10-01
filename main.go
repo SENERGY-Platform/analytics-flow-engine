@@ -37,7 +37,7 @@ import (
 	sb_util "github.com/SENERGY-Platform/go-service-base/util"
 )
 
-var version = "0.0.49"
+var Version = "0.0.51"
 
 func main() {
 	ec := 0
@@ -45,7 +45,7 @@ func main() {
 		os.Exit(ec)
 	}()
 
-	srvInfoHdl := srv_info_hdl.New("analytics-flow-engine", version)
+	srvInfoHdl := srv_info_hdl.New("analytics-flow-engine", Version)
 
 	config.ParseFlags()
 

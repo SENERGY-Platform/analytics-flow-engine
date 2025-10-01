@@ -23,6 +23,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/parnurzeal/gorequest v0.3.0
 	github.com/pkg/errors v0.9.1
+	github.com/swaggo/files v1.0.1
+	github.com/swaggo/gin-swagger v1.6.1
 	k8s.io/api v0.34.0
 	k8s.io/apimachinery v0.34.0
 	k8s.io/autoscaler/vertical-pod-autoscaler v1.4.2
@@ -77,7 +79,6 @@ require (
 	github.com/segmentio/kafka-go v0.4.47 // indirect
 	github.com/smartystreets/goconvey v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	github.com/swaggo/files v0.0.0-20220610200504-28940afbdbfe // indirect
 	github.com/swaggo/http-swagger v1.3.4 // indirect
 	github.com/swaggo/swag v1.16.4 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
