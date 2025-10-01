@@ -14,21 +14,8 @@
  * limitations under the License.
  */
 
-package api
+package kubernetes_api
 
 const (
-	HeaderRequestID = "X-Request-ID"
-	UserIdKey       = "UserId"
-)
-
-const (
-	HealthCheckPath = "/health-check"
-	PipelineIdPath  = "/pipeline/:id"
-	PipelinesPath   = "/pipelines"
-	PipelinePath    = "/pipeline"
-)
-
-const (
-	MessageSomethingWrong = "something went wrong"
-	MessageParseError     = "failed to parse request"
+	DummyOperatorId = "v3-123456789"
 )

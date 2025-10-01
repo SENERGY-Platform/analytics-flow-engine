@@ -185,7 +185,7 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []lib.Operator, p
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1],
+			Name: getOperatorName(pipelineId, lib.Operator{Id: DummyOperatorId})[1],
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: ptr.To[int32](1),
@@ -222,10 +222,10 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []lib.Operator, p
 	updateAutoMode := v1.UpdateModeAuto
 	vpa := &v1.VerticalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + "-vpa",
+			Name: getOperatorName(pipelineId, lib.Operator{Id: DummyOperatorId})[1] + "-vpa",
 		},
 		Spec: v1.VerticalPodAutoscalerSpec{
-			TargetRef:    &autoscaling.CrossVersionObjectReference{Kind: "Deployment", Name: getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]},
+			TargetRef:    &autoscaling.CrossVersionObjectReference{Kind: "Deployment", Name: getOperatorName(pipelineId, lib.Operator{Id: DummyOperatorId})[1]},
 			UpdatePolicy: &v1.PodUpdatePolicy{UpdateMode: &updateAutoMode},
 			ResourcePolicy: &v1.PodResourcePolicy{ContainerPolicies: []v1.ContainerResourcePolicy{{
 				ContainerName: "*",
@@ -282,7 +282,7 @@ func (k *Kubernetes) DeleteOperators(pipelineId string, operators []lib.Operator
 	util.Logger.Debug("deleting deployment " + pipelineId)
 	deletePolicy := metav1.DeletePropagationForeground
 
-	err = deploymentsClient.Delete(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1], metav1.DeleteOptions{
+	err = deploymentsClient.Delete(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: DummyOperatorId})[1], metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	})
 	if err != nil {
@@ -291,7 +291,7 @@ func (k *Kubernetes) DeleteOperators(pipelineId string, operators []lib.Operator
 	util.Logger.Debug(fmt.Sprintf("deleted deployment %s", pipelineId))
 
 	util.Logger.Debug("deleting autoscaler " + pipelineId)
-	err = verticalAutoscalerClient.Delete(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]+"-vpa", metav1.DeleteOptions{})
+	err = verticalAutoscalerClient.Delete(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: DummyOperatorId})[1]+"-vpa", metav1.DeleteOptions{})
 	util.Logger.Debug(fmt.Sprintf("deleted autoscaler %s", pipelineId))
 	if err != nil {
 		return
@@ -301,7 +301,7 @@ func (k *Kubernetes) DeleteOperators(pipelineId string, operators []lib.Operator
 
 func (k *Kubernetes) GetPipelineStatus(pipelineId string) (pipeStatus lib.PipelineStatus, err error) {
 	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
-	pipe, err := deploymentsClient.Get(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1], metav1.GetOptions{})
+	pipe, err := deploymentsClient.Get(context.TODO(), getOperatorName(pipelineId, lib.Operator{Id: DummyOperatorId})[1], metav1.GetOptions{})
 	if err != nil {
 		return
 	}

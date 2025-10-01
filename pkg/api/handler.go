@@ -62,7 +62,7 @@ func postPipelines(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) 
 	return http.MethodPost, PipelinesPath, func(c *gin.Context) {
 		var request lib.PipelineStatusRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			util.Logger.Error("error parsing request", "error", err, "method", "POST", "path", PipelinesPath)
+			util.Logger.Error(MessageParseError, "error", err, "method", "POST", "path", PipelinesPath)
 			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
@@ -88,7 +88,7 @@ func postPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodPost, PipelinePath, func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			util.Logger.Error("error parsing request", "error", err, "method", "POST", "path", PipelinePath)
+			util.Logger.Error(MessageParseError, "error", err, "method", "POST", "path", PipelinePath)
 			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
@@ -114,7 +114,7 @@ func putPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodPut, PipelinePath, func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			util.Logger.Error("error parsing request", "error", err, "method", "PUT", "path", PipelinePath)
+			util.Logger.Error(MessageParseError, "error", err, "method", "PUT", "path", PipelinePath)
 			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
