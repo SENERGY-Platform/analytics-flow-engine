@@ -17,6 +17,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"slices"
 	"strconv"
@@ -99,12 +100,19 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (r
 	middleware = append(middleware,
 		requestid.New(requestid.WithCustomHeaderStrKey(HeaderRequestID)),
 		gin_mw.StructRecoveryHandler(util.Logger, gin_mw.DefaultRecoveryFunc),
-		AuthMiddleware(),
 	)
 	r.Use(middleware...)
 	r.UseRawPath = true
 	prefix := r.Group(cfg.URLPrefix)
 	setRoutes, err := routes.Set(*flowEngine, prefix)
+	if err != nil {
+		return nil, err
+	}
+	for _, route := range setRoutes {
+		util.Logger.Debug("http route", attributes.MethodKey, route[0], attributes.PathKey, route[1])
+	}
+	prefix.Use(AuthMiddleware())
+	setRoutes, err = routesAuth.Set(*flowEngine, prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -145,6 +153,8 @@ func getUserId(c *gin.Context) (userId string, err error) {
 				return
 			}
 			userId = claims.Sub
+		} else {
+			err = errors.New("missing authorization and x-userid header")
 		}
 	}
 	return
