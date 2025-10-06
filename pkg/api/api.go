@@ -42,7 +42,7 @@ import (
 
 // CreateServer godoc
 // @title Analytics-Flow-Engine API
-// @version 0.0.52
+// @version 0.0.53
 // @description For the administration of analytics pipelines.
 // @license.name Apache-2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
@@ -99,6 +99,9 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (r
 	)
 	middleware = append(middleware,
 		requestid.New(requestid.WithCustomHeaderStrKey(HeaderRequestID)),
+		gin_mw.ErrorHandler(func(err error) int {
+			return 0
+		}, ", "),
 		gin_mw.StructRecoveryHandler(util.Logger, gin_mw.DefaultRecoveryFunc),
 	)
 	r.Use(middleware...)

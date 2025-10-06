@@ -18,12 +18,14 @@ package lib
 
 import (
 	"errors"
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
+
 	"encoding/json"
+
 	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
