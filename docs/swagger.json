@@ -8,7 +8,7 @@
             "name": "Apache-2.0",
             "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
         },
-        "version": "0.0.55"
+        "version": "0.0.56"
     },
     "basePath": "/",
     "paths": {
@@ -26,7 +26,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/lib.Pipeline"
+                            "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Pipeline"
                         }
                     },
                     "500": {
@@ -50,7 +50,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/lib.Pipeline"
+                            "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Pipeline"
                         }
                     },
                     "500": {
@@ -169,7 +169,7 @@
         }
     },
     "definitions": {
-        "lib.DownstreamConfig": {
+        "github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.DownstreamConfig": {
             "type": "object",
             "properties": {
                 "enabled": {
@@ -183,30 +183,7 @@
                 }
             }
         },
-        "lib.InputSelection": {
-            "type": "object",
-            "properties": {
-                "aspectId": {
-                    "type": "string"
-                },
-                "characteristicIds": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "functionId": {
-                    "type": "string"
-                },
-                "inputName": {
-                    "type": "string"
-                },
-                "selectableId": {
-                    "type": "string"
-                }
-            }
-        },
-        "lib.InputTopic": {
+        "github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.InputTopic": {
             "type": "object",
             "properties": {
                 "filterType": {
@@ -221,7 +198,7 @@
                 "mappings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/lib.Mapping"
+                        "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Mapping"
                     }
                 },
                 "name": {
@@ -229,7 +206,7 @@
                 }
             }
         },
-        "lib.Mapping": {
+        "github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Mapping": {
             "type": "object",
             "properties": {
                 "dest": {
@@ -240,7 +217,7 @@
                 }
             }
         },
-        "lib.Operator": {
+        "github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Operator": {
             "type": "object",
             "properties": {
                 "applicationId": {
@@ -259,7 +236,7 @@
                     "type": "string"
                 },
                 "downstream": {
-                    "$ref": "#/definitions/lib.DownstreamConfig"
+                    "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.DownstreamConfig"
                 },
                 "id": {
                     "type": "string"
@@ -276,7 +253,7 @@
                 "inputTopics": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/lib.InputTopic"
+                        "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.InputTopic"
                     }
                 },
                 "name": {
@@ -292,11 +269,11 @@
                     "type": "boolean"
                 },
                 "upstream": {
-                    "$ref": "#/definitions/lib.UpstreamConfig"
+                    "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.UpstreamConfig"
                 }
             }
         },
-        "lib.Pipeline": {
+        "github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Pipeline": {
             "type": "object",
             "properties": {
                 "consumeAllMessages": {
@@ -326,11 +303,42 @@
                 "operators": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/lib.Operator"
+                        "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Operator"
                     }
                 },
                 "windowTime": {
                     "type": "integer"
+                }
+            }
+        },
+        "github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.UpstreamConfig": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "lib.InputSelection": {
+            "type": "object",
+            "properties": {
+                "aspectId": {
+                    "type": "string"
+                },
+                "characteristicIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "functionId": {
+                    "type": "string"
+                },
+                "inputName": {
+                    "type": "string"
+                },
+                "selectableId": {
+                    "type": "string"
                 }
             }
         },
@@ -359,14 +367,6 @@
                     "items": {
                         "type": "string"
                     }
-                }
-            }
-        },
-        "lib.UpstreamConfig": {
-            "type": "object",
-            "properties": {
-                "enabled": {
-                    "type": "boolean"
                 }
             }
         }

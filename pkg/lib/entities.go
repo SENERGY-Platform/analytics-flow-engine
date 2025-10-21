@@ -146,15 +146,6 @@ type PipelineConfig struct {
 	UserId         string
 }
 
-type Claims struct {
-	Sub         string              `json:"sub,omitempty"`
-	RealmAccess map[string][]string `json:"realm_access,omitempty"`
-}
-
-func (c Claims) Valid() error {
-	return nil
-}
-
 type PipelineStatus struct {
 	Name          string `json:"name,omitempty"`
 	Running       bool   `json:"running"`

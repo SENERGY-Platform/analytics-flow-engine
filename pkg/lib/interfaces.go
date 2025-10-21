@@ -17,11 +17,11 @@
 package lib
 
 import (
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	"github.com/SENERGY-Platform/models/go/models"
 	"github.com/google/uuid"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
+	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 )
 
 type Driver interface {
@@ -37,7 +37,7 @@ type Driver interface {
 }
 
 type ParsingApiService interface {
-	GetPipeline(id string, userId string, authorization string) (p parsing_api.Pipeline, err error)
+	GetPipeline(id string, userId string, authorization string) (p parser.Pipeline, err error)
 }
 
 type PermissionApiService interface {

@@ -18,10 +18,12 @@ package parsing_api
 
 import (
 	"encoding/json"
-	"github.com/parnurzeal/gorequest"
-	"github.com/pkg/errors"
 	"net/http"
 	"strconv"
+
+	parser "github.com/SENERGY-Platform/analytics-parser/lib"
+	"github.com/parnurzeal/gorequest"
+	"github.com/pkg/errors"
 )
 
 type ParsingApi struct {
@@ -32,7 +34,7 @@ func NewParsingApi(url string) *ParsingApi {
 	return &ParsingApi{url}
 }
 
-func (a ParsingApi) GetPipeline(id string, userId string, authorization string) (p Pipeline, err error) {
+func (a ParsingApi) GetPipeline(id string, userId string, authorization string) (p parser.Pipeline, err error) {
 	request := gorequest.New()
 	request.Get(a.url+"/flow/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
 	resp, body, e := request.End()

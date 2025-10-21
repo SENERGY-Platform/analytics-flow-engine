@@ -19,15 +19,15 @@ package lib
 import (
 	"strings"
 
-	parsingApi "github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	deviceLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/devices"
 	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
+	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 	"github.com/SENERGY-Platform/models/go/models"
 	"github.com/google/uuid"
 )
 
-func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
+func createPipeline(parsedPipeline parser.Pipeline) (pipeline Pipeline) {
 	for _, operator := range parsedPipeline.Operators {
 		// TODO error handling
 		var outputTopicName string
@@ -36,7 +36,7 @@ func createPipeline(parsedPipeline parsingApi.Pipeline) (pipeline Pipeline) {
 		} else if operator.DeploymentType == deploymentLocationLib.Cloud {
 			outputTopicName = operatorLib.GenerateCloudOperatorTopic(operator.Name)
 		}
-		
+
 		op := Operator{
 			Id:             operator.Id,
 			ApplicationId:  uuid.New(),
@@ -76,8 +76,8 @@ func createLocalDeviceTopic(deviceID, serviceID, userID, token string, deviceMan
 	if err != nil {
 		return "", localService, err
 	}
-	for _, service := range(deviceType.Services) {
-		serviceID = strings.Replace(serviceID, "_", ":",-1)
+	for _, service := range deviceType.Services {
+		serviceID = strings.Replace(serviceID, "_", ":", -1)
 		if service.Id == serviceID {
 			localService = service
 			break
@@ -87,7 +87,7 @@ func createLocalDeviceTopic(deviceID, serviceID, userID, token string, deviceMan
 	return deviceTopic, localService, nil
 }
 
-func createLocalValuePath(service models.Service, path string) (string) {
+func createLocalValuePath(service models.Service, path string) string {
 	// The path to the selected value is specified by the message structure defined for inside the platform
 	// E.g. devices have an envelope of value.root around the actual device message. This needs to be stripped off
 	// value.root.OBIS -> OBIS for Landys Device Type
@@ -172,4 +172,3 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline, d
 	}
 	return
 }
-

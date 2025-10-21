@@ -26,13 +26,13 @@ import (
 	"strings"
 	"testing"
 
-	parsing_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
+	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 	"github.com/SENERGY-Platform/models/go/models"
 	"github.com/google/uuid"
 )
 
 func TestParser_createPipeline(t *testing.T) {
-	var parsedPipeline parsing_api.Pipeline
+	var parsedPipeline parser.Pipeline
 	err := json.Unmarshal(parseJsonFile("testdata/pipeline1.json", parsedPipeline), &parsedPipeline)
 	if err != nil {
 		fmt.Println(err)
@@ -118,7 +118,6 @@ func TestParser_createPipeline(t *testing.T) {
 }
 
 type MockDeviceManagerService struct {
-
 }
 
 func (m MockDeviceManagerService) GetDevice(deviceID, user, token string) (models.Device, error) {
@@ -238,7 +237,7 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	var parsedPipeline parsing_api.Pipeline
+	var parsedPipeline parser.Pipeline
 	err = json.Unmarshal(parseJsonFile("testdata/pipeline1.json", parsedPipeline), &parsedPipeline)
 	if err != nil {
 		fmt.Println(err)
@@ -360,7 +359,7 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	var parsedPipeline parsing_api.Pipeline
+	var parsedPipeline parser.Pipeline
 	err = json.Unmarshal(parseJsonFile("testdata/pipeline1.json", parsedPipeline), &parsedPipeline)
 	if err != nil {
 		fmt.Println(err)
@@ -508,7 +507,7 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	var parsedPipeline parsing_api.Pipeline
+	var parsedPipeline parser.Pipeline
 	err = json.Unmarshal(parseJsonFile("testdata/pipeline1.json", parsedPipeline), &parsedPipeline)
 	if err != nil {
 		fmt.Println(err)

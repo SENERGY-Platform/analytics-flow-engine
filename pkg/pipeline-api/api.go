@@ -19,11 +19,12 @@ package pipeline_api
 import (
 	"encoding/json"
 	"errors"
+	"net/http"
+	"strconv"
+
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	"github.com/google/uuid"
 	"github.com/parnurzeal/gorequest"
-	"net/http"
-	"strconv"
 )
 
 type PipelineResponse struct {
