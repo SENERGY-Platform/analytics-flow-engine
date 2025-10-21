@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v1"

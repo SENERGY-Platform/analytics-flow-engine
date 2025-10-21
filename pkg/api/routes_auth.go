@@ -17,11 +17,11 @@
 package api
 
 import (
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/service"
 	gin_mw "github.com/SENERGY-Platform/gin-middleware"
 )
 
-var routesAuth = gin_mw.Routes[lib.FlowEngine]{
+var routesAuth = gin_mw.Routes[service.FlowEngine]{
 	getPipeline,
 	postPipeline,
 	postPipelines,

@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package lib
+package service
 
 import (
 	"fmt"
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	"time"
+
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 )
 
 func StringInSlice(a string, list []string) bool {

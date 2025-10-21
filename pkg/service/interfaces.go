@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package lib
+package service
 
 import (
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/models/go/models"
 	"github.com/google/uuid"
 
@@ -25,15 +26,15 @@ import (
 )
 
 type Driver interface {
-	CreateOperators(pipelineId string, input []Operator, pipelineConfig PipelineConfig) error
+	CreateOperators(pipelineId string, input []lib.Operator, pipelineConfig lib.PipelineConfig) error
 	/*
 		DeleteOperator deletes an operator in the given pipeline
 		Deprecated: Use DeleteOperators instead.
 	*/
-	DeleteOperator(pipelineId string, input Operator) error
-	DeleteOperators(pipelineId string, inputs []Operator) error
-	GetPipelineStatus(pipelineId string) (PipelineStatus, error)
-	GetPipelinesStatus() ([]PipelineStatus, error)
+	DeleteOperator(pipelineId string, input lib.Operator) error
+	DeleteOperators(pipelineId string, inputs []lib.Operator) error
+	GetPipelineStatus(pipelineId string) (lib.PipelineStatus, error)
+	GetPipelinesStatus() ([]lib.PipelineStatus, error)
 }
 
 type ParsingApiService interface {
@@ -55,9 +56,9 @@ type DeviceManagerService interface {
 }
 
 type PipelineApiService interface {
-	RegisterPipeline(pipeline *Pipeline, userId string, authorization string) (id uuid.UUID, err error)
-	UpdatePipeline(pipeline *Pipeline, userId string, authorization string) (err error)
-	GetPipeline(id string, userId string, authorization string) (pipe Pipeline, err error)
-	GetPipelines(userId string, authorization string) (pipelines []Pipeline, err error)
+	RegisterPipeline(pipeline *lib.Pipeline, userId string, authorization string) (id uuid.UUID, err error)
+	UpdatePipeline(pipeline *lib.Pipeline, userId string, authorization string) (err error)
+	GetPipeline(id string, userId string, authorization string) (pipe lib.Pipeline, err error)
+	GetPipelines(userId string, authorization string) (pipelines []lib.Pipeline, err error)
 	DeletePipeline(id string, userId string, authorization string) (err error)
 }

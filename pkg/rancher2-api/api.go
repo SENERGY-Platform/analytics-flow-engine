@@ -19,13 +19,14 @@ package rancher2_api
 import (
 	"crypto/tls"
 	"errors"
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 
 	"encoding/json"
 
@@ -264,7 +265,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 		return
 	}
 	if len(e) > 0 {
-		err = lib.ErrSomethingWentWrong
+		err = ErrSomethingWentWrong
 		return
 	}
 
@@ -283,7 +284,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 		return
 	}
 	if len(e) > 0 {
-		err = lib.ErrSomethingWentWrong
+		err = ErrSomethingWentWrong
 		return
 	}
 
@@ -305,7 +306,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 		return
 	}
 	if len(e) > 0 {
-		err = lib.ErrSomethingWentWrong
+		err = ErrSomethingWentWrong
 		return
 	}
 
@@ -332,7 +333,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 			}
 		}
 		if len(e) > 0 {
-			err = lib.ErrSomethingWentWrong
+			err = ErrSomethingWentWrong
 			return
 		}
 	}
@@ -360,7 +361,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		}
 	}
 	if len(e) > 0 {
-		err = lib.ErrSomethingWentWrong
+		err = ErrSomethingWentWrong
 		return
 	}
 
@@ -379,7 +380,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		return
 	}
 	if len(e) > 0 {
-		err = lib.ErrSomethingWentWrong
+		err = ErrSomethingWentWrong
 		return
 	}
 
@@ -403,7 +404,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		return
 	}
 	if len(e) > 0 {
-		err = lib.ErrSomethingWentWrong
+		err = ErrSomethingWentWrong
 		return
 	}
 
@@ -425,7 +426,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 		return
 	}
 	if len(e) > 0 {
-		err = lib.ErrSomethingWentWrong
+		err = ErrSomethingWentWrong
 		return
 	}
 
@@ -465,7 +466,7 @@ func (r *Rancher2) deletePersistentVolumeClaim(name string) (err error) {
 	resp, body, e := request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/persistentVolumeClaims/" +
 		r.r2cfg.NamespaceId + ":" + name).End()
 	if len(e) > 0 {
-		err = lib.ErrSomethingWentWrong
+		err = ErrSomethingWentWrong
 		return
 	}
 	if resp.StatusCode == http.StatusNotFound {

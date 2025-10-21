@@ -27,10 +27,10 @@ import (
 	devicemanager_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/device-manager-api"
 	kafka2mqtt_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
 	kubernetes_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kubernetes-api"
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	permission_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/permission-api"
 	rancher2_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/rancher2-api"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/service"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	gin_mw "github.com/SENERGY-Platform/gin-middleware"
 	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
@@ -47,8 +47,8 @@ import (
 // @license.name Apache-2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 // @BasePath /
-func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (r *gin.Engine, err error) {
-	var driver lib.Driver
+func CreateServer(cfg *config.Config, pipelineService service.PipelineApiService) (r *gin.Engine, err error) {
+	var driver service.Driver
 	switch selectedDriver := cfg.Driver; selectedDriver {
 	case "rancher":
 		driver = rancher2_api.NewRancher2(
@@ -71,7 +71,7 @@ func CreateServer(cfg *config.Config, pipelineService lib.PipelineApiService) (r
 	permission := permission_api.NewPermissionApi(cfg.PermissionApiEndpoint)
 	kafka2mqtt := kafka2mqtt_api.NewKafka2MqttApi(cfg.Kafka2MqttApiEndpoint, &cfg.Mqtt)
 	deviceManager := devicemanager_api.NewDeviceManagerApi(cfg.DeviceManagerApiEndpoint)
-	flowEngine := lib.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService)
+	flowEngine := service.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService)
 
 	port := strconv.FormatInt(int64(cfg.ServerPort), 10)
 	util.Logger.Info("Starting api server at port " + port)

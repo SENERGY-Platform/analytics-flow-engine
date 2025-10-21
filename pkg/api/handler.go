@@ -21,7 +21,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/service"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	"github.com/gin-gonic/gin"
 )
@@ -35,7 +36,7 @@ import (
 // @Success	200 {object} lib.PipelineStatus
 // @Failure	500 {string} str
 // @Router /pipeline/{id} [get]
-func getPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
+func getPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodGet, PipelineIdPath, func(c *gin.Context) {
 		id := c.Param("id")
 		pipelineStatus, err := flowEngine.GetPipelineStatus(id, c.GetString(UserIdKey), c.GetHeader("Authorization"))
@@ -58,7 +59,7 @@ func getPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
 // @Success	200 {array} lib.PipelineStatus
 // @Failure	500 {string} str
 // @Router /pipelines [post]
-func postPipelines(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
+func postPipelines(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodPost, PipelinesPath, func(c *gin.Context) {
 		var request lib.PipelineStatusRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
@@ -84,7 +85,7 @@ func postPipelines(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) 
 // @Success	200 {object} lib.Pipeline
 // @Failure	500 {string} str
 // @Router /pipeline [post]
-func postPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
+func postPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodPost, PipelinePath, func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
@@ -110,7 +111,7 @@ func postPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
 // @Success	200 {object} lib.Pipeline
 // @Failure	500 {string} str
 // @Router /pipeline [put]
-func putPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
+func putPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodPut, PipelinePath, func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
@@ -136,7 +137,7 @@ func putPipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
 // @Success	204
 // @Failure	500 {string} str
 // @Router /pipeline/{id} [delete]
-func deletePipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc) {
+func deletePipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodDelete, PipelineIdPath, func(c *gin.Context) {
 		id := c.Param("id")
 		err := flowEngine.DeletePipeline(id, c.GetString(UserIdKey), c.GetHeader("Authorization"))
@@ -149,13 +150,13 @@ func deletePipeline(flowEngine lib.FlowEngine) (string, string, gin.HandlerFunc)
 	}
 }
 
-func getHealthCheckH(_ lib.FlowEngine) (string, string, gin.HandlerFunc) {
+func getHealthCheckH(_ service.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodGet, HealthCheckPath, func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	}
 }
 
-func getSwaggerDocH(_ lib.FlowEngine) (string, string, gin.HandlerFunc) {
+func getSwaggerDocH(_ service.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodGet, "/doc", func(gc *gin.Context) {
 		if _, err := os.Stat("docs/swagger.json"); err != nil {
 			_ = gc.Error(err)

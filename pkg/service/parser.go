@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package lib
+package service
 
 import (
 	"strings"
 
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	deviceLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/devices"
 	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
@@ -27,7 +28,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func createPipeline(parsedPipeline parser.Pipeline) (pipeline Pipeline) {
+func createPipeline(parsedPipeline parser.Pipeline) (pipeline lib.Pipeline) {
 	for _, operator := range parsedPipeline.Operators {
 		// TODO error handling
 		var outputTopicName string
@@ -37,7 +38,7 @@ func createPipeline(parsedPipeline parser.Pipeline) (pipeline Pipeline) {
 			outputTopicName = operatorLib.GenerateCloudOperatorTopic(operator.Name)
 		}
 
-		op := Operator{
+		op := lib.Operator{
 			Id:             operator.Id,
 			ApplicationId:  uuid.New(),
 			Name:           operator.Name,
@@ -46,17 +47,17 @@ func createPipeline(parsedPipeline parser.Pipeline) (pipeline Pipeline) {
 			DeploymentType: operator.DeploymentType,
 			OutputTopic:    outputTopicName,
 			Cost:           operator.Cost,
-			UpstreamConfig: UpstreamConfig{
+			UpstreamConfig: lib.UpstreamConfig{
 				Enabled: operator.UpstreamConfig.Enabled,
 			},
-			DownstreamConfig: DownstreamConfig{
+			DownstreamConfig: lib.DownstreamConfig{
 				Enabled: operator.DownstreamConfig.Enabled,
 			},
 		}
 		for _, topic := range operator.InputTopics {
-			top := InputTopic{Name: topic.TopicName, FilterType: topic.FilterType, FilterValue: topic.FilterValue}
+			top := lib.InputTopic{Name: topic.TopicName, FilterType: topic.FilterType, FilterValue: topic.FilterValue}
 			for _, mapping := range topic.Mappings {
-				top.Mappings = append(top.Mappings, Mapping{mapping.Dest, mapping.Source})
+				top.Mappings = append(top.Mappings, lib.Mapping{Dest: mapping.Dest, Source: mapping.Source})
 			}
 			op.InputTopics = append(op.InputTopics, top)
 		}
@@ -96,7 +97,10 @@ func createLocalValuePath(_ models.Service, path string) string {
 	return strings.Join(splittedPath[2:], ".")
 }
 
-func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline, deviceManagerService DeviceManagerService, userID, token string) (operators []Operator, err error) {
+func addOperatorConfigs(pipelineRequest lib.PipelineRequest,
+	tmpPipeline lib.Pipeline,
+	deviceManagerService DeviceManagerService,
+	userID, token string) (operators []lib.Operator, err error) {
 	// Add operator configs and input topics of the first operators (input topics of later operators are configured by the parser)
 	operatorIds := make([]string, 0)
 	for _, operator := range tmpPipeline.Operators {
@@ -110,7 +114,7 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline, d
 			}
 
 		}
-		tmpTopics := make([]InputTopic, 0)
+		tmpTopics := make([]lib.InputTopic, 0)
 		for _, indexToKeep := range toKeep {
 			tmpTopics = append(tmpTopics, operator.InputTopics[indexToKeep])
 		}
@@ -146,13 +150,13 @@ func addOperatorConfigs(pipelineRequest PipelineRequest, tmpPipeline Pipeline, d
 								filterType = "ImportId"
 							}
 
-							t := InputTopic{Name: topicName, FilterType: filterType, FilterValue: filterId}
+							t := lib.InputTopic{Name: topicName, FilterType: filterType, FilterValue: filterId}
 							for _, value := range input.Values {
 								valuePath := value.Path
 								if operator.DeploymentType == "local" {
 									valuePath = createLocalValuePath(localService, value.Path)
 								}
-								t.Mappings = append(t.Mappings, Mapping{value.Name, valuePath})
+								t.Mappings = append(t.Mappings, lib.Mapping{Dest: value.Name, Source: valuePath})
 							}
 							operator.InputTopics = append(operator.InputTopics, t)
 						}

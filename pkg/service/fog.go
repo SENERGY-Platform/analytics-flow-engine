@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 
-package lib
+package service
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	"strings"
+
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
@@ -109,7 +111,7 @@ func (f *FogClient) sendTopicsWithEnabledForward(userID string, token string) {
 	}
 }
 
-func convertInputTopics(inputTopics []InputTopic) []operatorLib.InputTopic {
+func convertInputTopics(inputTopics []lib.InputTopic) []operatorLib.InputTopic {
 	var fogInputTopics []operatorLib.InputTopic
 	for _, v := range inputTopics {
 		var fogMappings []operatorLib.Mapping
@@ -127,7 +129,7 @@ func convertInputTopics(inputTopics []InputTopic) []operatorLib.InputTopic {
 	return fogInputTopics
 }
 
-func GenerateFogOperatorStartCommand(operator Operator, pipelineID string, inputTopics []operatorLib.InputTopic) operatorLib.StartOperatorControlCommand {
+func GenerateFogOperatorStartCommand(operator lib.Operator, pipelineID string, inputTopics []operatorLib.InputTopic) operatorLib.StartOperatorControlCommand {
 	return operatorLib.StartOperatorControlCommand{
 		ImageId:        operator.ImageId,
 		InputTopics:    inputTopics,
@@ -141,7 +143,7 @@ func GenerateFogOperatorStartCommand(operator Operator, pipelineID string, input
 	}
 }
 
-func startFogOperator(operator Operator, pipelineConfig PipelineConfig, userID string) error {
+func startFogOperator(operator lib.Operator, pipelineConfig lib.PipelineConfig, userID string) error {
 	inputTopics := convertInputTopics(operator.InputTopics)
 
 	command := GenerateFogOperatorStartCommand(operator, pipelineConfig.PipelineId, inputTopics)
@@ -159,7 +161,7 @@ func startFogOperator(operator Operator, pipelineConfig PipelineConfig, userID s
 	return nil
 }
 
-func stopFogOperator(pipelineId string, operator Operator, userID string) error {
+func stopFogOperator(pipelineId string, operator lib.Operator, userID string) error {
 	command := &operatorLib.StopOperatorControlCommand{
 		OperatorIDs: operatorLib.OperatorIDs{
 			OperatorId:     operator.Id,

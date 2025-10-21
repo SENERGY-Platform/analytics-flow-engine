@@ -29,8 +29,8 @@ import (
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
-	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/lib"
 	pipeline_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/pipeline-api"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/service"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	"github.com/SENERGY-Platform/go-service-base/srv-info-hdl"
 	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
@@ -63,7 +63,7 @@ func main() {
 
 	pipelineService := pipeline_api.NewPipelineApi(cfg.PipelineApiEndpoint)
 
-	err = lib.ConnectMQTTBroker(cfg.Mqtt, pipelineService)
+	err = service.ConnectMQTTBroker(cfg.Mqtt, pipelineService)
 	if err != nil {
 		util.Logger.Error("error connecting to mqtt broker", "error", err)
 		ec = 1
@@ -123,7 +123,7 @@ func main() {
 		}
 
 		util.Logger.Info("closing mqtt connection")
-		lib.CloseMQTTConnection()
+		service.CloseMQTTConnection()
 		util.Logger.Info("mqtt connection closed")
 	}()
 

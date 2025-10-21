@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 InfAI (CC SES)
+ * Copyright 2018 InfAI (CC SES)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,24 +14,7 @@
  * limitations under the License.
  */
 
-package lib
+package service
 
-import (
-	"fmt"
-	"io/ioutil"
-	"os"
-)
-
-func parseJsonFile(path string, object interface{}) []byte {
-	jsonFile, err := os.Open(path)
-	if err != nil {
-		fmt.Println(err)
-	}
-	defer func() {
-		if err := jsonFile.Close(); err != nil {
-			fmt.Println(err)
-		}
-	}()
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-	return byteValue
-}
+const RequestDeviceId = "deviceId"
+const RequestOperatorId = "operatorId"

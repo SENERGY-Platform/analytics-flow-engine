@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package lib
+package service
 
 import (
 	"errors"
@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 
 	"encoding/json"
@@ -51,7 +52,7 @@ func NewFlowEngine(
 	return &FlowEngine{driver, parsingService, permissionService, kafak2mqttService, deviceManagerService, pipelineService}
 }
 
-func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
+func (f *FlowEngine) StartPipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline lib.Pipeline, err error) {
 	err = f.checkAccess(pipelineRequest, token, userId)
 	if err != nil {
 		return
@@ -96,13 +97,13 @@ func (f *FlowEngine) StartPipeline(pipelineRequest PipelineRequest, userId strin
 	return
 }
 
-func addPipelineIDToFogTopic(operators []Operator, pipelineId string) (newOperators []Operator) {
+func addPipelineIDToFogTopic(operators []lib.Operator, pipelineId string) (newOperators []lib.Operator) {
 	// Input and Output Topics are set during parsing where pipeline ID is not available
 	for _, operator := range operators {
 		if operator.DeploymentType == deploymentLocationLib.Local {
 			operator.OutputTopic = operator.OutputTopic + pipelineId
 
-			var inputTopicsWithID []InputTopic
+			var inputTopicsWithID []lib.InputTopic
 			for _, inputTopic := range operator.InputTopics {
 				if inputTopic.FilterType == "OperatorId" {
 					inputTopic.Name += pipelineId
@@ -116,7 +117,7 @@ func addPipelineIDToFogTopic(operators []Operator, pipelineId string) (newOperat
 	return
 }
 
-func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId string, token string) (pipeline Pipeline, err error) {
+func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline lib.Pipeline, err error) {
 	util.Logger.Debug("engine - update pipeline: " + pipelineRequest.Id)
 	err = f.checkAccess(pipelineRequest, token, userId)
 	if err != nil {
@@ -184,7 +185,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest PipelineRequest, userId stri
 	return
 }
 
-func (f *FlowEngine) checkAccess(pipelineRequest PipelineRequest, token string, userId string) (err error) {
+func (f *FlowEngine) checkAccess(pipelineRequest lib.PipelineRequest, token string, userId string) (err error) {
 	deviceIds, operatorIds := getFilterIdsFromPipelineRequest(pipelineRequest)
 	if len(deviceIds) > 0 {
 		hasAccess, e := f.permissionService.UserHasDevicesReadAccess(deviceIds, token)
@@ -227,7 +228,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 	return
 }
 
-func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (status PipelineStatus, err error) {
+func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (status lib.PipelineStatus, err error) {
 	_, err = f.pipelineService.GetPipeline(id, userId, token)
 	if err != nil {
 		return
@@ -236,14 +237,14 @@ func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (status Pipelin
 	return
 }
 
-func (f *FlowEngine) GetPipelinesStatus(ids []string, userId, token string) (status []PipelineStatus, err error) {
+func (f *FlowEngine) GetPipelinesStatus(ids []string, userId, token string) (status []lib.PipelineStatus, err error) {
 	statusTemp, err := f.driver.GetPipelinesStatus()
 	pipes, err := f.pipelineService.GetPipelines(userId, token)
 	if err != nil {
 		return
 	}
 	for _, stat := range statusTemp {
-		idx := slices.IndexFunc(pipes, func(p Pipeline) bool { return "pipeline-"+p.Id.String() == stat.Name })
+		idx := slices.IndexFunc(pipes, func(p lib.Pipeline) bool { return "pipeline-"+p.Id.String() == stat.Name })
 		if idx != -1 {
 			stat.Name = strings.Replace(stat.Name, "pipeline-", "", -1)
 			status = append(status, stat)
@@ -253,7 +254,7 @@ func (f *FlowEngine) GetPipelinesStatus(ids []string, userId, token string) (sta
 		statusTemp = status
 		status = nil
 		for _, id := range ids {
-			idx := slices.IndexFunc(statusTemp, func(t PipelineStatus) bool { return t.Name == id })
+			idx := slices.IndexFunc(statusTemp, func(t lib.PipelineStatus) bool { return t.Name == id })
 			if idx != -1 {
 				status = append(status, statusTemp[idx])
 			}
@@ -262,7 +263,7 @@ func (f *FlowEngine) GetPipelinesStatus(ids []string, userId, token string) (sta
 	return
 }
 
-func seperateOperators(pipeline Pipeline) (localOperators []Operator, cloudOperators []Operator) {
+func seperateOperators(pipeline lib.Pipeline) (localOperators []lib.Operator, cloudOperators []lib.Operator) {
 	for _, operator := range pipeline.Operators {
 		switch operator.DeploymentType {
 		case "local":
@@ -276,7 +277,7 @@ func seperateOperators(pipeline Pipeline) (localOperators []Operator, cloudOpera
 	return
 }
 
-func (f *FlowEngine) stopOperators(pipeline Pipeline, userID, token string) error {
+func (f *FlowEngine) stopOperators(pipeline lib.Pipeline, userID, token string) error {
 	localOperators, cloudOperators := seperateOperators(pipeline)
 	util.Logger.Debug("engine - stop operators for pipeline: "+pipeline.Id.String(), "localOperators", localOperators, "cloudOperators", cloudOperators)
 
@@ -310,7 +311,7 @@ func (f *FlowEngine) stopOperators(pipeline Pipeline, userID, token string) erro
 	return nil
 }
 
-func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig, userID, token string) (newOperators []Operator, err error) {
+func (f *FlowEngine) startOperators(pipeline lib.Pipeline, pipeConfig lib.PipelineConfig, userID, token string) (newOperators []lib.Operator, err error) {
 	localOperators, cloudOperators := seperateOperators(pipeline)
 
 	if len(cloudOperators) > 0 {
@@ -356,14 +357,14 @@ func (f *FlowEngine) startOperators(pipeline Pipeline, pipeConfig PipelineConfig
 	return
 }
 
-func (f *FlowEngine) enableCloudToFogForwarding(operators []Operator, pipelineID, userID, token string) (newOperators []Operator, err error) {
+func (f *FlowEngine) enableCloudToFogForwarding(operators []lib.Operator, pipelineID, userID, token string) (newOperators []lib.Operator, err error) {
 	for _, operator := range operators {
 		if operator.DownstreamConfig.Enabled {
 			util.Logger.Debug("Try to enable Cloud2Fog Forwarding for operator: " + operator.Id)
 			createdInstance, err := f.kafak2mqttService.StartOperatorInstance(operator.Name, operator.Id, pipelineID, userID, token)
 			if err != nil {
 				util.Logger.Error("cannot enable cloud2fog forwarding", "error", err, "operator", operator)
-				return []Operator{}, err
+				return []lib.Operator{}, err
 			}
 			operator.DownstreamConfig.InstanceID = createdInstance.Id
 		}
@@ -373,7 +374,7 @@ func (f *FlowEngine) enableCloudToFogForwarding(operators []Operator, pipelineID
 	return
 }
 
-func (f *FlowEngine) enableFogToCloudForwarding(operator Operator, _, userID string) error {
+func (f *FlowEngine) enableFogToCloudForwarding(operator lib.Operator, _, userID string) error {
 	if operator.UpstreamConfig.Enabled {
 		util.Logger.Debug("Try to enable Fog2Cloud Forwarding for operator: " + operator.Id)
 
@@ -397,7 +398,7 @@ func (f *FlowEngine) enableFogToCloudForwarding(operator Operator, _, userID str
 	return nil
 }
 
-func (f *FlowEngine) disableCloudToFogForwarding(operators []Operator, pipelineID, userID, token string) error {
+func (f *FlowEngine) disableCloudToFogForwarding(operators []lib.Operator, pipelineID, userID, token string) error {
 	for _, operator := range operators {
 		downstreamConfig := operator.DownstreamConfig
 		if downstreamConfig.Enabled {
@@ -419,7 +420,7 @@ func (f *FlowEngine) disableCloudToFogForwarding(operators []Operator, pipelineI
 	return nil
 }
 
-func (f *FlowEngine) disableFogToCloudForwarding(operator Operator, _, userID, _ string) error {
+func (f *FlowEngine) disableFogToCloudForwarding(operator lib.Operator, _, userID, _ string) error {
 	if operator.UpstreamConfig.Enabled {
 		command := &upstreamLib.UpstreamControlMessage{
 			OperatorOutputTopic: operator.OutputTopic,
@@ -440,8 +441,8 @@ func (f *FlowEngine) disableFogToCloudForwarding(operator Operator, _, userID, _
 	return nil
 }
 
-func (f *FlowEngine) createPipelineConfig(pipeline Pipeline) PipelineConfig {
-	var pipeConfig = PipelineConfig{
+func (f *FlowEngine) createPipelineConfig(pipeline lib.Pipeline) lib.PipelineConfig {
+	var pipeConfig = lib.PipelineConfig{
 		WindowTime:     pipeline.WindowTime,
 		MergeStrategy:  pipeline.MergeStrategy,
 		FlowId:         pipeline.FlowId,
@@ -455,7 +456,7 @@ func (f *FlowEngine) createPipelineConfig(pipeline Pipeline) PipelineConfig {
 	return pipeConfig
 }
 
-func getFilterIdsFromPipelineRequest(pipelineRequest PipelineRequest) ([]string, []string) {
+func getFilterIdsFromPipelineRequest(pipelineRequest lib.PipelineRequest) ([]string, []string) {
 	var deviceIds []string
 	var operatorIds []string
 	for _, node := range pipelineRequest.Nodes {
