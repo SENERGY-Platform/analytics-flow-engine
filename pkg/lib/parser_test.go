@@ -120,11 +120,11 @@ func TestParser_createPipeline(t *testing.T) {
 type MockDeviceManagerService struct {
 }
 
-func (m MockDeviceManagerService) GetDevice(deviceID, user, token string) (models.Device, error) {
+func (m MockDeviceManagerService) GetDevice(_, _, _ string) (models.Device, error) {
 	return models.Device{}, nil
 }
 
-func (m MockDeviceManagerService) GetDeviceType(deviceTypeID, user, token string) (models.DeviceType, error) {
+func (m MockDeviceManagerService) GetDeviceType(_, _, _ string) (models.DeviceType, error) {
 	return models.DeviceType{}, nil
 }
 

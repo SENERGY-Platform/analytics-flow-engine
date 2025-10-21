@@ -87,7 +87,7 @@ func createLocalDeviceTopic(deviceID, serviceID, userID, token string, deviceMan
 	return deviceTopic, localService, nil
 }
 
-func createLocalValuePath(service models.Service, path string) string {
+func createLocalValuePath(_ models.Service, path string) string {
 	// The path to the selected value is specified by the message structure defined for inside the platform
 	// E.g. devices have an envelope of value.root around the actual device message. This needs to be stripped off
 	// value.root.OBIS -> OBIS for Landys Device Type

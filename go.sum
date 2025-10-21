@@ -8,12 +8,8 @@ github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migc
 github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=
 github.com/Microsoft/hcsshim v0.12.0 h1:rbICA+XZFwrBef2Odk++0LjFvClNCJGRK+fsrP254Ts=
 github.com/Microsoft/hcsshim v0.12.0/go.mod h1:RZV12pcHCXQ42XnlQ3pz6FZfmrC1C+R4gaOHhRNML1g=
-github.com/SENERGY-Platform/analytics-flow-repo-v2 v0.0.22 h1:3kkn8BhaGmMjSQv6K3dw0fIyhdTXSZIjRRyxmsopoaE=
-github.com/SENERGY-Platform/analytics-flow-repo-v2 v0.0.22/go.mod h1:EZfsGRJ0fwnvHZGNTPFksntspH+7vNbrh2rC2fyBgbA=
 github.com/SENERGY-Platform/analytics-fog-lib v1.1.26 h1:xBS+FwCN0xAw72NQDCT7O7gwcLBR29JzP9SretbmPYo=
 github.com/SENERGY-Platform/analytics-fog-lib v1.1.26/go.mod h1:IbFAOaWXaEkLvNyI9QSq9Mw3PtLCONkrY9WHSpqbDQg=
-github.com/SENERGY-Platform/analytics-parser v0.0.14 h1:+3VmxcvUOwynlvGcanl8Pj0Y5wdsytsLgMd5+MqDTk4=
-github.com/SENERGY-Platform/analytics-parser v0.0.14/go.mod h1:C3iW2vanHAHjBQRibWEXe/9XkxwYEtM97CBBBndJBME=
 github.com/SENERGY-Platform/analytics-parser/lib v0.0.0-20251021081440-4d0efa579954 h1:y2LN43cXqbLlObbvafqBZLMMQkergUwcVGBMTD0INO0=
 github.com/SENERGY-Platform/analytics-parser/lib v0.0.0-20251021081440-4d0efa579954/go.mod h1:DovJYt2AOyc5k4GA4RqbESUC9nrMnnVwjAvgOpJ/Clk=
 github.com/SENERGY-Platform/developer-notifications v0.0.4 h1:SmblhfWavNhE1mDxzrkhmWl2AoPPqKD+7YcZCQ7a5Tg=
