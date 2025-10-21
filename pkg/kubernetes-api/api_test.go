@@ -6,6 +6,7 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
+	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 	"github.com/google/uuid"
 )
 
@@ -46,7 +47,7 @@ func TestKubernetes_CreateOperators(t *testing.T) {
 	}
 	id, _ := uuid.Parse("00000000-0000-0000-0000-000000000000")
 	pipelineId := testPipeId
-	ops := []lib.Operator{
+	ops := []pipe.Operator{
 		{
 			Id:               id.String(),
 			Name:             "test-op-1",
@@ -60,8 +61,8 @@ func TestKubernetes_CreateOperators(t *testing.T) {
 			InputTopics:      nil,
 			InputSelections:  nil,
 			Cost:             0,
-			UpstreamConfig:   lib.UpstreamConfig{},
-			DownstreamConfig: lib.DownstreamConfig{},
+			UpstreamConfig:   pipe.UpstreamConfig{},
+			DownstreamConfig: pipe.DownstreamConfig{},
 		},
 	}
 	err = driver.CreateOperators(pipelineId, ops, lib.PipelineConfig{
@@ -87,7 +88,7 @@ func TestKubernetes_DeleteOperators(t *testing.T) {
 	}
 	pipelineId := testPipeId
 	id, _ := uuid.Parse("00000000-0000-0000-0000-000000000000")
-	ops := []lib.Operator{
+	ops := []pipe.Operator{
 		{
 			Id:               id.String(),
 			Name:             "test-op-1",
@@ -101,8 +102,8 @@ func TestKubernetes_DeleteOperators(t *testing.T) {
 			InputTopics:      nil,
 			InputSelections:  nil,
 			Cost:             0,
-			UpstreamConfig:   lib.UpstreamConfig{},
-			DownstreamConfig: lib.DownstreamConfig{},
+			UpstreamConfig:   pipe.UpstreamConfig{},
+			DownstreamConfig: pipe.DownstreamConfig{},
 		},
 	}
 	err = driver.DeleteOperators(pipelineId, ops)

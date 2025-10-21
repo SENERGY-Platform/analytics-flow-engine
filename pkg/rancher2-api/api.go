@@ -27,6 +27,7 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
+	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 
 	"encoding/json"
 
@@ -105,7 +106,7 @@ func (r *Rancher2) GetPipelinesStatus() (status []lib.PipelineStatus, err error)
 	return
 }
 
-func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
+func (r *Rancher2) CreateOperators(pipelineId string, inputs []pipe.Operator, pipeConfig lib.PipelineConfig) (err error) {
 	var containers []Container
 	var volumes []Volume
 	basePort := 8080
@@ -181,7 +182,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 	time.Sleep(3 * time.Second)
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	reqBody := &WorkloadRequest{
-		Name:        r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1],
+		Name:        r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1],
 		NamespaceId: r.r2cfg.NamespaceId,
 		Volumes:     volumes,
 		Containers:  containers,
@@ -214,14 +215,14 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 		ApiVersion: "autoscaling.k8s.io/v1",
 		Kind:       "VerticalPodAutoscaler",
 		Metadata: AutoscalingRequestMetadata{
-			Name:      r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + "-vpa",
+			Name:      r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1] + "-vpa",
 			Namespace: r.r2cfg.NamespaceId,
 		},
 		Spec: AutoscalingRequestSpec{
 			TargetRef: AutoscalingRequestTargetRef{
 				ApiVersion: "apps/v1",
 				Kind:       "Deployment",
-				Name:       r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1],
+				Name:       r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1],
 			},
 			UpdatePolicy: AutoscalingRequestUpdatePolicy{UpdateMode: "Auto"},
 			ResourcePolicy: ResourcePolicy{
@@ -249,15 +250,15 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []lib.Operator, pip
 	return
 }
 
-func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) (err error) {
+func (r *Rancher2) DeleteOperators(pipelineId string, operators []pipe.Operator) (err error) {
 	//Delete Workload
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e := request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/workloads/deployment:" +
-		r.r2cfg.NamespaceId + ":" + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]).End()
+		r.r2cfg.NamespaceId + ":" + r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1]).End()
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			util.Logger.Error("cannot delete operator " + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + " as it does not exist")
+			util.Logger.Error("cannot delete operator " + r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1] + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator " + body)
@@ -272,11 +273,11 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 	// Delete Service
 	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	resp, body, e = request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/services/" +
-		r.r2cfg.NamespaceId + ":" + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1]).End()
+		r.r2cfg.NamespaceId + ":" + r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1]).End()
 	if resp.StatusCode != http.StatusNoContent {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			util.Logger.Debug("cannot delete operator service " + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + " as it does not exist")
+			util.Logger.Debug("cannot delete operator service " + r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1] + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator service " + body)
@@ -293,12 +294,12 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 	resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers/" +
 		r.r2cfg.NamespaceId +
 		"/" +
-		r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + "-vpa").
+		r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1] + "-vpa").
 		End()
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			util.Logger.Debug("cannot delete operator vpa " + r.getOperatorName(pipelineId, lib.Operator{Id: "v3-123456789"})[1] + "-vpa" + " as it does not exist")
+			util.Logger.Debug("cannot delete operator vpa " + r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1] + "-vpa" + " as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
 			err = errors.New("rancher2 API - could not delete operator vpa " + body)
@@ -341,7 +342,7 @@ func (r *Rancher2) DeleteOperators(pipelineId string, operators []lib.Operator) 
 	return
 }
 
-func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err error) {
+func (r *Rancher2) DeleteOperator(pipelineId string, operator pipe.Operator) (err error) {
 
 	// Delete AutoscalerCheckpoint
 	autoscalerCheckpointId := r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
@@ -433,7 +434,7 @@ func (r *Rancher2) DeleteOperator(pipelineId string, operator lib.Operator) (err
 	return
 }
 
-func (r *Rancher2) getOperatorName(pipelineId string, operator lib.Operator) []string {
+func (r *Rancher2) getOperatorName(pipelineId string, operator pipe.Operator) []string {
 	return []string{"operator-" + pipelineId + "-" + operator.Id[0:8], "pipeline-" + pipelineId}
 }
 

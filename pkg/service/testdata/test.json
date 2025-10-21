@@ -1,0 +1,85 @@
+{
+ "id": "",
+ "createdAt": "0001-01-01T00:00:00Z",
+ "updatedAt": "0001-01-01T00:00:00Z",
+ "UserId": "",
+ "operators": [
+  {
+   "id": "47ef81cb-fa88-45c2-99fe-ac82d57774ba",
+   "name": "adder",
+   "applicationId": "00000000-0000-0000-0000-000000000000",
+   "imageId": "repo/analytics-operator-adder:dev",
+   "deploymentType": "cloud",
+   "operatorId": "5d2da1c0de2c3100015801f3",
+   "outputTopic": "analytics-adder",
+   "inputTopics": [
+    {
+     "name": "analytics-adder",
+     "filterType": "OperatorId",
+     "filterValue": "738dc0c6-91f9-47c0-96d8-3b09c0278837",
+     "mappings": [
+      {
+       "dest": "timestamp",
+       "source": "lastTimestamp"
+      }
+     ]
+    }
+   ],
+   "cost": 0,
+   "upstream": {
+    "Enabled": false
+   },
+   "downstream": {
+    "Enabled": false,
+    "InstanceID": ""
+   }
+  },
+  {
+   "id": "6fc47542-dfee-4d6e-b352-dab9c91e5aed",
+   "name": "adder",
+   "applicationId": "00000000-0000-0000-0000-000000000000",
+   "imageId": "repo/analytics-operator-adder:dev",
+   "deploymentType": "cloud",
+   "operatorId": "5d2da1c0de2c3100015801f3",
+   "outputTopic": "analytics-adder",
+   "inputTopics": [
+    {
+     "name": "analytics-adder",
+     "filterType": "OperatorId",
+     "filterValue": "738dc0c6-91f9-47c0-96d8-3b09c0278837",
+     "mappings": [
+      {
+       "dest": "value",
+       "source": "sum"
+      }
+     ]
+    }
+   ],
+   "cost": 0,
+   "upstream": {
+    "Enabled": false
+   },
+   "downstream": {
+    "Enabled": false,
+    "InstanceID": ""
+   }
+  },
+  {
+   "id": "738dc0c6-91f9-47c0-96d8-3b09c0278837",
+   "name": "adder",
+   "applicationId": "00000000-0000-0000-0000-000000000000",
+   "imageId": "repo/analytics-operator-adder:dev",
+   "deploymentType": "cloud",
+   "operatorId": "5d2da1c0de2c3100015801f3",
+   "outputTopic": "analytics-adder",
+   "cost": 0,
+   "upstream": {
+    "Enabled": false
+   },
+   "downstream": {
+    "Enabled": false,
+    "InstanceID": ""
+   }
+  }
+ ]
+}

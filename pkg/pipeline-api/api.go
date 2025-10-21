@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
+	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 	"github.com/google/uuid"
 	"github.com/parnurzeal/gorequest"
 )
@@ -41,7 +42,7 @@ func NewPipelineApi(url string) *PipelineApi {
 	return &PipelineApi{url}
 }
 
-func (p *PipelineApi) RegisterPipeline(pipeline *lib.Pipeline, userId string, authorization string) (id uuid.UUID, err error) {
+func (p *PipelineApi) RegisterPipeline(pipeline *pipe.Pipeline, userId string, authorization string) (id uuid.UUID, err error) {
 	request := gorequest.New()
 	request.Post(p.url+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization).Send(pipeline)
 	resp, body, e := request.End()
@@ -62,7 +63,7 @@ func (p *PipelineApi) RegisterPipeline(pipeline *lib.Pipeline, userId string, au
 	return
 }
 
-func (p *PipelineApi) UpdatePipeline(pipeline *lib.Pipeline, userId string, authorization string) (err error) {
+func (p *PipelineApi) UpdatePipeline(pipeline *pipe.Pipeline, userId string, authorization string) (err error) {
 	request := gorequest.New()
 	request.Put(p.url+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization).Send(pipeline)
 	resp, body, e := request.End()
@@ -75,7 +76,7 @@ func (p *PipelineApi) UpdatePipeline(pipeline *lib.Pipeline, userId string, auth
 	return
 }
 
-func (p *PipelineApi) GetPipeline(id string, userId string, authorization string) (pipe lib.Pipeline, err error) {
+func (p *PipelineApi) GetPipeline(id string, userId string, authorization string) (pipe pipe.Pipeline, err error) {
 	request := gorequest.New()
 	request.Get(p.url+"/pipeline/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
 	resp, body, e := request.End()
@@ -96,7 +97,7 @@ func (p *PipelineApi) GetPipeline(id string, userId string, authorization string
 	return
 }
 
-func (p *PipelineApi) GetPipelines(userId string, authorization string) (pipelines []lib.Pipeline, err error) {
+func (p *PipelineApi) GetPipelines(userId string, authorization string) (pipelines []pipe.Pipeline, err error) {
 	request := gorequest.New()
 	request.Get(p.url+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization)
 	resp, body, e := request.End()

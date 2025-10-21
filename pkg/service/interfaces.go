@@ -18,6 +18,7 @@ package service
 
 import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
+	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 	"github.com/SENERGY-Platform/models/go/models"
 	"github.com/google/uuid"
 
@@ -26,13 +27,13 @@ import (
 )
 
 type Driver interface {
-	CreateOperators(pipelineId string, input []lib.Operator, pipelineConfig lib.PipelineConfig) error
+	CreateOperators(pipelineId string, input []pipe.Operator, pipelineConfig lib.PipelineConfig) error
 	/*
 		DeleteOperator deletes an operator in the given pipeline
 		Deprecated: Use DeleteOperators instead.
 	*/
-	DeleteOperator(pipelineId string, input lib.Operator) error
-	DeleteOperators(pipelineId string, inputs []lib.Operator) error
+	DeleteOperator(pipelineId string, input pipe.Operator) error
+	DeleteOperators(pipelineId string, inputs []pipe.Operator) error
 	GetPipelineStatus(pipelineId string) (lib.PipelineStatus, error)
 	GetPipelinesStatus() ([]lib.PipelineStatus, error)
 }
@@ -56,9 +57,9 @@ type DeviceManagerService interface {
 }
 
 type PipelineApiService interface {
-	RegisterPipeline(pipeline *lib.Pipeline, userId string, authorization string) (id uuid.UUID, err error)
-	UpdatePipeline(pipeline *lib.Pipeline, userId string, authorization string) (err error)
-	GetPipeline(id string, userId string, authorization string) (pipe lib.Pipeline, err error)
-	GetPipelines(userId string, authorization string) (pipelines []lib.Pipeline, err error)
+	RegisterPipeline(pipeline *pipe.Pipeline, userId string, authorization string) (id uuid.UUID, err error)
+	UpdatePipeline(pipeline *pipe.Pipeline, userId string, authorization string) (err error)
+	GetPipeline(id string, userId string, authorization string) (pipe pipe.Pipeline, err error)
+	GetPipelines(userId string, authorization string) (pipelines []pipe.Pipeline, err error)
 	DeletePipeline(id string, userId string, authorization string) (err error)
 }

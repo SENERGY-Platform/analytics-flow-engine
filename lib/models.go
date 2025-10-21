@@ -17,70 +17,17 @@
 package lib
 
 import (
-	"github.com/google/uuid"
+	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 )
 
 type PipelinesResponse struct {
-	Data  []Pipeline `json:"data,omitempty"`
-	Total int        `json:"total,omitempty"`
-}
-
-type Pipeline struct {
-	Id                 uuid.UUID  `json:"id,omitempty"`
-	FlowId             string     `json:"flowId,omitempty"`
-	Name               string     `json:"name,omitempty"`
-	Description        string     `json:"description,omitempty"`
-	Image              string     `json:"image,omitempty"`
-	WindowTime         int        `json:"windowTime,omitempty"`
-	MergeStrategy      string     `json:"mergeStrategy,omitempty"`
-	ConsumeAllMessages bool       `json:"consumeAllMessages,omitempty"`
-	Metrics            bool       `json:"metrics,omitempty"`
-	Operators          []Operator `json:"operators,omitempty"`
-}
-
-type UpstreamConfig struct {
-	Enabled bool
-}
-
-type DownstreamConfig struct {
-	Enabled    bool
-	InstanceID string
-	ServiceID  string
-}
-
-type Operator struct {
-	Id               string            `json:"id,omitempty"`
-	Name             string            `json:"name,omitempty"`
-	ApplicationId    uuid.UUID         `json:"applicationId,omitempty"`
-	ImageId          string            `json:"imageId,omitempty"`
-	DeploymentType   string            `json:"deploymentType,omitempty"`
-	OperatorId       string            `json:"operatorId,omitempty"`
-	Config           map[string]string `json:"config,omitempty"`
-	OutputTopic      string            `json:"outputTopic,omitempty"`
-	PersistData      bool              `json:"persistData,omitempty"`
-	InputTopics      []InputTopic
-	InputSelections  []InputSelection `json:"inputSelections,omitempty"`
-	Cost             uint             `json:"cost"`
-	UpstreamConfig   UpstreamConfig   `json:"upstream,omitempty"`
-	DownstreamConfig DownstreamConfig `json:"downstream,omitempty"`
+	Data  []pipe.Pipeline `json:"data,omitempty"`
+	Total int             `json:"total,omitempty"`
 }
 
 type OperatorRequestConfig struct {
 	Config      map[string]string `json:"config,omitempty"`
-	InputTopics []InputTopic      `json:"inputTopics,omitempty"`
-}
-
-type InputTopic struct {
-	Name         string    `json:"name,omitempty"`
-	FilterType   string    `json:"filterType,omitempty"`
-	FilterValue  string    `json:"filterValue,omitempty"`
-	FilterValue2 string    `json:"filterValue2,omitempty"`
-	Mappings     []Mapping `json:"mappings,omitempty"`
-}
-
-type Mapping struct {
-	Dest   string `json:"dest,omitempty"`
-	Source string `json:"source,omitempty"`
+	InputTopics []pipe.InputTopic `json:"inputTopics,omitempty"`
 }
 
 type PipelineRequest struct {
@@ -100,24 +47,16 @@ type PipelineStatusRequest struct {
 }
 
 type PipelineNode struct {
-	NodeId          string           `json:"nodeId,omitempty"`
-	Inputs          []NodeInput      `json:"inputs,omitempty"`
-	Config          []NodeConfig     `json:"config,omitempty"`
-	InputSelections []InputSelection `json:"inputSelections,omitempty"`
-	PersistData     bool             `json:"persistData,omitempty"`
+	NodeId          string                `json:"nodeId,omitempty"`
+	Inputs          []NodeInput           `json:"inputs,omitempty"`
+	Config          []NodeConfig          `json:"config,omitempty"`
+	InputSelections []pipe.InputSelection `json:"inputSelections,omitempty"`
+	PersistData     bool                  `json:"persistData,omitempty"`
 }
 
 type NodeConfig struct {
 	Name  string `json:"name,omitempty"`
 	Value string `json:"value,omitempty"`
-}
-
-type InputSelection struct {
-	InputName         string   `json:"inputName,omitempty"`
-	AspectId          string   `json:"aspectId,omitempty"`
-	FunctionId        string   `json:"functionId,omitempty"`
-	CharacteristicIds []string `json:"characteristicIds,omitempty"`
-	SelectableId      string   `json:"selectableId,omitempty"`
 }
 
 type NodeInput struct {

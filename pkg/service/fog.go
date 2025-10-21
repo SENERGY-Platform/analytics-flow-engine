@@ -23,6 +23,7 @@ import (
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
+	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 
 	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
@@ -63,7 +64,7 @@ func (f *FogClient) sendActiveOperators(userID string, token string) {
 		for _, operator := range pipeline.Operators {
 			if operator.DeploymentType == "local" {
 				inputTopics := convertInputTopics(operator.InputTopics)
-				command := GenerateFogOperatorStartCommand(operator, pipeline.Id.String(), inputTopics)
+				command := GenerateFogOperatorStartCommand(operator, pipeline.Id, inputTopics)
 				startCommands = append(startCommands, command)
 			}
 		}
@@ -111,7 +112,7 @@ func (f *FogClient) sendTopicsWithEnabledForward(userID string, token string) {
 	}
 }
 
-func convertInputTopics(inputTopics []lib.InputTopic) []operatorLib.InputTopic {
+func convertInputTopics(inputTopics []pipe.InputTopic) []operatorLib.InputTopic {
 	var fogInputTopics []operatorLib.InputTopic
 	for _, v := range inputTopics {
 		var fogMappings []operatorLib.Mapping
@@ -129,7 +130,7 @@ func convertInputTopics(inputTopics []lib.InputTopic) []operatorLib.InputTopic {
 	return fogInputTopics
 }
 
-func GenerateFogOperatorStartCommand(operator lib.Operator, pipelineID string, inputTopics []operatorLib.InputTopic) operatorLib.StartOperatorControlCommand {
+func GenerateFogOperatorStartCommand(operator pipe.Operator, pipelineID string, inputTopics []operatorLib.InputTopic) operatorLib.StartOperatorControlCommand {
 	return operatorLib.StartOperatorControlCommand{
 		ImageId:        operator.ImageId,
 		InputTopics:    inputTopics,
@@ -143,7 +144,7 @@ func GenerateFogOperatorStartCommand(operator lib.Operator, pipelineID string, i
 	}
 }
 
-func startFogOperator(operator lib.Operator, pipelineConfig lib.PipelineConfig, userID string) error {
+func startFogOperator(operator pipe.Operator, pipelineConfig lib.PipelineConfig, userID string) error {
 	inputTopics := convertInputTopics(operator.InputTopics)
 
 	command := GenerateFogOperatorStartCommand(operator, pipelineConfig.PipelineId, inputTopics)
@@ -161,7 +162,7 @@ func startFogOperator(operator lib.Operator, pipelineConfig lib.PipelineConfig, 
 	return nil
 }
 
-func stopFogOperator(pipelineId string, operator lib.Operator, userID string) error {
+func stopFogOperator(pipelineId string, operator pipe.Operator, userID string) error {
 	command := &operatorLib.StopOperatorControlCommand{
 		OperatorIDs: operatorLib.OperatorIDs{
 			OperatorId:     operator.Id,
