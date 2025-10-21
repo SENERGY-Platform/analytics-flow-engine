@@ -22,7 +22,7 @@ import (
 	"os"
 )
 
-func parseJsonFile(path string, object interface{}) []byte {
+func parseJsonFile(path string, _ interface{}) []byte {
 	jsonFile, err := os.Open(path)
 	if err != nil {
 		fmt.Println(err)

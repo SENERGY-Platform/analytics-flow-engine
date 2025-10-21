@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 	"github.com/SENERGY-Platform/models/go/models"
 	"github.com/google/uuid"
@@ -38,10 +39,10 @@ func TestParser_createPipeline(t *testing.T) {
 		fmt.Println(err)
 	}
 	id, _ := uuid.Parse("00000000-0000-0000-0000-000000000000")
-	var expected = Pipeline{
+	var expected = lib.Pipeline{
 		Id:      id,
 		Metrics: false,
-		Operators: []Operator{
+		Operators: []lib.Operator{
 			{
 				Id:             "6fc47542-dfee-4d6e-b352-dab9c91e5aed",
 				Name:           "adder",
@@ -50,12 +51,12 @@ func TestParser_createPipeline(t *testing.T) {
 				DeploymentType: "cloud",
 				OperatorId:     "5d2da1c0de2c3100015801f3",
 				OutputTopic:    "analytics-adder",
-				InputTopics: []InputTopic{
+				InputTopics: []lib.InputTopic{
 					{
 						Name:        "analytics-adder",
 						FilterType:  "OperatorId",
 						FilterValue: "738dc0c6-91f9-47c0-96d8-3b09c0278837",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "value",
 								Source: "sum",
@@ -72,12 +73,12 @@ func TestParser_createPipeline(t *testing.T) {
 				DeploymentType: "cloud",
 				OperatorId:     "5d2da1c0de2c3100015801f3",
 				OutputTopic:    "analytics-adder",
-				InputTopics: []InputTopic{
+				InputTopics: []lib.InputTopic{
 					{
 						Name:        "analytics-adder",
 						FilterType:  "OperatorId",
 						FilterValue: "738dc0c6-91f9-47c0-96d8-3b09c0278837",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "timestamp",
 								Source: "lastTimestamp",
@@ -102,10 +103,10 @@ func TestParser_createPipeline(t *testing.T) {
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}
-	slices.SortFunc(expected.Operators, func(a, b Operator) int {
+	slices.SortFunc(expected.Operators, func(a, b lib.Operator) int {
 		return strings.Compare(a.Id, b.Id)
 	})
-	slices.SortFunc(pipeline.Operators, func(a, b Operator) int {
+	slices.SortFunc(pipeline.Operators, func(a, b lib.Operator) int {
 		return strings.Compare(a.Id, b.Id)
 	})
 	if !reflect.DeepEqual(expected, pipeline) {
@@ -130,10 +131,10 @@ func (m MockDeviceManagerService) GetDeviceType(_, _, _ string) (models.DeviceTy
 
 func TestParser_addStartingOperatorConfigs(t *testing.T) {
 	id, _ := uuid.Parse("00000000-0000-0000-0000-000000000000")
-	var expected = Pipeline{
+	var expected = lib.Pipeline{
 		Id:      id,
 		Metrics: false,
-		Operators: []Operator{
+		Operators: []lib.Operator{
 			{
 				Id:             "6fc47542-dfee-4d6e-b352-dab9c91e5aed",
 				Name:           "adder",
@@ -141,12 +142,12 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 				DeploymentType: "cloud",
 				OperatorId:     "5d2da1c0de2c3100015801f3",
 				OutputTopic:    "analytics-adder",
-				InputTopics: []InputTopic{
+				InputTopics: []lib.InputTopic{
 					{
 						Name:        "analytics-adder",
 						FilterType:  "OperatorId",
 						FilterValue: "738dc0c6-91f9-47c0-96d8-3b09c0278837",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "value",
 								Source: "sum",
@@ -157,7 +158,7 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 						Name:        "device3",
 						FilterType:  "DeviceId",
 						FilterValue: "3",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "timestamp",
 								Source: "value.root.time",
@@ -173,12 +174,12 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 				DeploymentType: "cloud",
 				OperatorId:     "5d2da1c0de2c3100015801f3",
 				OutputTopic:    "analytics-adder",
-				InputTopics: []InputTopic{
+				InputTopics: []lib.InputTopic{
 					{
 						Name:        "analytics-adder",
 						FilterType:  "OperatorId",
 						FilterValue: "738dc0c6-91f9-47c0-96d8-3b09c0278837",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "timestamp",
 								Source: "lastTimestamp",
@@ -189,7 +190,7 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 						Name:        "device4",
 						FilterType:  "DeviceId",
 						FilterValue: "4",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "value",
 								Source: "value.root.OBIS_16_7.value",
@@ -205,12 +206,12 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 				DeploymentType: "cloud",
 				OperatorId:     "5d2da1c0de2c3100015801f3",
 				OutputTopic:    "analytics-adder",
-				InputTopics: []InputTopic{
+				InputTopics: []lib.InputTopic{
 					{
 						Name:        "device1",
 						FilterType:  "DeviceId",
 						FilterValue: "1",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "timestamp",
 								Source: "value.root.time",
@@ -221,7 +222,7 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 						Name:        "device2",
 						FilterType:  "DeviceId",
 						FilterValue: "2",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "value",
 								Source: "value.root.OBIS_16_7.value",
@@ -232,7 +233,7 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 			},
 		},
 	}
-	var pipelineRequest PipelineRequest
+	var pipelineRequest lib.PipelineRequest
 	err := json.Unmarshal(parseJsonFile("testdata/request1.json", pipelineRequest), &pipelineRequest)
 	if err != nil {
 		fmt.Println(err)
@@ -252,10 +253,10 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}
-	slices.SortFunc(expected.Operators, func(a, b Operator) int {
+	slices.SortFunc(expected.Operators, func(a, b lib.Operator) int {
 		return strings.Compare(a.Id, b.Id)
 	})
-	slices.SortFunc(pipeline.Operators, func(a, b Operator) int {
+	slices.SortFunc(pipeline.Operators, func(a, b lib.Operator) int {
 		return strings.Compare(a.Id, b.Id)
 	})
 	if !reflect.DeepEqual(expected, pipeline) {
@@ -269,10 +270,10 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 
 func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 	id, _ := uuid.Parse("00000000-0000-0000-0000-000000000000")
-	var expected = Pipeline{
+	var expected = lib.Pipeline{
 		Id:      id,
 		Metrics: false,
-		Operators: []Operator{
+		Operators: []lib.Operator{
 			{
 				Id:             "6fc47542-dfee-4d6e-b352-dab9c91e5aed",
 				Name:           "adder",
@@ -280,12 +281,12 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 				DeploymentType: "cloud",
 				OperatorId:     "5d2da1c0de2c3100015801f3",
 				OutputTopic:    "analytics-adder",
-				InputTopics: []InputTopic{
+				InputTopics: []lib.InputTopic{
 					{
 						Name:        "analytics-adder",
 						FilterType:  "OperatorId",
 						FilterValue: "738dc0c6-91f9-47c0-96d8-3b09c0278837",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "value",
 								Source: "sum",
@@ -301,12 +302,12 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 				DeploymentType: "cloud",
 				OperatorId:     "5d2da1c0de2c3100015801f3",
 				OutputTopic:    "analytics-adder",
-				InputTopics: []InputTopic{
+				InputTopics: []lib.InputTopic{
 					{
 						Name:        "analytics-adder",
 						FilterType:  "OperatorId",
 						FilterValue: "738dc0c6-91f9-47c0-96d8-3b09c0278837",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "timestamp",
 								Source: "lastTimestamp",
@@ -322,12 +323,12 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 				DeploymentType: "cloud",
 				OperatorId:     "5d2da1c0de2c3100015801f3",
 				OutputTopic:    "analytics-adder",
-				InputTopics: []InputTopic{
+				InputTopics: []lib.InputTopic{
 					{
 						Name:        "device1",
 						FilterType:  "DeviceId",
 						FilterValue: "1",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "timestamp",
 								Source: "value.root.time",
@@ -338,7 +339,7 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 						Name:        "device2",
 						FilterType:  "DeviceId",
 						FilterValue: "2",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "value",
 								Source: "CHANGED",
@@ -349,12 +350,12 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 			},
 		},
 	}
-	var pipelineRequest PipelineRequest
+	var pipelineRequest lib.PipelineRequest
 	err := json.Unmarshal(parseJsonFile("testdata/request3.json", pipelineRequest), &pipelineRequest)
 	if err != nil {
 		fmt.Println(err)
 	}
-	var pipelineRequest2 PipelineRequest
+	var pipelineRequest2 lib.PipelineRequest
 	err = json.Unmarshal(parseJsonFile("testdata/request3.json", pipelineRequest2), &pipelineRequest2)
 	if err != nil {
 		fmt.Println(err)
@@ -378,10 +379,10 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}
-	slices.SortFunc(expected.Operators, func(a, b Operator) int {
+	slices.SortFunc(expected.Operators, func(a, b lib.Operator) int {
 		return strings.Compare(a.Id, b.Id)
 	})
-	slices.SortFunc(pipeline.Operators, func(a, b Operator) int {
+	slices.SortFunc(pipeline.Operators, func(a, b lib.Operator) int {
 		return strings.Compare(a.Id, b.Id)
 	})
 	if !reflect.DeepEqual(expected, pipeline) {
@@ -395,10 +396,10 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 
 func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 	id, _ := uuid.Parse("00000000-0000-0000-0000-000000000000")
-	var expected = Pipeline{
+	var expected = lib.Pipeline{
 		Id:      id,
 		Metrics: false,
-		Operators: []Operator{
+		Operators: []lib.Operator{
 			{
 				Id:             "6fc47542-dfee-4d6e-b352-dab9c91e5aed",
 				Name:           "adder",
@@ -406,12 +407,12 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 				DeploymentType: "cloud",
 				OperatorId:     "5d2da1c0de2c3100015801f3",
 				OutputTopic:    "analytics-adder",
-				InputTopics: []InputTopic{
+				InputTopics: []lib.InputTopic{
 					{
 						Name:        "analytics-adder",
 						FilterType:  "OperatorId",
 						FilterValue: "738dc0c6-91f9-47c0-96d8-3b09c0278837",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "value",
 								Source: "sum",
@@ -422,7 +423,7 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 						Name:        "device3",
 						FilterType:  "DeviceId",
 						FilterValue: "3",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "timestamp",
 								Source: "value.root.time",
@@ -438,12 +439,12 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 				DeploymentType: "cloud",
 				OperatorId:     "5d2da1c0de2c3100015801f3",
 				OutputTopic:    "analytics-adder",
-				InputTopics: []InputTopic{
+				InputTopics: []lib.InputTopic{
 					{
 						Name:        "analytics-adder",
 						FilterType:  "OperatorId",
 						FilterValue: "738dc0c6-91f9-47c0-96d8-3b09c0278837",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "timestamp",
 								Source: "lastTimestamp",
@@ -454,7 +455,7 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 						Name:        "device4",
 						FilterType:  "DeviceId",
 						FilterValue: "4",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "value",
 								Source: "value.root.OBIS_16_7.value",
@@ -470,12 +471,12 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 				DeploymentType: "cloud",
 				OperatorId:     "5d2da1c0de2c3100015801f3",
 				OutputTopic:    "analytics-adder",
-				InputTopics: []InputTopic{
+				InputTopics: []lib.InputTopic{
 					{
 						Name:        "device1",
 						FilterType:  "DeviceId",
 						FilterValue: "1",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "timestamp",
 								Source: "value.root.time",
@@ -486,7 +487,7 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 						Name:        "device2",
 						FilterType:  "DeviceId",
 						FilterValue: "2",
-						Mappings: []Mapping{
+						Mappings: []lib.Mapping{
 							{
 								Dest:   "value",
 								Source: "CHANGED",
@@ -497,12 +498,12 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 			},
 		},
 	}
-	var pipelineRequest PipelineRequest
+	var pipelineRequest lib.PipelineRequest
 	err := json.Unmarshal(parseJsonFile("testdata/request1.json", pipelineRequest), &pipelineRequest)
 	if err != nil {
 		fmt.Println(err)
 	}
-	var pipelineRequest2 PipelineRequest
+	var pipelineRequest2 lib.PipelineRequest
 	err = json.Unmarshal(parseJsonFile("testdata/request2.json", pipelineRequest2), &pipelineRequest2)
 	if err != nil {
 		fmt.Println(err)
@@ -527,10 +528,10 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = id
 	}
-	slices.SortFunc(expected.Operators, func(a, b Operator) int {
+	slices.SortFunc(expected.Operators, func(a, b lib.Operator) int {
 		return strings.Compare(a.Id, b.Id)
 	})
-	slices.SortFunc(pipeline.Operators, func(a, b Operator) int {
+	slices.SortFunc(pipeline.Operators, func(a, b lib.Operator) int {
 		return strings.Compare(a.Id, b.Id)
 	})
 	if !reflect.DeepEqual(expected, pipeline) {
