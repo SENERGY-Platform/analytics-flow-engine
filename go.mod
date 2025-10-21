@@ -10,6 +10,7 @@ require (
 	github.com/SENERGY-Platform/analytics-flow-engine/lib v0.0.0-00010101000000-000000000000
 	github.com/SENERGY-Platform/analytics-fog-lib v1.1.26
 	github.com/SENERGY-Platform/analytics-parser/lib v0.0.0-20251021082024-01866c0951e0
+	github.com/SENERGY-Platform/analytics-pipeline v0.0.17
 	github.com/SENERGY-Platform/gin-middleware v0.12.0
 	github.com/SENERGY-Platform/go-service-base/config-hdl v1.2.0
 	github.com/SENERGY-Platform/go-service-base/srv-info-hdl v0.2.0
@@ -34,7 +35,6 @@ require (
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
-	github.com/SENERGY-Platform/analytics-pipeline v0.0.17 // indirect
 	github.com/SENERGY-Platform/developer-notifications v0.0.4 // indirect
 	github.com/SENERGY-Platform/go-env-loader v0.5.3 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
