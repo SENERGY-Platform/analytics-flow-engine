@@ -8,31 +8,11 @@
             "name": "Apache-2.0",
             "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
         },
-        "version": "0.0.59"
+        "version": "0.0.60"
     },
     "basePath": "/",
     "paths": {
-      "/url": {
-        "get": {
-          "description": "New endpoint",
-          "responses": {
-            "200": {
-              "description": "New response"
-            }
-          }
-        }
-      },
-      "/url": {
-        "get": {
-          "description": "New endpoint",
-          "responses": {
-            "200": {
-              "description": "New response"
-            }
-          }
-        }
-      },
-      "/pipeline": {
+        "/pipeline": {
             "put": {
                 "description": "Updates a pipeline",
                 "produces": [
@@ -189,11 +169,7 @@
         }
     },
     "definitions": {
-      "NewSchema": {
-        "description": "New schema",
-        "": ""
-      },
-      "github_com_SENERGY-Platform_analytics-pipeline_lib.DownstreamConfig": {
+        "github_com_SENERGY-Platform_analytics-pipeline_lib.DownstreamConfig": {
             "type": "object",
             "properties": {
                 "enabled": {
