@@ -8,11 +8,31 @@
             "name": "Apache-2.0",
             "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
         },
-        "version": "0.0.57"
+        "version": "0.0.59"
     },
     "basePath": "/",
     "paths": {
-        "/pipeline": {
+      "/url": {
+        "get": {
+          "description": "New endpoint",
+          "responses": {
+            "200": {
+              "description": "New response"
+            }
+          }
+        }
+      },
+      "/url": {
+        "get": {
+          "description": "New endpoint",
+          "responses": {
+            "200": {
+              "description": "New response"
+            }
+          }
+        }
+      },
+      "/pipeline": {
             "put": {
                 "description": "Updates a pipeline",
                 "produces": [
@@ -26,7 +46,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Pipeline"
+                            "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-pipeline_lib.Pipeline"
                         }
                     },
                     "500": {
@@ -50,7 +70,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Pipeline"
+                            "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-pipeline_lib.Pipeline"
                         }
                     },
                     "500": {
@@ -169,7 +189,11 @@
         }
     },
     "definitions": {
-        "github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.DownstreamConfig": {
+      "NewSchema": {
+        "description": "New schema",
+        "": ""
+      },
+      "github_com_SENERGY-Platform_analytics-pipeline_lib.DownstreamConfig": {
             "type": "object",
             "properties": {
                 "enabled": {
@@ -177,13 +201,10 @@
                 },
                 "instanceID": {
                     "type": "string"
-                },
-                "serviceID": {
-                    "type": "string"
                 }
             }
         },
-        "github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.InputTopic": {
+        "github_com_SENERGY-Platform_analytics-pipeline_lib.InputTopic": {
             "type": "object",
             "properties": {
                 "filterType": {
@@ -192,13 +213,10 @@
                 "filterValue": {
                     "type": "string"
                 },
-                "filterValue2": {
-                    "type": "string"
-                },
                 "mappings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Mapping"
+                        "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-pipeline_lib.Mapping"
                     }
                 },
                 "name": {
@@ -206,7 +224,7 @@
                 }
             }
         },
-        "github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Mapping": {
+        "github_com_SENERGY-Platform_analytics-pipeline_lib.Mapping": {
             "type": "object",
             "properties": {
                 "dest": {
@@ -217,7 +235,7 @@
                 }
             }
         },
-        "github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Operator": {
+        "github_com_SENERGY-Platform_analytics-pipeline_lib.Operator": {
             "type": "object",
             "properties": {
                 "applicationId": {
@@ -236,7 +254,7 @@
                     "type": "string"
                 },
                 "downstream": {
-                    "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.DownstreamConfig"
+                    "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-pipeline_lib.DownstreamConfig"
                 },
                 "id": {
                     "type": "string"
@@ -253,7 +271,7 @@
                 "inputTopics": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.InputTopic"
+                        "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-pipeline_lib.InputTopic"
                     }
                 },
                 "name": {
@@ -269,15 +287,18 @@
                     "type": "boolean"
                 },
                 "upstream": {
-                    "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.UpstreamConfig"
+                    "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-pipeline_lib.UpstreamConfig"
                 }
             }
         },
-        "github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Pipeline": {
+        "github_com_SENERGY-Platform_analytics-pipeline_lib.Pipeline": {
             "type": "object",
             "properties": {
                 "consumeAllMessages": {
                     "type": "boolean"
+                },
+                "createdAt": {
+                    "type": "string"
                 },
                 "description": {
                     "type": "string"
@@ -303,15 +324,21 @@
                 "operators": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.Operator"
+                        "$ref": "#/definitions/github_com_SENERGY-Platform_analytics-pipeline_lib.Operator"
                     }
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "userId": {
+                    "type": "string"
                 },
                 "windowTime": {
                     "type": "integer"
                 }
             }
         },
-        "github_com_SENERGY-Platform_analytics-flow-engine_pkg_lib.UpstreamConfig": {
+        "github_com_SENERGY-Platform_analytics-pipeline_lib.UpstreamConfig": {
             "type": "object",
             "properties": {
                 "enabled": {
@@ -335,9 +362,11 @@
                     "type": "string"
                 },
                 "inputName": {
+                    "description": "references mapping name",
                     "type": "string"
                 },
                 "selectableId": {
+                    "description": "either device or group. can be used for SNRGY-1172, needed to update devices in group",
                     "type": "string"
                 }
             }

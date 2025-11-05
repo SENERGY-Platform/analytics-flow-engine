@@ -17,12 +17,13 @@
 package util
 
 import (
-	structlogger "github.com/SENERGY-Platform/go-service-base/struct-logger"
 	"log/slog"
 	"os"
 	"runtime/debug"
 	"strings"
 	"time"
+
+	structlogger "github.com/SENERGY-Platform/go-service-base/struct-logger"
 )
 
 var Logger *slog.Logger
@@ -30,8 +31,8 @@ var Logger *slog.Logger
 func InitStructLogger(level string) {
 	if Logger == nil {
 		info, ok := debug.ReadBuildInfo()
-		project := ""
-		org := ""
+		project := "github.com/SENERGY-Platform"
+		org := "analytics-flow-engine"
 		if ok {
 			if parts := strings.Split(info.Main.Path, "/"); len(parts) > 2 {
 				project = strings.Join(parts[2:], "/")

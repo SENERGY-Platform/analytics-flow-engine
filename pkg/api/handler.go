@@ -24,6 +24,8 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/service"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
+	pipeApi "github.com/SENERGY-Platform/analytics-pipeline/lib"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -82,7 +84,7 @@ func postPipelines(flowEngine service.FlowEngine) (string, string, gin.HandlerFu
 // @Description	Starts a pipeline
 // @Tags Pipeline
 // @Produce json
-// @Success	200 {object} lib.Pipeline
+// @Success	200 {object} pipeApi.Pipeline
 // @Failure	500 {string} str
 // @Router /pipeline [post]
 func postPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
@@ -93,6 +95,7 @@ func postPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFun
 			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
+		var pipe pipeApi.Pipeline
 		pipe, err := flowEngine.StartPipeline(request, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not start pipeline", "error", err, "method", "POST", "path", PipelinePath)
@@ -108,7 +111,7 @@ func postPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFun
 // @Description	Updates a pipeline
 // @Tags Pipeline
 // @Produce json
-// @Success	200 {object} lib.Pipeline
+// @Success	200 {object} pipeApi.Pipeline
 // @Failure	500 {string} str
 // @Router /pipeline [put]
 func putPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
@@ -119,6 +122,7 @@ func putPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc
 			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
+		var pipe pipeApi.Pipeline
 		pipe, err := flowEngine.UpdatePipeline(request, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not update pipeline", "error", err, "method", "PUT", "path", PipelinePath)
