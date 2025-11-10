@@ -95,6 +95,10 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []pipe_lib.Operat
 				Value: k.r2cfg.Zookeeper,
 			},
 			{
+				Name:  "CONFIG_BOOTSTRAP_SERVERS",
+				Value: k.r2cfg.KafkaBootstrap,
+			},
+			{
 				Name:  "CONFIG_APPLICATION_ID",
 				Value: "analytics-" + operator.ApplicationId.String(),
 			},

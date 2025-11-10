@@ -31,14 +31,15 @@ type LoggerConfig struct {
 }
 
 type Rancher2Config struct {
-	Endpoint      string `json:"endpoint" env_var:"RANCHER2_ENDPOINT"`
-	AccessKey     string `json:"access_key" env_var:"RANCHER2_ACCESS_KEY"`
-	SecretKey     string `json:"secret_key" env_var:"RANCHER2_SECRET_KEY"`
-	StackId       string `json:"stack_id" env_var:"RANCHER2_STACK_ID"`
-	ProjectId     string `json:"project_id" env_var:"RANCHER2_PROJECT_ID"`
-	NamespaceId   string `json:"namespace_id" env_var:"RANCHER2_NAMESPACE_ID"`
-	StorageDriver string `json:"storage_driver" env_var:"RANCHER2_STORAGE_DRIVER"`
-	Zookeeper     string `json:"zookeeper" env_var:"ZOOKEEPER"`
+	Endpoint       string `json:"endpoint" env_var:"RANCHER2_ENDPOINT"`
+	AccessKey      string `json:"access_key" env_var:"RANCHER2_ACCESS_KEY"`
+	SecretKey      string `json:"secret_key" env_var:"RANCHER2_SECRET_KEY"`
+	StackId        string `json:"stack_id" env_var:"RANCHER2_STACK_ID"`
+	ProjectId      string `json:"project_id" env_var:"RANCHER2_PROJECT_ID"`
+	NamespaceId    string `json:"namespace_id" env_var:"RANCHER2_NAMESPACE_ID"`
+	StorageDriver  string `json:"storage_driver" env_var:"RANCHER2_STORAGE_DRIVER"`
+	Zookeeper      string `json:"zookeeper" env_var:"ZOOKEEPER"`
+	KafkaBootstrap string `json:"kafka_bootstrap" env_var:"KAFKA_BOOTSTRAP"`
 }
 
 type Config struct {
@@ -67,8 +68,10 @@ func New(path string) (*Config, error) {
 		ServerPort: 8000,
 		Debug:      false,
 		Rancher2: Rancher2Config{
-			ProjectId:     "_:_",
-			StorageDriver: "nfs-client",
+			ProjectId:      "_:_",
+			StorageDriver:  "nfs-client",
+			Zookeeper:      "zookeeper.kafka:2181",
+			KafkaBootstrap: "kafka.kafka:9092",
 		},
 	}
 	err := sb_config_hdl.Load(&cfg, nil, envTypeParser, nil, path)

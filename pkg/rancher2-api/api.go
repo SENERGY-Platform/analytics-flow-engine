@@ -115,6 +115,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []pipe.Operator, pi
 		labels := map[string]string{"operatorId": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId, "user": pipeConfig.UserId}
 		env := map[string]string{
 			"ZK_QUORUM":                         r.r2cfg.Zookeeper,
+			"CONFIG_BOOTSTRAP_SERVERS":          r.r2cfg.KafkaBootstrap,
 			"CONFIG_APPLICATION_ID":             "analytics-" + operator.ApplicationId.String(),
 			"PIPELINE_ID":                       pipelineId,
 			"OPERATOR_ID":                       operator.Id,
