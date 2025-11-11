@@ -25,6 +25,7 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
+	k8apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"encoding/json"
 
@@ -219,10 +220,12 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 	}
 	err = f.stopOperators(pipeline, userId, token)
 	if err != nil {
-		return
+		if !k8apierrors.IsNotFound(err) {
+			return
+		}
+	} else {
+		util.Logger.Debug("removed all operators for pipeline: " + id)
 	}
-	util.Logger.Debug("removed all operators for pipeline: " + id)
-
 	err = f.pipelineService.DeletePipeline(id, userId, token)
 	if err != nil {
 		return
