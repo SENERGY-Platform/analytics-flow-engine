@@ -35,7 +35,7 @@ func createPipeline(parsedPipeline parser.Pipeline) (pipeline pipe.Pipeline) {
 		var outputTopicName string
 		if operator.DeploymentType == deploymentLocationLib.Local {
 			outputTopicName = operatorLib.GenerateFogOperatorTopic(operator.Name, operator.Id, "")
-		} else if operator.DeploymentType == deploymentLocationLib.Cloud {
+		} else {
 			outputTopicName = operatorLib.GenerateCloudOperatorTopic(operator.Name)
 		}
 
