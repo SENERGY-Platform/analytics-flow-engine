@@ -6,7 +6,7 @@ go 1.25.0
 
 require (
 	github.com/SENERGY-Platform/analytics-fog-lib v1.1.26
-	github.com/SENERGY-Platform/analytics-parser/lib v0.0.0-20251105142140-3f1f82b825ee
+	github.com/SENERGY-Platform/analytics-parser v0.0.18
 	github.com/SENERGY-Platform/analytics-pipeline v0.0.30
 	github.com/SENERGY-Platform/gin-middleware v0.12.0
 	github.com/SENERGY-Platform/go-service-base/config-hdl v1.2.0

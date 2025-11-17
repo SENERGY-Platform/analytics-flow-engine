@@ -10,8 +10,8 @@ github.com/Microsoft/hcsshim v0.12.0 h1:rbICA+XZFwrBef2Odk++0LjFvClNCJGRK+fsrP25
 github.com/Microsoft/hcsshim v0.12.0/go.mod h1:RZV12pcHCXQ42XnlQ3pz6FZfmrC1C+R4gaOHhRNML1g=
 github.com/SENERGY-Platform/analytics-fog-lib v1.1.26 h1:xBS+FwCN0xAw72NQDCT7O7gwcLBR29JzP9SretbmPYo=
 github.com/SENERGY-Platform/analytics-fog-lib v1.1.26/go.mod h1:IbFAOaWXaEkLvNyI9QSq9Mw3PtLCONkrY9WHSpqbDQg=
-github.com/SENERGY-Platform/analytics-parser/lib v0.0.0-20251105142140-3f1f82b825ee h1:p1En4YcCEUe68Wrnt9Iw3YFJia/Vtl3OkUfMiB6PQYY=
-github.com/SENERGY-Platform/analytics-parser/lib v0.0.0-20251105142140-3f1f82b825ee/go.mod h1:DovJYt2AOyc5k4GA4RqbESUC9nrMnnVwjAvgOpJ/Clk=
+github.com/SENERGY-Platform/analytics-parser v0.0.18 h1:lOx9hjYJ6YOND3uNYDSGSENIyzDxE3ep8yGVBYAjPFQ=
+github.com/SENERGY-Platform/analytics-parser v0.0.18/go.mod h1:eUrczHnWZW2bkkMpmJx6smICkQZijdhl5/c0Qlx6LJI=
 github.com/SENERGY-Platform/analytics-pipeline v0.0.30 h1:fD+FgBWicA1s1Ta8QEfSYkMhrK7iW4UyTgclTxNK9Og=
 github.com/SENERGY-Platform/analytics-pipeline v0.0.30/go.mod h1:nQ+4fu3v5/UFeH6QQ61n8RQ6mthpj8Ov2ue2ck3LOk8=
 github.com/SENERGY-Platform/developer-notifications v0.0.4 h1:SmblhfWavNhE1mDxzrkhmWl2AoPPqKD+7YcZCQ7a5Tg=
