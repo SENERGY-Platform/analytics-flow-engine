@@ -8,7 +8,7 @@
             "name": "Apache-2.0",
             "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
         },
-        "version": "0.0.64"
+        "version": "0.0.65"
     },
     "basePath": "/",
     "paths": {
@@ -177,6 +177,9 @@
                 },
                 "instanceID": {
                     "type": "string"
+                },
+                "serviceID": {
+                    "type": "string"
                 }
             }
         },
@@ -187,6 +190,9 @@
                     "type": "string"
                 },
                 "filterValue": {
+                    "type": "string"
+                },
+                "filterValue2": {
                     "type": "string"
                 },
                 "mappings": {
