@@ -44,7 +44,7 @@ func getPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc
 		pipelineStatus, err := flowEngine.GetPipelineStatus(id, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not get pipeline status", "error", err, "method", "GET", "path", PipelineIdPath)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			_ = c.Error(errors.New(lib.MessageSomethingWrong))
 			return
 		}
 		c.JSON(http.StatusOK, pipelineStatus)
@@ -65,14 +65,14 @@ func postPipelines(flowEngine service.FlowEngine) (string, string, gin.HandlerFu
 	return http.MethodPost, PipelinesPath, func(c *gin.Context) {
 		var request lib.PipelineStatusRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			util.Logger.Error(MessageParseError, "error", err, "method", "POST", "path", PipelinesPath)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			util.Logger.Error(lib.MessageParseError, "error", err, "method", "POST", "path", PipelinesPath)
+			_ = c.Error(errors.New(lib.MessageSomethingWrong))
 			return
 		}
 		pipelinesStatus, err := flowEngine.GetPipelinesStatus(request.Ids, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not get pipelines status", "error", err, "method", "POST", "path", PipelinesPath)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			_ = c.Error(errors.New(lib.MessageSomethingWrong))
 			return
 		}
 		c.JSON(http.StatusOK, pipelinesStatus)
@@ -91,15 +91,15 @@ func postPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFun
 	return http.MethodPost, PipelinePath, func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			util.Logger.Error(MessageParseError, "error", err, "method", "POST", "path", PipelinePath)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			util.Logger.Error(lib.MessageParseError, "error", err, "method", "POST", "path", PipelinePath)
+			_ = c.Error(errors.New(lib.MessageSomethingWrong))
 			return
 		}
 		var pipe pipeApi.Pipeline
 		pipe, err := flowEngine.StartPipeline(request, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not start pipeline", "error", err, "method", "POST", "path", PipelinePath)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			_ = c.Error(errors.New(lib.MessageSomethingWrong))
 			return
 		}
 		c.JSON(http.StatusOK, pipe)
@@ -118,15 +118,15 @@ func putPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc
 	return http.MethodPut, PipelinePath, func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			util.Logger.Error(MessageParseError, "error", err, "method", "PUT", "path", PipelinePath)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			util.Logger.Error(lib.MessageParseError, "error", err, "method", "PUT", "path", PipelinePath)
+			_ = c.Error(errors.New(lib.MessageSomethingWrong))
 			return
 		}
 		var pipe pipeApi.Pipeline
 		pipe, err := flowEngine.UpdatePipeline(request, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not update pipeline", "error", err, "method", "PUT", "path", PipelinePath)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			_ = c.Error(errors.New(lib.MessageSomethingWrong))
 			return
 		}
 		c.JSON(http.StatusOK, pipe)
@@ -139,6 +139,8 @@ func putPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc
 // @Tags Pipeline
 // @Param id path string true "Pipeline ID"
 // @Success	204
+// @Failure 403 {string} lib.MessageForbidden
+// @Failure 404 {string} lib.MessageNotFound
 // @Failure	500 {string} str
 // @Router /pipeline/{id} [delete]
 func deletePipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
@@ -147,7 +149,7 @@ func deletePipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerF
 		err := flowEngine.DeletePipeline(id, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not delete pipeline", "error", err, "method", "DELETE", "path", PipelineIdPath)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			_ = c.Error(handleError(err))
 			return
 		}
 		c.Status(http.StatusNoContent)

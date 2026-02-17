@@ -32,8 +32,6 @@ type PipelineResponse struct {
 	Id uuid.UUID `json:"id,omitempty"`
 }
 
-var ErrNotFound = errors.New("not found")
-
 type PipelineApi struct {
 	url string
 }
@@ -84,7 +82,11 @@ func (p *PipelineApi) GetPipeline(id string, userId string, authorization string
 		return pipe, errors.New("pipeline API - could not get pipeline from pipeline registry: an error occurred")
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		return pipe, ErrNotFound
+		return pipe, lib.NewNotFoundError(errors.New(lib.MessageNotFound))
+	}
+	if resp.StatusCode == http.StatusForbidden {
+		err = lib.NewForbiddenError(lib.NewNotFoundError(errors.New(lib.MessageForbidden)))
+		return
 	}
 	if resp.StatusCode != 200 {
 		return pipe, errors.New("pipeline API - could not get pipeline from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
@@ -106,7 +108,11 @@ func (p *PipelineApi) GetPipelines(userId string, authorization string) (pipelin
 		return
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		err = ErrNotFound
+		err = lib.NewNotFoundError(lib.NewNotFoundError(errors.New(lib.MessageNotFound)))
+		return
+	}
+	if resp.StatusCode == http.StatusForbidden {
+		err = lib.NewForbiddenError(lib.NewNotFoundError(errors.New(lib.MessageForbidden)))
 		return
 	}
 	if resp.StatusCode != 200 {

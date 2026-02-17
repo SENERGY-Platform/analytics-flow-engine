@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 InfAI (CC SES)
+ * Copyright 2026 InfAI (CC SES)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,31 @@
  * limitations under the License.
  */
 
-package api
+package util
 
-const (
-	HeaderRequestID = "X-Request-ID"
-	UserIdKey       = "UserId"
+import (
+	"errors"
+	"net/http"
+
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 )
 
-const (
-	HealthCheckPath = "/health-check"
-	PipelineIdPath  = "/pipeline/:id"
-	PipelinesPath   = "/pipelines"
-	PipelinePath    = "/pipeline"
-)
+func GetStatusCode(err error) int {
+	var nfe *lib.NotFoundError
+	if errors.As(err, &nfe) {
+		return http.StatusNotFound
+	}
+	var pe *lib.InputError
+	if errors.As(err, &pe) {
+		return http.StatusBadRequest
+	}
+	var ie *lib.InternalError
+	if errors.As(err, &ie) {
+		return http.StatusInternalServerError
+	}
+	var fe *lib.ForbiddenError
+	if errors.As(err, &fe) {
+		return http.StatusForbidden
+	}
+	return 0
+}

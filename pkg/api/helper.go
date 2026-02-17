@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 InfAI (CC SES)
+ * Copyright 2026 InfAI (CC SES)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,21 @@
 
 package api
 
-const (
-	HeaderRequestID = "X-Request-ID"
-	UserIdKey       = "UserId"
+import (
+	"errors"
+
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 )
 
-const (
-	HealthCheckPath = "/health-check"
-	PipelineIdPath  = "/pipeline/:id"
-	PipelinesPath   = "/pipelines"
-	PipelinePath    = "/pipeline"
-)
+func handleError(err error) error {
+	var ie *lib.ForbiddenError
+	var fe *lib.NotFoundError
+	if errors.As(err, &ie) {
+		err = lib.NewForbiddenError(errors.New(lib.MessageForbidden))
+	} else if errors.As(err, &fe) {
+		err = lib.NewNotFoundError(errors.New(lib.MessageNotFound))
+	} else {
+		err = lib.NewInternalError(errors.New(lib.MessageSomethingWrong))
+	}
+	return err
+}
