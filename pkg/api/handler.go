@@ -36,6 +36,8 @@ import (
 // @Produce json
 // @Param id path string true "Pipeline ID"
 // @Success	200 {object} lib.PipelineStatus
+// @Failure 403 {string} lib.MessageForbidden
+// @Failure 404 {string} lib.MessageNotFound
 // @Failure	500 {string} str
 // @Router /pipeline/{id} [get]
 func getPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
@@ -44,7 +46,7 @@ func getPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc
 		pipelineStatus, err := flowEngine.GetPipelineStatus(id, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not get pipeline status", "error", err, "method", "GET", "path", PipelineIdPath)
-			_ = c.Error(errors.New(lib.MessageSomethingWrong))
+			_ = c.Error(handleError(err))
 			return
 		}
 		c.JSON(http.StatusOK, pipelineStatus)
