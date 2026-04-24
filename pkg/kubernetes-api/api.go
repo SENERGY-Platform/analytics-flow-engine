@@ -354,8 +354,13 @@ func (k *Kubernetes) makePVC(name string, size string) *apiv1.PersistentVolumeCl
 					apiv1.ResourceStorage: resource.MustParse(size),
 				},
 			},
-			StorageClassName: k.r2cfg.StorageDriver,
-			VolumeMode:       &fs,
+			StorageClassName: func() *string {
+				if k.r2cfg.StorageDriver != nil && *k.r2cfg.StorageDriver != "" {
+					return k.r2cfg.StorageDriver
+				}
+				return nil
+			}(),
+			VolumeMode: &fs,
 		},
 	}
 	return &pvc
