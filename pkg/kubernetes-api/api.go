@@ -224,7 +224,7 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []pipe_lib.Operat
 	util.Logger.Debug(fmt.Sprintf("created deployment %s", result.GetObjectMeta().GetName()))
 
 	// Create Vertical Pod Autoscaler
-	updateAutoMode := v1.UpdateModeAuto
+	updateAutoMode := v1.UpdateModeRecreate
 	vpa := &v1.VerticalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1] + "-vpa",
