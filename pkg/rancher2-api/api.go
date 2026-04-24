@@ -446,7 +446,7 @@ func (r *Rancher2) createPersistentVolumeClaim(name string) (err error) {
 		NamespaceId:    r.r2cfg.NamespaceId,
 		AccessModes:    []string{"ReadWriteOnce"},
 		Resources:      Resources{Requests: map[string]string{"storage": "50M"}},
-		StorageClassId: r.r2cfg.StorageDriver,
+		StorageClassId: *r.r2cfg.StorageDriver,
 	}
 	resp, body, e := request.Post(r.url + "projects/" + r.r2cfg.ProjectId + "/persistentvolumeclaims").Send(reqBody).End()
 	if len(e) > 0 {
