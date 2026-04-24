@@ -342,7 +342,6 @@ func getOperatorName(pipelineId string, operator pipe_lib.Operator) []string {
 
 func (k *Kubernetes) makePVC(name string, size string) *apiv1.PersistentVolumeClaim {
 	fs := apiv1.PersistentVolumeFilesystem
-	storageClass := k.r2cfg.StorageDriver
 	pvc := apiv1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -355,7 +354,7 @@ func (k *Kubernetes) makePVC(name string, size string) *apiv1.PersistentVolumeCl
 					apiv1.ResourceStorage: resource.MustParse(size),
 				},
 			},
-			StorageClassName: &storageClass,
+			StorageClassName: k.r2cfg.StorageDriver,
 			VolumeMode:       &fs,
 		},
 	}
