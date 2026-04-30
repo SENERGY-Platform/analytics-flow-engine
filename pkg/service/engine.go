@@ -18,6 +18,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -191,61 +192,48 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId 
 	return
 }
 
-func (f *FlowEngine) checkAccess(pipelineRequest lib.PipelineRequest, operators map[string]parser.Operator, token string) (err error) {
+func (f *FlowEngine) checkAccess(pipelineRequest lib.PipelineRequest, operators map[string]parser.Operator, token string) error {
 	deviceIds, _, pipelineIds, importIds := getFilterIdsFromPipelineRequest(pipelineRequest)
-	hasAccess, e := f.permissionService.UserHasExecuteAccess(PermissionResourceFlows, []string{pipelineRequest.FlowId}, token)
-	if e != nil {
-		return e
+
+	checks := []struct {
+		resource string
+		ids      []string
+		msg      string
+	}{
+		{PermissionResourceFlows, []string{pipelineRequest.FlowId}, "flow: " + pipelineRequest.FlowId},
+		{PermissionResourceDevices, deviceIds, "one or more devices"},
+		{PermissionResourceAnalyticsPipelines, pipelineIds, "one or more pipelines"},
+		{PermissionResourceImports, importIds, "one or more imports"},
 	}
-	if !hasAccess {
-		e = errors.New("engine - user does not have the rights to execute the flow: " + pipelineRequest.FlowId)
-		return e
-	}
-	if len(deviceIds) > 0 {
-		hasAccess, e = f.permissionService.UserHasExecuteAccess(PermissionResourceDevices, deviceIds, token)
-		if e != nil {
-			return e
+
+	for _, c := range checks {
+		if len(c.ids) == 0 {
+			continue
 		}
-		if !hasAccess {
-			e = errors.New("engine - user does not have the rights to execute one or more devices")
-			return e
+		ok, err := f.permissionService.UserHasExecuteAccess(c.resource, c.ids, token)
+		if err != nil {
+			return err
 		}
-	}
-	if len(pipelineIds) > 0 {
-		hasAccess, e = f.permissionService.UserHasExecuteAccess(PermissionResourceAnalyticsPipelines, pipelineIds, token)
-		if e != nil {
-			return e
-		}
-		if !hasAccess {
-			e = errors.New("engine - user does not have the rights to execute one or more pipelines")
-			return e
+		if !ok {
+			return fmt.Errorf("engine - user does not have the rights to execute %s", c.msg)
 		}
 	}
-	if len(importIds) > 0 {
-		hasAccess, e = f.permissionService.UserHasExecuteAccess(PermissionResourceImports, pipelineIds, token)
-		if e != nil {
-			return e
-		}
-		if !hasAccess {
-			e = errors.New("engine - user does not have the rights to execute one or more imports")
-			return e
-		}
-	}
+
 	if len(operators) > 0 {
-		var operatorIds []string
-		for _, operator := range operators {
-			operatorIds = append(operatorIds, operator.OperatorId)
+		operatorIds := make([]string, 0, len(operators))
+		for _, op := range operators {
+			operatorIds = append(operatorIds, op.OperatorId)
 		}
-		hasAccess, e = f.permissionService.UserHasExecuteAccess(PermissionResourceOperators, operatorIds, token)
-		if e != nil {
-			return e
+		ok, err := f.permissionService.UserHasExecuteAccess(PermissionResourceOperators, operatorIds, token)
+		if err != nil {
+			return err
 		}
-		if !hasAccess {
-			e = errors.New("engine - user does not have the rights to execute one or more operators")
-			return e
+		if !ok {
+			return errors.New("engine - user does not have the rights to execute one or more operators")
 		}
 	}
-	return
+
+	return nil
 }
 
 func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err error) {
