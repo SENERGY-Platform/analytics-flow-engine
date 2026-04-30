@@ -18,3 +18,10 @@ package service
 
 const RequestDeviceId = "deviceId"
 const RequestOperatorId = "operatorId"
+const RequestImportId = "ImportId"
+
+const PermissionResourceDevices = "devices"
+const PermissionResourceAnalyticsPipelines = "analytics-pipelines"
+const PermissionResourceOperators = "analytics-operators"
+const PermissionResourceFlows = "analytics-flows"
+const PermissionResourceImports = "imports"

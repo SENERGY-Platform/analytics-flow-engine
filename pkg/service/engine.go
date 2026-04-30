@@ -24,6 +24,7 @@ import (
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
+	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 	k8apierrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -55,12 +56,12 @@ func NewFlowEngine(
 }
 
 func (f *FlowEngine) StartPipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline pipe.Pipeline, err error) {
-	err = f.checkAccess(pipelineRequest, token, userId)
+	//Get parsed pipeline
+	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, token)
 	if err != nil {
 		return
 	}
-	//Get parsed pipeline
-	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, token)
+	err = f.checkAccess(pipelineRequest, parsedPipeline.Operators, token)
 	if err != nil {
 		return
 	}
@@ -122,7 +123,11 @@ func addPipelineIDToFogTopic(operators []pipe.Operator, pipelineId string) (newO
 
 func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline pipe.Pipeline, err error) {
 	util.Logger.Debug("engine - update pipeline: " + pipelineRequest.Id)
-	err = f.checkAccess(pipelineRequest, token, userId)
+	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, token)
+	if err != nil {
+		return
+	}
+	err = f.checkAccess(pipelineRequest, parsedPipeline.Operators, token)
 	if err != nil {
 		return
 	}
@@ -130,6 +135,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId 
 	if err != nil {
 		return
 	}
+
 	configuredOperators, err := addOperatorConfigs(pipelineRequest, pipeline, f.deviceManagerService, userId, token)
 	if err != nil {
 		return
@@ -145,9 +151,6 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId 
 		util.Logger.Error("cant stop operators", "error", err)
 		return
 	}
-
-	// give the backend some time to delete the operators
-	time.Sleep(15 * time.Second)
 
 	missingUuid, _ := uuid.FromBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
 	for index := range pipeline.Operators {
@@ -188,25 +191,58 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId 
 	return
 }
 
-func (f *FlowEngine) checkAccess(pipelineRequest lib.PipelineRequest, token string, userId string) (err error) {
-	deviceIds, operatorIds := getFilterIdsFromPipelineRequest(pipelineRequest)
+func (f *FlowEngine) checkAccess(pipelineRequest lib.PipelineRequest, operators map[string]parser.Operator, token string) (err error) {
+	deviceIds, _, pipelineIds, importIds := getFilterIdsFromPipelineRequest(pipelineRequest)
+	hasAccess, e := f.permissionService.UserHasExecuteAccess(PermissionResourceFlows, []string{pipelineRequest.FlowId}, token)
+	if e != nil {
+		return e
+	}
+	if !hasAccess {
+		e = errors.New("engine - user does not have the rights to execute the flow: " + pipelineRequest.FlowId)
+		return e
+	}
 	if len(deviceIds) > 0 {
-		hasAccess, e := f.permissionService.UserHasDevicesReadAccess(deviceIds, token)
+		hasAccess, e = f.permissionService.UserHasExecuteAccess(PermissionResourceDevices, deviceIds, token)
 		if e != nil {
 			return e
 		}
 		if !hasAccess {
-			e = errors.New("engine - user does not have the rights to access the devices")
+			e = errors.New("engine - user does not have the rights to execute one or more devices")
 			return e
 		}
 	}
-	if len(operatorIds) > 0 {
-		for _, operatorId := range operatorIds {
-			_, e := f.pipelineService.GetPipeline(strings.Split(operatorId, ":")[1], userId, token)
-			if e != nil {
-				e = errors.New("engine - user does not have the rights to access the pipeline: " + strings.Split(operatorId, ":")[1])
-				return e
-			}
+	if len(pipelineIds) > 0 {
+		hasAccess, e = f.permissionService.UserHasExecuteAccess(PermissionResourceAnalyticsPipelines, pipelineIds, token)
+		if e != nil {
+			return e
+		}
+		if !hasAccess {
+			e = errors.New("engine - user does not have the rights to execute one or more pipelines")
+			return e
+		}
+	}
+	if len(importIds) > 0 {
+		hasAccess, e = f.permissionService.UserHasExecuteAccess(PermissionResourceImports, pipelineIds, token)
+		if e != nil {
+			return e
+		}
+		if !hasAccess {
+			e = errors.New("engine - user does not have the rights to execute one or more imports")
+			return e
+		}
+	}
+	if len(operators) > 0 {
+		var operatorIds []string
+		for _, operator := range operators {
+			operatorIds = append(operatorIds, operator.OperatorId)
+		}
+		hasAccess, e = f.permissionService.UserHasExecuteAccess(PermissionResourceOperators, operatorIds, token)
+		if e != nil {
+			return e
+		}
+		if !hasAccess {
+			e = errors.New("engine - user does not have the rights to execute one or more operators")
+			return e
 		}
 	}
 	return
@@ -461,22 +497,27 @@ func (f *FlowEngine) createPipelineConfig(pipeline pipe.Pipeline) lib.PipelineCo
 	return pipeConfig
 }
 
-func getFilterIdsFromPipelineRequest(pipelineRequest lib.PipelineRequest) ([]string, []string) {
-	var deviceIds []string
-	var operatorIds []string
+func getFilterIdsFromPipelineRequest(pipelineRequest lib.PipelineRequest) (deviceIds []string, operatorIds []string, pipelineIds []string, importIds []string) {
 	for _, node := range pipelineRequest.Nodes {
 		for _, input := range node.Inputs {
-			if input.FilterType == RequestDeviceId {
-				stringSlice := strings.Split(input.FilterIds, ",")
-				deviceIds = append(deviceIds, stringSlice...)
+			ids := strings.Split(input.FilterIds, ",")
+			switch input.FilterType {
+			case RequestDeviceId:
+				deviceIds = append(deviceIds, ids...)
+			case RequestImportId:
+				importIds = append(importIds, ids...)
+			case RequestOperatorId:
+				for _, v := range ids {
+					parts := strings.SplitN(strings.TrimSpace(v), ":", 2)
+					if len(parts) != 2 {
+						util.Logger.Warn("malformed operator filter ID: " + v)
+						continue
+					}
+					operatorIds = append(operatorIds, parts[0])
+					pipelineIds = append(pipelineIds, parts[1])
+				}
 			}
-			if input.FilterType == RequestOperatorId {
-				stringSlice := strings.Split(input.FilterIds, ",")
-				operatorIds = append(operatorIds, stringSlice...)
-			}
-
 		}
-
 	}
-	return deviceIds, operatorIds
+	return
 }

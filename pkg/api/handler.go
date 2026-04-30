@@ -100,7 +100,8 @@ func postPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFun
 		var pipe pipeApi.Pipeline
 		pipe, err := flowEngine.StartPipeline(request, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
-			util.Logger.Error("could not start pipeline", "error", err, "method", "POST", "path", PipelinePath)
+			util.Logger.Error("could not start pipeline",
+				"error", err, "method", "POST", "path", PipelinePath, "flowId", request.FlowId, "user", c.GetString(UserIdKey))
 			_ = c.Error(errors.New(lib.MessageSomethingWrong))
 			return
 		}
@@ -127,8 +128,9 @@ func putPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc
 		var pipe pipeApi.Pipeline
 		pipe, err := flowEngine.UpdatePipeline(request, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
-			util.Logger.Error("could not update pipeline", "error", err, "method", "PUT", "path", PipelinePath)
-			_ = c.Error(errors.New(lib.MessageSomethingWrong))
+			util.Logger.Error("could not update pipeline",
+				"error", err, "method", "PUT", "path", PipelinePath, "pipelineId", request.Id, "user", c.GetString(UserIdKey))
+			_ = c.Error(handleError(err))
 			return
 		}
 		c.JSON(http.StatusOK, pipe)

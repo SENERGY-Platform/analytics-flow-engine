@@ -29,8 +29,8 @@ func NewPermissionApi(url string) *PermissionApi {
 	return &PermissionApi{url: url, c: client.New(url)}
 }
 
-func (a PermissionApi) UserHasDevicesReadAccess(ids []string, authorization string) (result bool, err error) {
-	response, err, _ := a.c.CheckMultiplePermissions(authorization, "devices", ids, client.Read)
+func (a PermissionApi) UserHasExecuteAccess(resource string, ids []string, authorization string) (result bool, err error) {
+	response, err, _ := a.c.CheckMultiplePermissions(authorization, resource, ids, client.Execute)
 	if err != nil {
 		return false, err
 	}

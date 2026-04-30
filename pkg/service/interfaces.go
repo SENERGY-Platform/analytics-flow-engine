@@ -43,7 +43,7 @@ type ParsingApiService interface {
 }
 
 type PermissionApiService interface {
-	UserHasDevicesReadAccess(ids []string, authorization string) (bool, error)
+	UserHasExecuteAccess(resource string, ids []string, authorization string) (bool, error)
 }
 
 type Kafka2MqttApiService interface {

@@ -25,3 +25,11 @@ var routes = gin_mw.Routes[service.FlowEngine]{
 	getHealthCheckH,
 	getSwaggerDocH,
 }
+
+var routesAuth = gin_mw.Routes[service.FlowEngine]{
+	getPipeline,
+	postPipeline,
+	postPipelines,
+	putPipeline,
+	deletePipeline,
+}
