@@ -56,7 +56,7 @@ func NewFlowEngine(
 	return &FlowEngine{driver, parsingService, permissionService, kafak2mqttService, deviceManagerService, pipelineService}
 }
 
-func (f *FlowEngine) StartPipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline pipe.Pipeline, err error) {
+func (f *FlowEngine) StartPipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline *pipe.Pipeline, err error) {
 	//Get parsed pipeline
 	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, token)
 	if err != nil {
@@ -64,8 +64,9 @@ func (f *FlowEngine) StartPipeline(pipelineRequest lib.PipelineRequest, userId s
 	}
 	err = f.checkAccess(pipelineRequest, parsedPipeline.Operators, token)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("engine - checkAccess: %s", err)
 	}
+	pipeline = &pipe.Pipeline{}
 	pipeline.FlowId = parsedPipeline.FlowId
 	pipeline.Image = parsedPipeline.Image
 	pipeline.WindowTime = pipelineRequest.WindowTime
@@ -80,21 +81,21 @@ func (f *FlowEngine) StartPipeline(pipelineRequest lib.PipelineRequest, userId s
 		return
 	}
 	pipeline.Operators = configuredOperators
-	id, err := f.pipelineService.RegisterPipeline(&pipeline, userId, token)
+	id, err := f.pipelineService.RegisterPipeline(pipeline, userId, token)
 	if err != nil {
 		return
 	}
 	pipeline.Id = id.String()
 	pipeline.Operators = addPipelineIDToFogTopic(pipeline.Operators, pipeline.Id)
 	pipeline.Metrics = pipelineRequest.Metrics
-	pipeConfig := f.createPipelineConfig(pipeline)
+	pipeConfig := f.createPipelineConfig(*pipeline)
 	pipeConfig.UserId = userId
-	newOperators, err := f.startOperators(pipeline, pipeConfig, userId, token)
+	newOperators, err := f.startOperators(*pipeline, pipeConfig, userId, token)
 	if err != nil {
 		return
 	}
 	pipeline.Operators = newOperators
-	err = f.pipelineService.UpdatePipeline(&pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
+	err = f.pipelineService.UpdatePipeline(pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
 	if err != nil {
 		util.Logger.Error("cant update pipeline", "error", err)
 	}

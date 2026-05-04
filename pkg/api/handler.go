@@ -97,7 +97,7 @@ func postPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFun
 			_ = c.Error(errors.New(lib.MessageSomethingWrong))
 			return
 		}
-		var pipe pipeApi.Pipeline
+		var pipe *pipeApi.Pipeline
 		pipe, err := flowEngine.StartPipeline(request, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not start pipeline",
