@@ -16,14 +16,6 @@
 
 package lib
 
-const (
-	MessageSomethingWrong = "something went wrong"
-	MessageNotFound       = "not found"
-	MessageParseError     = "failed to parse request"
-	MessageForbidden      = "forbidden"
-	MessageBadInput       = "bad input"
-)
-
 type cError struct {
 	err error
 }

@@ -27,3 +27,12 @@ const (
 	PipelinesPath   = "/pipelines"
 	PipelinePath    = "/pipeline"
 )
+
+const (
+	MessageSomethingWrong = "something went wrong"
+	MessageNotFound       = "not found"
+	MessageUnauthorized   = "unauthorized"
+	MessageParseError     = "failed to parse request"
+	MessageForbidden      = "forbidden"
+	MessageBadInput       = "bad input"
+)

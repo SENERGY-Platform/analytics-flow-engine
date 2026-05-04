@@ -19,6 +19,7 @@ package pipeline_api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -82,10 +83,10 @@ func (p *PipelineApi) GetPipeline(id string, userId string, authorization string
 		return pipe, errors.New("pipeline API - could not get pipeline from pipeline registry: an error occurred")
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		return pipe, lib.NewNotFoundError(errors.New(lib.MessageNotFound))
+		return pipe, lib.NewNotFoundError(fmt.Errorf("could not find pipeline %s", id))
 	}
 	if resp.StatusCode == http.StatusForbidden {
-		err = lib.NewForbiddenError(lib.NewNotFoundError(errors.New(lib.MessageForbidden)))
+		err = lib.NewForbiddenError(lib.NewNotFoundError(fmt.Errorf("could not access pipeline %s", id)))
 		return
 	}
 	if resp.StatusCode != 200 {
@@ -108,11 +109,11 @@ func (p *PipelineApi) GetPipelines(userId string, authorization string) (pipelin
 		return
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		err = lib.NewNotFoundError(lib.NewNotFoundError(errors.New(lib.MessageNotFound)))
+		err = lib.NewNotFoundError(lib.NewNotFoundError(fmt.Errorf("could not find pipelines")))
 		return
 	}
 	if resp.StatusCode == http.StatusForbidden {
-		err = lib.NewForbiddenError(lib.NewNotFoundError(errors.New(lib.MessageForbidden)))
+		err = lib.NewForbiddenError(lib.NewNotFoundError(fmt.Errorf("could not access pipelines")))
 		return
 	}
 	if resp.StatusCode != 200 {

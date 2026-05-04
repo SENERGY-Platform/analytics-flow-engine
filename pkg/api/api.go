@@ -19,6 +19,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -128,7 +129,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		userId, err := getUserId(gc)
 		if err != nil {
 			util.Logger.Error("could not get user id", "error", err)
-			gc.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			gc.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 		gc.Set(UserIdKey, userId)
@@ -139,8 +140,22 @@ func AuthMiddleware() gin.HandlerFunc {
 func getUserId(c *gin.Context) (userId string, err error) {
 	forUser := c.Query("for_user")
 	if forUser != "" {
+		if !isValidUserId(forUser) {
+			util.Logger.Warn("invalid for_user format",
+				"for_user", forUser,
+				"requester", userId)
+			return "", errors.New("invalid user ID format")
+		}
+
 		roles := strings.Split(c.GetHeader("X-User-Roles"), ", ")
 		if slices.Contains[[]string](roles, "admin") {
+			util.Logger.Info("user_impersonation",
+				"admin_user", userId,
+				"target_user", forUser,
+				"path", c.Request.URL.Path,
+				"method", c.Request.Method,
+				"ip", c.ClientIP(),
+				"request_id", c.GetHeader(HeaderRequestID))
 			return forUser, nil
 		}
 	}
@@ -159,4 +174,12 @@ func getUserId(c *gin.Context) (userId string, err error) {
 		}
 	}
 	return
+}
+
+func isValidUserId(id string) bool {
+	if len(id) == 0 || len(id) > 64 {
+		return false
+	}
+	matched, _ := regexp.MatchString(`^[a-zA-Z0-9_-]+$`, id)
+	return matched
 }

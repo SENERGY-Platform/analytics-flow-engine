@@ -23,14 +23,16 @@ import (
 )
 
 func handleError(err error) error {
-	var ie *lib.ForbiddenError
-	var fe *lib.NotFoundError
-	if errors.As(err, &ie) {
-		err = lib.NewForbiddenError(errors.New(lib.MessageForbidden))
-	} else if errors.As(err, &fe) {
-		err = lib.NewNotFoundError(errors.New(lib.MessageNotFound))
-	} else {
-		err = lib.NewInternalError(errors.New(lib.MessageSomethingWrong))
+	if err == nil {
+		return nil
 	}
-	return err
+
+	switch {
+	case errors.As(err, new(*lib.NotFoundError)):
+		return lib.NewNotFoundError(errors.New(MessageNotFound))
+	case errors.As(err, new(*lib.ForbiddenError)):
+		return lib.NewForbiddenError(errors.New(MessageForbidden))
+	default:
+		return lib.NewInternalError(errors.New(MessageSomethingWrong))
+	}
 }

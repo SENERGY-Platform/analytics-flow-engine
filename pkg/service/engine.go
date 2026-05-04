@@ -64,7 +64,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest lib.PipelineRequest, userId s
 	}
 	err = f.checkAccess(pipelineRequest, parsedPipeline.Operators, token)
 	if err != nil {
-		return nil, fmt.Errorf("engine - checkAccess: %s", err)
+		return nil, lib.NewForbiddenError(fmt.Errorf("engine - checkAccess: %s", err))
 	}
 	pipeline = &pipe.Pipeline{}
 	pipeline.FlowId = parsedPipeline.FlowId
@@ -131,7 +131,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId 
 	}
 	err = f.checkAccess(pipelineRequest, parsedPipeline.Operators, token)
 	if err != nil {
-		return
+		return pipeline, lib.NewForbiddenError(fmt.Errorf("engine - checkAccess: %s", err))
 	}
 	pipeline, err = f.pipelineService.GetPipeline(pipelineRequest.Id, userId, token)
 	if err != nil {

@@ -36,9 +36,10 @@ import (
 // @Produce json
 // @Param id path string true "Pipeline ID"
 // @Success	200 {object} lib.PipelineStatus
-// @Failure 403 {string} lib.MessageForbidden
-// @Failure 404 {string} lib.MessageNotFound
-// @Failure	500 {string} str
+// @Failure	401 {string} MessageUnauthorized
+// @Failure 403 {string} MessageForbidden
+// @Failure 404 {string} MessageNotFound
+// @Failure	500 {string} MessageSomethingWrong
 // @Router /pipeline/{id} [get]
 func getPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodGet, PipelineIdPath, func(c *gin.Context) {
@@ -61,20 +62,22 @@ func getPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc
 // @Produce json
 // @Param request body lib.PipelineStatusRequest true "Pipeline status request"
 // @Success	200 {array} lib.PipelineStatus
-// @Failure	500 {string} str
+// @Failure 400 {string} MessageBadInput
+// @Failure	401 {string} MessageUnauthorized
+// @Failure	500 {string} MessageSomethingWrong
 // @Router /pipelines [post]
 func postPipelines(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodPost, PipelinesPath, func(c *gin.Context) {
 		var request lib.PipelineStatusRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			util.Logger.Error(lib.MessageParseError, "error", err, "method", "POST", "path", PipelinesPath)
-			_ = c.Error(errors.New(lib.MessageSomethingWrong))
+			util.Logger.Error(MessageParseError, "error", err, "method", "POST", "path", PipelinesPath)
+			_ = c.Error(lib.NewInputError(errors.New(MessageBadInput)))
 			return
 		}
 		pipelinesStatus, err := flowEngine.GetPipelinesStatus(request.Ids, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not get pipelines status", "error", err, "method", "POST", "path", PipelinesPath)
-			_ = c.Error(errors.New(lib.MessageSomethingWrong))
+			_ = c.Error(handleError(err))
 			return
 		}
 		c.JSON(http.StatusOK, pipelinesStatus)
@@ -87,14 +90,17 @@ func postPipelines(flowEngine service.FlowEngine) (string, string, gin.HandlerFu
 // @Tags Pipeline
 // @Produce json
 // @Success	200 {object} pipeApi.Pipeline
-// @Failure	500 {string} str
+// @Failure 400 {string} MessageBadInput
+// @Failure	401 {string} MessageUnauthorized
+// @Failure	403 {string} MessageForbidden
+// @Failure	500 {string} MessageSomethingWrong
 // @Router /pipeline [post]
 func postPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodPost, PipelinePath, func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			util.Logger.Error(lib.MessageParseError, "error", err, "method", "POST", "path", PipelinePath)
-			_ = c.Error(errors.New(lib.MessageSomethingWrong))
+			util.Logger.Error(MessageParseError, "error", err, "method", "POST", "path", PipelinePath)
+			_ = c.Error(lib.NewInputError(errors.New(MessageBadInput)))
 			return
 		}
 		var pipe *pipeApi.Pipeline
@@ -102,7 +108,7 @@ func postPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFun
 		if err != nil {
 			util.Logger.Error("could not start pipeline",
 				"error", err, "method", "POST", "path", PipelinePath, "flowId", request.FlowId, "user", c.GetString(UserIdKey))
-			_ = c.Error(errors.New(lib.MessageSomethingWrong))
+			_ = c.Error(handleError(err))
 			return
 		}
 		c.JSON(http.StatusOK, pipe)
@@ -114,15 +120,18 @@ func postPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFun
 // @Description	Updates a pipeline
 // @Tags Pipeline
 // @Produce json
-// @Success	200 {object} pipeApi.Pipeline
-// @Failure	500 {string} str
+// @Failure 400 {string} MessageBadInput
+// @Failure	401 {string} MessageUnauthorized
+// @Failure	403 {string} MessageForbidden
+// @Failure	404 {string} MessageNotFound
+// @Failure	500 {string} MessageSomethingWrong
 // @Router /pipeline [put]
 func putPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodPut, PipelinePath, func(c *gin.Context) {
 		var request lib.PipelineRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
-			util.Logger.Error(lib.MessageParseError, "error", err, "method", "PUT", "path", PipelinePath)
-			_ = c.Error(errors.New(lib.MessageSomethingWrong))
+			util.Logger.Error(MessageParseError, "error", err, "method", "PUT", "path", PipelinePath)
+			_ = c.Error(lib.NewInputError(errors.New(MessageBadInput)))
 			return
 		}
 		var pipe pipeApi.Pipeline
@@ -143,9 +152,11 @@ func putPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc
 // @Tags Pipeline
 // @Param id path string true "Pipeline ID"
 // @Success	204
-// @Failure 403 {string} lib.MessageForbidden
-// @Failure 404 {string} lib.MessageNotFound
-// @Failure	500 {string} str
+// @Failure 400 {string} MessageBadInput
+// @Failure	401 {string} MessageUnauthorized
+// @Failure	403 {string} MessageForbidden
+// @Failure	404 {string} MessageNotFound
+// @Failure	500 {string} MessageSomethingWrong
 // @Router /pipeline/{id} [delete]
 func deletePipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc) {
 	return http.MethodDelete, PipelineIdPath, func(c *gin.Context) {
