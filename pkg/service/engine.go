@@ -103,26 +103,6 @@ func (f *FlowEngine) StartPipeline(pipelineRequest lib.PipelineRequest, userId s
 	return
 }
 
-func addPipelineIDToFogTopic(operators []pipe.Operator, pipelineId string) (newOperators []pipe.Operator) {
-	// Input and Output Topics are set during parsing where pipeline ID is not available
-	for _, operator := range operators {
-		if operator.DeploymentType == deploymentLocationLib.Local {
-			operator.OutputTopic = operator.OutputTopic + pipelineId
-
-			var inputTopicsWithID []pipe.InputTopic
-			for _, inputTopic := range operator.InputTopics {
-				if inputTopic.FilterType == "OperatorId" {
-					inputTopic.Name += pipelineId
-				}
-				inputTopicsWithID = append(inputTopicsWithID, inputTopic)
-			}
-			operator.InputTopics = inputTopicsWithID
-		}
-		newOperators = append(newOperators, operator)
-	}
-	return
-}
-
 func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline pipe.Pipeline, err error) {
 	util.Logger.Debug("engine - update pipeline: " + pipelineRequest.Id)
 	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, token)
@@ -193,50 +173,6 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId 
 	return
 }
 
-func (f *FlowEngine) checkAccess(pipelineRequest lib.PipelineRequest, operators map[string]parser.Operator, token string) error {
-	deviceIds, _, pipelineIds, importIds := getFilterIdsFromPipelineRequest(pipelineRequest)
-
-	checks := []struct {
-		resource string
-		ids      []string
-		msg      string
-	}{
-		{PermissionResourceFlows, []string{pipelineRequest.FlowId}, "flow: " + pipelineRequest.FlowId},
-		{PermissionResourceDevices, deviceIds, "one or more devices"},
-		{PermissionResourceAnalyticsPipelines, pipelineIds, "one or more pipelines"},
-		{PermissionResourceImports, importIds, "one or more imports"},
-	}
-
-	for _, c := range checks {
-		if len(c.ids) == 0 {
-			continue
-		}
-		ok, err := f.permissionService.UserHasExecuteAccess(c.resource, c.ids, token)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return fmt.Errorf("engine - user does not have the rights to execute %s", c.msg)
-		}
-	}
-
-	if len(operators) > 0 {
-		operatorIds := make([]string, 0, len(operators))
-		for _, op := range operators {
-			operatorIds = append(operatorIds, op.OperatorId)
-		}
-		ok, err := f.permissionService.UserHasExecuteAccess(PermissionResourceOperators, operatorIds, token)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return errors.New("engine - user does not have the rights to execute one or more operators")
-		}
-	}
-
-	return nil
-}
-
 func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err error) {
 	util.Logger.Debug("engine - delete pipeline: " + id)
 	pipeline, err := f.pipelineService.GetPipeline(id, userId, token)
@@ -289,6 +225,70 @@ func (f *FlowEngine) GetPipelinesStatus(ids []string, userId, token string) (sta
 				status = append(status, statusTemp[idx])
 			}
 		}
+	}
+	return
+}
+
+func (f *FlowEngine) checkAccess(pipelineRequest lib.PipelineRequest, operators map[string]parser.Operator, token string) error {
+	deviceIds, _, pipelineIds, importIds := getFilterIdsFromPipelineRequest(pipelineRequest)
+
+	checks := []struct {
+		resource string
+		ids      []string
+		msg      string
+	}{
+		{PermissionResourceFlows, []string{pipelineRequest.FlowId}, "flow: " + pipelineRequest.FlowId},
+		{PermissionResourceDevices, deviceIds, "one or more devices"},
+		{PermissionResourceAnalyticsPipelines, pipelineIds, "one or more pipelines"},
+		{PermissionResourceImports, importIds, "one or more imports"},
+	}
+
+	for _, c := range checks {
+		if len(c.ids) == 0 {
+			continue
+		}
+		ok, err := f.permissionService.UserHasExecuteAccess(c.resource, c.ids, token)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("engine - user does not have the rights to execute %s", c.msg)
+		}
+	}
+
+	if len(operators) > 0 {
+		operatorIds := make([]string, 0, len(operators))
+		for _, op := range operators {
+			operatorIds = append(operatorIds, op.OperatorId)
+		}
+		ok, err := f.permissionService.UserHasExecuteAccess(PermissionResourceOperators, operatorIds, token)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return errors.New("engine - user does not have the rights to execute one or more operators")
+		}
+	}
+
+	return nil
+}
+
+func addPipelineIDToFogTopic(operators []pipe.Operator, pipelineId string) (newOperators []pipe.Operator) {
+	// Input and Output Topics are set during parsing where pipeline ID is not available
+	for _, operator := range operators {
+		if operator.DeploymentType == deploymentLocationLib.Local {
+			operator.OutputTopic = operator.OutputTopic + pipelineId
+
+			var inputTopicsWithID []pipe.InputTopic
+			for _, inputTopic := range operator.InputTopics {
+				if inputTopic.FilterType == "OperatorId" {
+					inputTopic.Name += pipelineId
+				}
+				inputTopicsWithID = append(inputTopicsWithID, inputTopic)
+			}
+			operator.InputTopics = inputTopicsWithID
+		}
+		newOperators = append(newOperators, operator)
 	}
 	return
 }
