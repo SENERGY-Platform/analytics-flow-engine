@@ -101,7 +101,7 @@ func TestParser_createPipeline(t *testing.T) {
 			},
 		},
 	}
-	pipeline := createPipeline(parsedPipeline)
+	pipeline := createOperatorConfig(parsedPipeline)
 	for key := range pipeline.Operators {
 		pipeline.Operators[key].ApplicationId = uid
 	}
@@ -246,7 +246,7 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	pipeline := createPipeline(parsedPipeline)
+	pipeline := createOperatorConfig(parsedPipeline)
 	deviceManagerService := MockDeviceManagerService{}
 	configuredOperators, err := addOperatorConfigs(pipelineRequest, pipeline, deviceManagerService, "", "")
 	if err != nil {
@@ -369,7 +369,7 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	pipeline := createPipeline(parsedPipeline)
+	pipeline := createOperatorConfig(parsedPipeline)
 	configuredOperators, err := addOperatorConfigs(pipelineRequest, pipeline, MockDeviceManagerService{}, "", "")
 	if err != nil {
 		fmt.Println(err)
@@ -518,7 +518,7 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	pipeline := createPipeline(parsedPipeline)
+	pipeline := createOperatorConfig(parsedPipeline)
 	configuredOperators, err := addOperatorConfigs(pipelineRequest, pipeline, MockDeviceManagerService{}, "", "")
 	if err != nil {
 		fmt.Println(err)

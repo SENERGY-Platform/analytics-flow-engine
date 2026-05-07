@@ -29,7 +29,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func createPipeline(parsedPipeline parser.Pipeline) (pipeline pipe.Pipeline) {
+func createOperatorConfig(parsedPipeline parser.Pipeline) (pipeline pipe.Pipeline) {
 	for _, operator := range parsedPipeline.Operators {
 		// TODO error handling
 		var outputTopicName string

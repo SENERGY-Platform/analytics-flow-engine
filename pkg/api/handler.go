@@ -134,7 +134,7 @@ func putPipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerFunc
 			_ = c.Error(lib.NewInputError(errors.New(MessageBadInput)))
 			return
 		}
-		var pipe pipeApi.Pipeline
+		var pipe *pipeApi.Pipeline
 		pipe, err := flowEngine.UpdatePipeline(request, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
 			util.Logger.Error("could not update pipeline",

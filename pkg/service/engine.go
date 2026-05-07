@@ -27,14 +27,13 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
+	"github.com/google/uuid"
 	k8apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"encoding/json"
 
 	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
-	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
-	"github.com/google/uuid"
 )
 
 type FlowEngine struct {
@@ -57,120 +56,106 @@ func NewFlowEngine(
 }
 
 func (f *FlowEngine) StartPipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline *pipe.Pipeline, err error) {
-	//Get parsed pipeline
-	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, token)
+	util.Logger.Debug("engine - start pipeline: " + pipelineRequest.Id)
+	pipeline, err = f.setupPipeline(pipelineRequest, userId, token)
 	if err != nil {
 		return
 	}
-	err = f.checkAccess(pipelineRequest, parsedPipeline.Operators, token)
-	if err != nil {
-		return nil, lib.NewForbiddenError(fmt.Errorf("engine - checkAccess: %s", err))
-	}
-	pipeline = &pipe.Pipeline{}
-	pipeline.FlowId = parsedPipeline.FlowId
-	pipeline.Image = parsedPipeline.Image
-	pipeline.WindowTime = pipelineRequest.WindowTime
-	pipeline.MergeStrategy = pipelineRequest.MergeStrategy
-	pipeline.ConsumeAllMessages = pipelineRequest.ConsumeAllMessages
 
-	tmpPipeline := createPipeline(parsedPipeline)
-	pipeline.Name = pipelineRequest.Name
-	pipeline.Description = pipelineRequest.Description
-	configuredOperators, err := addOperatorConfigs(pipelineRequest, tmpPipeline, f.deviceManagerService, userId, token)
-	if err != nil {
-		return
-	}
-	pipeline.Operators = configuredOperators
 	id, err := f.pipelineService.RegisterPipeline(pipeline, userId, token)
 	if err != nil {
 		return
 	}
 	pipeline.Id = id.String()
+
 	pipeline.Operators = addPipelineIDToFogTopic(pipeline.Operators, pipeline.Id)
-	pipeline.Metrics = pipelineRequest.Metrics
 	pipeConfig := f.createPipelineConfig(*pipeline)
 	pipeConfig.UserId = userId
 	newOperators, err := f.startOperators(*pipeline, pipeConfig, userId, token)
 	if err != nil {
+		if delErr := f.pipelineService.DeletePipeline(pipeline.Id, userId, token); delErr != nil {
+			util.Logger.Error("failed to rollback pipeline registration", "error", delErr)
+		}
 		return
 	}
 	pipeline.Operators = newOperators
 	err = f.pipelineService.UpdatePipeline(pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
 	if err != nil {
-		util.Logger.Error("cant update pipeline", "error", err)
+		return
 	}
 	util.Logger.Debug("started pipeline: "+pipeline.Id, "pipeline", pipeline)
 	return
 }
 
-func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline pipe.Pipeline, err error) {
+func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline *pipe.Pipeline, err error) {
 	util.Logger.Debug("engine - update pipeline: " + pipelineRequest.Id)
-	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, token)
-	if err != nil {
-		return
-	}
-	err = f.checkAccess(pipelineRequest, parsedPipeline.Operators, token)
-	if err != nil {
-		return pipeline, lib.NewForbiddenError(fmt.Errorf("engine - checkAccess: %s", err))
-	}
-	pipeline, err = f.pipelineService.GetPipeline(pipelineRequest.Id, userId, token)
+	oldPipeline, err := f.pipelineService.GetPipeline(pipelineRequest.Id, userId, token)
 	if err != nil {
 		return
 	}
 
-	configuredOperators, err := addOperatorConfigs(pipelineRequest, pipeline, f.deviceManagerService, userId, token)
+	pipeline, err = f.setupPipeline(pipelineRequest, userId, token)
 	if err != nil {
 		return
 	}
-	pipeline.Operators = configuredOperators
-	pipeline.Name = pipelineRequest.Name
-	pipeline.Description = pipelineRequest.Description
-	pipeline.WindowTime = pipelineRequest.WindowTime
-	pipeline.MergeStrategy = pipelineRequest.MergeStrategy
 
-	err = f.stopOperators(pipeline, userId, token)
-	if err != nil {
-		util.Logger.Error("cant stop operators", "error", err)
-		return
-	}
-
-	missingUuid, _ := uuid.FromBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
-	for index := range pipeline.Operators {
-		// if app id is missing, set a new one
-		if pipeline.Operators[index].ApplicationId == missingUuid {
-			pipeline.Operators[index].ApplicationId = uuid.New()
+	// If consume all messages is the same, we can reuse the application IDs
+	if pipeline.ConsumeAllMessages == oldPipeline.ConsumeAllMessages {
+		oldAppIds := make(map[string]uuid.UUID)
+		for _, op := range oldPipeline.Operators {
+			oldAppIds[op.Id] = op.ApplicationId
 		}
-		// if output topic is missing,set it
-		if pipeline.Operators[index].OutputTopic == "" {
-			outputTopicName := pipeline.Operators[index].Name
-			operator := pipeline.Operators[index]
-			if operator.DeploymentType == deploymentLocationLib.Local {
-				outputTopicName = operatorLib.GenerateFogOperatorTopic(operator.Name, operator.Id, "")
-			} else if operator.DeploymentType == deploymentLocationLib.Cloud {
-				outputTopicName = operatorLib.GenerateCloudOperatorTopic(operator.Name)
+		for i := range pipeline.Operators {
+			if appId, exists := oldAppIds[pipeline.Operators[i].Id]; exists {
+				pipeline.Operators[i].ApplicationId = appId
 			}
-			pipeline.Operators[index].OutputTopic = outputTopicName
 		}
 	}
 
-	pipeConfig := f.createPipelineConfig(pipeline)
-	pipeConfig.UserId = userId
-	if pipelineRequest.ConsumeAllMessages != pipeline.ConsumeAllMessages {
-		for index := range pipeline.Operators {
-			pipeline.Operators[index].ApplicationId = uuid.New()
-		}
-	}
-	pipeline.ConsumeAllMessages = pipelineRequest.ConsumeAllMessages
-
-	newOperators, err := f.startOperators(pipeline, pipeConfig, userId, token)
+	err = f.stopOperators(oldPipeline, userId, token)
 	if err != nil {
+		util.Logger.Error("cannot stop operators", "error", err)
 		return
+	}
+
+	pipeline.Id = oldPipeline.Id
+	pipeline.Operators = addPipelineIDToFogTopic(pipeline.Operators, pipeline.Id)
+	pipeConfig := f.createPipelineConfig(*pipeline)
+	pipeConfig.UserId = userId
+	newOperators, err := f.startOperators(*pipeline, pipeConfig, userId, token)
+	if err != nil {
+		util.Logger.Error("failed to start new operators, attempting to restart old pipeline", "error", err)
+		if _, err = f.startOperators(oldPipeline, f.createPipelineConfig(oldPipeline), userId, token); err != nil {
+			util.Logger.Error("CRITICAL: failed to restart old pipeline", "error", err)
+		}
+		return nil, fmt.Errorf("failed to start operators: %w", err)
 	}
 	pipeline.Operators = newOperators
-
-	err = f.pipelineService.UpdatePipeline(&pipeline, userId, token)
-
+	err = f.pipelineService.UpdatePipeline(pipeline, userId, token)
+	util.Logger.Debug("updated pipeline: "+pipeline.Id, "pipeline", pipeline)
 	return
+}
+
+func (f *FlowEngine) setupPipeline(pipelineRequest lib.PipelineRequest, userId, token string) (*pipe.Pipeline, error) {
+	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, token)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = f.checkAccess(pipelineRequest, parsedPipeline.Operators, token); err != nil {
+		return nil, lib.NewForbiddenError(fmt.Errorf("checkAccess failed: %w", err))
+	}
+
+	pipeline := setPipelineModel(pipelineRequest, parsedPipeline)
+	tmpPipeline := createOperatorConfig(parsedPipeline)
+
+	configuredOperators, err := addOperatorConfigs(pipelineRequest, tmpPipeline, f.deviceManagerService, userId, token)
+	if err != nil {
+		return nil, err
+	}
+	pipeline.Operators = configuredOperators
+
+	return pipeline, nil
 }
 
 func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err error) {
@@ -305,6 +290,19 @@ func seperateOperators(pipeline pipe.Pipeline) (localOperators []pipe.Operator, 
 		}
 	}
 	return
+}
+
+func setPipelineModel(pipelineRequest lib.PipelineRequest, parsedPipeline parser.Pipeline) *pipe.Pipeline {
+	pipeline := &pipe.Pipeline{}
+	pipeline.Name = pipelineRequest.Name
+	pipeline.Description = pipelineRequest.Description
+	pipeline.FlowId = parsedPipeline.FlowId
+	pipeline.Image = parsedPipeline.Image
+	pipeline.WindowTime = pipelineRequest.WindowTime
+	pipeline.MergeStrategy = pipelineRequest.MergeStrategy
+	pipeline.ConsumeAllMessages = pipelineRequest.ConsumeAllMessages
+	pipeline.Metrics = pipelineRequest.Metrics
+	return pipeline
 }
 
 func (f *FlowEngine) stopOperators(pipeline pipe.Pipeline, userID, token string) error {
