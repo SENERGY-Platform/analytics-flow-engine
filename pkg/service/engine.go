@@ -23,14 +23,14 @@ import (
 	"strings"
 	"time"
 
+	"encoding/json"
+
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 	"github.com/google/uuid"
 	k8apierrors "k8s.io/apimachinery/pkg/api/errors"
-
-	"encoding/json"
 
 	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
 	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
@@ -52,7 +52,59 @@ func NewFlowEngine(
 	kafak2mqttService Kafka2MqttApiService,
 	deviceManagerService DeviceManagerService,
 	pipelineService PipelineApiService) *FlowEngine {
-	return &FlowEngine{driver, parsingService, permissionService, kafak2mqttService, deviceManagerService, pipelineService}
+	f := &FlowEngine{driver, parsingService, permissionService, kafak2mqttService, deviceManagerService, pipelineService}
+	err := f.syncPipelines()
+	if err != nil {
+		util.Logger.Error("failed to sync pipelines", "error", err)
+	}
+	return f
+}
+
+func (f *FlowEngine) syncPipelines() (err error) {
+	util.Logger.Info("syncing pipelines")
+	pipelines, err := f.pipelineService.GetPipelinesAdmin()
+	if err != nil {
+		return err
+	}
+	statusTemp, err := f.driver.GetPipelinesStatus()
+	if err != nil {
+		return err
+	}
+
+	missing, extra := CompareSlicesWithKey(
+		pipelines,
+		statusTemp,
+		func(a pipe.Pipeline) string { return a.Id },
+		func(b lib.PipelineStatus) string { return strings.Replace(b.Name, "pipeline-", "", -1) },
+	)
+	if len(missing) > 0 {
+		util.Logger.Warn("found missing pipelines")
+		for _, item := range missing {
+			item.Image = ""
+			util.Logger.Warn("trying to recreate pipeline", "pipeline", item)
+			//first delete every resource that might still be present
+			err = f.stopOperators(item, "")
+			if err != nil {
+				util.Logger.Error("cannot stop operators", "error", err)
+				return
+			}
+
+			pipeConfig := f.createPipelineConfig(item)
+			pipeConfig.UserId = item.UserId
+			_, err := f.startOperators(item, pipeConfig, "")
+			if err != nil {
+				return fmt.Errorf("failed to start operators: %w", err)
+			}
+		}
+	}
+
+	if len(extra) > 0 {
+		util.Logger.Warn("found extra pipelines")
+		for _, item := range extra {
+			util.Logger.Warn("extra deployment", "deployment", item)
+		}
+	}
+	return
 }
 
 func (f *FlowEngine) StartPipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline *pipe.Pipeline, err error) {
@@ -71,7 +123,7 @@ func (f *FlowEngine) StartPipeline(pipelineRequest lib.PipelineRequest, userId s
 	pipeline.Operators = addPipelineIDToFogTopic(pipeline.Operators, pipeline.Id)
 	pipeConfig := f.createPipelineConfig(*pipeline)
 	pipeConfig.UserId = userId
-	newOperators, err := f.startOperators(*pipeline, pipeConfig, userId, token)
+	newOperators, err := f.startOperators(*pipeline, pipeConfig, token)
 	if err != nil {
 		if delErr := f.pipelineService.DeletePipeline(pipeline.Id, userId, token); delErr != nil {
 			util.Logger.Error("failed to rollback pipeline registration", "error", delErr)
@@ -122,10 +174,10 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId 
 	pipeline.Operators = addPipelineIDToFogTopic(pipeline.Operators, pipeline.Id)
 	pipeConfig := f.createPipelineConfig(*pipeline)
 	pipeConfig.UserId = userId
-	newOperators, err := f.startOperators(*pipeline, pipeConfig, userId, token)
+	newOperators, err := f.startOperators(*pipeline, pipeConfig, token)
 	if err != nil {
 		util.Logger.Error("failed to start new operators, attempting to restart old pipeline", "error", err)
-		if _, err = f.startOperators(oldPipeline, f.createPipelineConfig(oldPipeline), userId, token); err != nil {
+		if _, err = f.startOperators(oldPipeline, f.createPipelineConfig(oldPipeline), token); err != nil {
 			util.Logger.Error("CRITICAL: failed to restart old pipeline", "error", err)
 		}
 		return nil, fmt.Errorf("failed to start operators: %w", err)
@@ -312,8 +364,11 @@ func (f *FlowEngine) stopOperators(pipeline pipe.Pipeline, token string) error {
 	if len(cloudOperators) > 0 {
 		err := f.driver.DeleteOperators(pipeline.Id, cloudOperators)
 		if err != nil {
-			util.Logger.Error("cannot delete operators", "error", err)
-			return err
+			//ignore error if operator was not found
+			var notFoundErr *lib.NotFoundError
+			if ok := errors.As(err, &notFoundErr); !ok {
+				return err
+			}
 		}
 		err = f.disableCloudToFogForwarding(cloudOperators, pipeline.Id, pipeline.UserId, token)
 		if err != nil {
@@ -339,7 +394,7 @@ func (f *FlowEngine) stopOperators(pipeline pipe.Pipeline, token string) error {
 	return nil
 }
 
-func (f *FlowEngine) startOperators(pipeline pipe.Pipeline, pipeConfig lib.PipelineConfig, userID, token string) (newOperators []pipe.Operator, err error) {
+func (f *FlowEngine) startOperators(pipeline pipe.Pipeline, pipeConfig lib.PipelineConfig, token string) (newOperators []pipe.Operator, err error) {
 	localOperators, cloudOperators := seperateOperators(pipeline)
 
 	if len(cloudOperators) > 0 {
@@ -356,7 +411,7 @@ func (f *FlowEngine) startOperators(pipeline pipe.Pipeline, pipeConfig lib.Pipel
 			return
 		} else {
 			util.Logger.Debug("engine - successfully started cloud operators - " + pipeline.Id)
-			cloudOperatorsWithDownstreamID, err2 := f.enableCloudToFogForwarding(cloudOperators, pipeline.Id, userID, token)
+			cloudOperatorsWithDownstreamID, err2 := f.enableCloudToFogForwarding(cloudOperators, pipeline.Id, pipeline.UserId, token)
 			if err2 != nil {
 				util.Logger.Error("cannot enable cloud2fog forwarding", "error", err2)
 				err = err2
@@ -368,14 +423,14 @@ func (f *FlowEngine) startOperators(pipeline pipe.Pipeline, pipeConfig lib.Pipel
 	if len(localOperators) > 0 {
 		for _, operator := range localOperators {
 			util.Logger.Debug("try to start local operator: " + operator.Name + " for pipeline: " + pipeline.Id)
-			err = startFogOperator(operator, pipeConfig, userID)
+			err = startFogOperator(operator, pipeConfig, pipeline.UserId)
 			if err != nil {
 				util.Logger.Error("cannot start local operator", "error", err, "operator", operator)
 				return
 			}
 			util.Logger.Debug("engine - successfully started local operator: " + operator.Name + " for pipeline: " + pipeline.Id)
 
-			err = f.enableFogToCloudForwarding(operator, pipeline.Id, userID)
+			err = f.enableFogToCloudForwarding(operator, pipeline.Id, pipeline.UserId)
 			if err != nil {
 				return
 			}

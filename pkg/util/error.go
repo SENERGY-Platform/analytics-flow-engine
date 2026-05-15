@@ -24,20 +24,16 @@ import (
 )
 
 func GetStatusCode(err error) int {
-	var nfe *lib.NotFoundError
-	if errors.As(err, &nfe) {
+	if _, ok := errors.AsType[*lib.NotFoundError](err); ok {
 		return http.StatusNotFound
 	}
-	var pe *lib.InputError
-	if errors.As(err, &pe) {
+	if _, ok := errors.AsType[*lib.InputError](err); ok {
 		return http.StatusBadRequest
 	}
-	var ie *lib.InternalError
-	if errors.As(err, &ie) {
+	if _, ok := errors.AsType[*lib.InternalError](err); ok {
 		return http.StatusInternalServerError
 	}
-	var fe *lib.ForbiddenError
-	if errors.As(err, &fe) {
+	if _, ok := errors.AsType[*lib.ForbiddenError](err); ok {
 		return http.StatusForbidden
 	}
 	return 0

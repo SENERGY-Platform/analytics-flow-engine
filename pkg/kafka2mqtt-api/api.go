@@ -7,9 +7,10 @@ import (
 
 	"encoding/json"
 	"errors"
-	"github.com/parnurzeal/gorequest"
 	"net/http"
 	"strconv"
+
+	"github.com/parnurzeal/gorequest"
 )
 
 type Kafka2MqttApi struct {
@@ -21,7 +22,7 @@ func NewKafka2MqttApi(url string, mqttCfg *config.MqttConfig) *Kafka2MqttApi {
 	return &Kafka2MqttApi{url, mqttCfg}
 }
 
-func (api *Kafka2MqttApi) StartOperatorInstance(operatorName, operatorID string, pipelineId string, userID, token string) (createdInstance Instance, err error) {
+func (api *Kafka2MqttApi) StartOperatorInstance(operatorName, operatorID string, pipelineId string, userID, token string) (_ Instance, err error) {
 	mqttBaseTopic := downstreamLib.GetDownstreamOperatorCloudPubTopicPrefix(userID)
 	mqttTopic := operatorLib.GenerateFogOperatorTopic(operatorName, operatorID, pipelineId)
 	kafkaTopic := operatorLib.GenerateCloudOperatorTopic(operatorName)

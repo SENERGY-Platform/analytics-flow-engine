@@ -291,15 +291,25 @@ func (k *Kubernetes) DeleteOperators(pipelineId string, operators []pipe_lib.Ope
 		PropagationPolicy: &deletePolicy,
 	})
 	if err != nil {
-		return
+		if k8s_errors.IsNotFound(err) {
+			util.Logger.Debug("deployment not found: " + getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1])
+		} else {
+			return
+		}
+	} else {
+		util.Logger.Debug(fmt.Sprintf("deleted deployment %s", pipelineId))
 	}
-	util.Logger.Debug(fmt.Sprintf("deleted deployment %s", pipelineId))
 
 	util.Logger.Debug("deleting autoscaler " + pipelineId)
 	err = verticalAutoscalerClient.Delete(context.TODO(), getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1]+"-vpa", metav1.DeleteOptions{})
-	util.Logger.Debug(fmt.Sprintf("deleted autoscaler %s", pipelineId))
 	if err != nil {
-		return
+		if k8s_errors.IsNotFound(err) {
+			util.Logger.Debug("autoscaler not found: " + pipelineId)
+		} else {
+			return
+		}
+	} else {
+		util.Logger.Debug(fmt.Sprintf("deleted autoscaler %s", pipelineId))
 	}
 	return
 }

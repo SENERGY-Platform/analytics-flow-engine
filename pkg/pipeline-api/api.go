@@ -130,6 +130,36 @@ func (p *PipelineApi) GetPipelines(userId string, authorization string) (pipelin
 	return
 }
 
+func (p *PipelineApi) GetPipelinesAdmin() (pipelines []pipe.Pipeline, err error) {
+	request := gorequest.New()
+	request.Get(p.url+"/admin/pipeline").Set("X-UserId", "admin").Set("X-User-Roles", "admin")
+	resp, body, e := request.End()
+	if len(e) > 0 {
+		err = errors.New("pipeline API - could not get admin pipelines from pipeline registry: an error occurred")
+		return
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		err = lib.NewNotFoundError(lib.NewNotFoundError(fmt.Errorf("could not find admin pipelines")))
+		return
+	}
+	if resp.StatusCode == http.StatusForbidden {
+		err = lib.NewForbiddenError(lib.NewNotFoundError(fmt.Errorf("could not access admin pipelines")))
+		return
+	}
+	if resp.StatusCode != 200 {
+		err = errors.New("pipeline API - could not get admin pipelines from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
+		return
+	}
+	var pResponse lib.PipelinesResponse
+	err = json.Unmarshal([]byte(body), &pResponse)
+	if err != nil {
+		err = errors.New("pipeline API  - could not parse admin pipelines: " + err.Error())
+		return
+	}
+	pipelines = pResponse.Data
+	return
+}
+
 func (p *PipelineApi) DeletePipeline(id string, userId string, authorization string) (err error) {
 	request := gorequest.New()
 	request.Delete(p.url+"/pipeline/"+id).Set("X-UserId", userId).Set("Authorization", authorization)

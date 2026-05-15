@@ -61,5 +61,6 @@ type PipelineApiService interface {
 	UpdatePipeline(pipeline *pipe.Pipeline, userId string, authorization string) (err error)
 	GetPipeline(id string, userId string, authorization string) (pipe pipe.Pipeline, err error)
 	GetPipelines(userId string, authorization string) (pipelines []pipe.Pipeline, err error)
+	GetPipelinesAdmin() (pipelines []pipe.Pipeline, err error)
 	DeletePipeline(id string, userId string, authorization string) (err error)
 }
