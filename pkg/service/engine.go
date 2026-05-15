@@ -112,7 +112,7 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId 
 		}
 	}
 
-	err = f.stopOperators(oldPipeline, userId, token)
+	err = f.stopOperators(oldPipeline, token)
 	if err != nil {
 		util.Logger.Error("cannot stop operators", "error", err)
 		return
@@ -164,7 +164,7 @@ func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err
 	if err != nil {
 		return
 	}
-	err = f.stopOperators(pipeline, userId, token)
+	err = f.stopOperators(pipeline, token)
 	if err != nil {
 		if !k8apierrors.IsNotFound(err) {
 			return
@@ -305,7 +305,7 @@ func setPipelineModel(pipelineRequest lib.PipelineRequest, parsedPipeline parser
 	return pipeline
 }
 
-func (f *FlowEngine) stopOperators(pipeline pipe.Pipeline, userID, token string) error {
+func (f *FlowEngine) stopOperators(pipeline pipe.Pipeline, token string) error {
 	localOperators, cloudOperators := seperateOperators(pipeline)
 	util.Logger.Debug("engine - stop operators for pipeline: "+pipeline.Id, "localOperators", localOperators, "cloudOperators", cloudOperators)
 
@@ -315,7 +315,7 @@ func (f *FlowEngine) stopOperators(pipeline pipe.Pipeline, userID, token string)
 			util.Logger.Error("cannot delete operators", "error", err)
 			return err
 		}
-		err = f.disableCloudToFogForwarding(cloudOperators, pipeline.Id, userID, token)
+		err = f.disableCloudToFogForwarding(cloudOperators, pipeline.Id, pipeline.UserId, token)
 		if err != nil {
 			util.Logger.Error("cannot disable cloud2fog forwarding", "error", err)
 			return err
@@ -326,11 +326,11 @@ func (f *FlowEngine) stopOperators(pipeline pipe.Pipeline, userID, token string)
 		for _, operator := range localOperators {
 			util.Logger.Debug("engine - stop local Operator: " + operator.Name)
 			err := stopFogOperator(pipeline.Id,
-				operator, userID)
+				operator, pipeline.UserId)
 			if err != nil {
 				return err
 			}
-			err = f.disableFogToCloudForwarding(operator, pipeline.Id, userID, token)
+			err = f.disableFogToCloudForwarding(operator, pipeline.Id, pipeline.UserId, token)
 			if err != nil {
 				return err
 			}
