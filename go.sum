@@ -10,8 +10,8 @@ github.com/SENERGY-Platform/analytics-fog-lib v1.1.28 h1:/wYfSSabEWzhCmDn6APyChD
 github.com/SENERGY-Platform/analytics-fog-lib v1.1.28/go.mod h1:1rPzig+drbFbQCsTC52cVwTendccIbg3u2p560N3H2A=
 github.com/SENERGY-Platform/analytics-parser v0.0.22 h1:G+rihTJ9e3fl+7EdmGo4xeRi+kQqvHoJU/qQlyjumGo=
 github.com/SENERGY-Platform/analytics-parser v0.0.22/go.mod h1:LE8G73CBUv2neNgiyqFIFlEsKjmeduByQoFD5iS/ucA=
-github.com/SENERGY-Platform/analytics-pipeline v0.0.42 h1:CVGh/RllLmILUQ+QlHxPUMGY6+uEwK8kD1h2il8hAZ0=
-github.com/SENERGY-Platform/analytics-pipeline v0.0.42/go.mod h1:PtC4tJOfXiR4Jv6WuWRW/4DFUjHxQ0mV8Ed+eBk9lwk=
+github.com/SENERGY-Platform/analytics-pipeline v0.1.1 h1:IODeYH5+e9MRhSe+oBgFIxi92mQHZOys5YcFJpOZdwo=
+github.com/SENERGY-Platform/analytics-pipeline v0.1.1/go.mod h1:PtC4tJOfXiR4Jv6WuWRW/4DFUjHxQ0mV8Ed+eBk9lwk=
 github.com/SENERGY-Platform/developer-notifications v0.0.5 h1:x66XZgLxiwzWTaUXE9xcWI2zlW9reS6Moizc93nuQSs=
 github.com/SENERGY-Platform/developer-notifications v0.0.5/go.mod h1:4zJM5bicd+k3cijxUz81U63dyRqtBWQpHAkcXb2KWSw=
 github.com/SENERGY-Platform/gin-middleware v0.14.1 h1:o2le7do9++e377ixtnFXbobAJP5CSMQXW7d1dUSAwFU=
