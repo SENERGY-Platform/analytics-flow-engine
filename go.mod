@@ -30,6 +30,7 @@ require (
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
+	github.com/SENERGY-Platform/analytics-flow-engine/lib v0.0.0-00010101000000-000000000000
 	github.com/SENERGY-Platform/developer-notifications v0.0.5 // indirect
 	github.com/SENERGY-Platform/go-env-loader v0.5.3 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
@@ -139,3 +140,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
+
+replace github.com/SENERGY-Platform/analytics-flow-engine/lib => ./lib
