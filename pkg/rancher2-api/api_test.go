@@ -17,6 +17,7 @@
 package rancher2_api
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -37,14 +38,14 @@ func TestRancher2_createPersistentVolumeClaim(t *testing.T) {
 		&cfg.Rancher2,
 	)
 	name := "test"
-	err = driver.createPersistentVolumeClaim(name)
+	err = driver.createPersistentVolumeClaim(context.Background(), name)
 	if err != nil {
 		t.Error(err.Error())
 		return
 	}
 	time.Sleep(3 * time.Second)
 
-	err = driver.deletePersistentVolumeClaim(name)
+	err = driver.deletePersistentVolumeClaim(context.Background(), name)
 	if err != nil {
 		t.Error(err.Error())
 		return

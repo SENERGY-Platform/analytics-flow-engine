@@ -21,6 +21,10 @@ const (
 	UserIdKey       = "UserId"
 )
 
+// ServiceName identifies this service to the outside: it names the traces in
+// Jaeger and it is what srv-info-hdl reports.
+const ServiceName = "analytics-flow-engine"
+
 const (
 	HealthCheckPath = "/health-check"
 	PipelineIdPath  = "/pipeline/:id"

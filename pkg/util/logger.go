@@ -24,6 +24,7 @@ import (
 	"time"
 
 	structlogger "github.com/SENERGY-Platform/go-service-base/struct-logger"
+	"github.com/SENERGY-Platform/go-service-base/struct-logger/handlers"
 )
 
 var Logger *slog.Logger
@@ -51,5 +52,11 @@ func InitStructLogger(level string) {
 			org,
 			project,
 		)
+		// Wrapped on the outside of the configured handler so the level, time format
+		// and meta attributes above still apply. Every *Context log call whose context
+		// carries baggage now writes those entries as attributes, which is what makes a
+		// log line about a pipeline findable by the caller's context; it also mirrors
+		// the record onto the active span.
+		Logger = slog.New(handlers.NewOpenTelemetryHandler(Logger.Handler()))
 	}
 }

@@ -17,6 +17,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -38,7 +39,7 @@ func newRecordingPermissions(denied ...string) *recordingPermissions {
 	return r
 }
 
-func (r *recordingPermissions) UserHasExecuteAccess(resource string, ids []string, _ string) (bool, error) {
+func (r *recordingPermissions) UserHasExecuteAccess(_ context.Context, resource string, ids []string, _ string) (bool, error) {
 	r.asked[resource] = append(r.asked[resource], ids...)
 	return !r.denied[resource], nil
 }
@@ -54,7 +55,7 @@ func TestATwoOperatorPipelineNeedsNoPipelinePermission(t *testing.T) {
 	perms := newRecordingPermissions()
 	f := &FlowEngine{permissionService: perms}
 
-	err := f.checkTopicAccess([]pipe.Operator{
+	err := f.checkTopicAccess(context.Background(), []pipe.Operator{
 		operatorWith("op-1", pipe.InputTopic{
 			Name: "urn_infai_ses_service_a", FilterType: access.FilterTypeDevice, FilterValue: "dev-a",
 		}),
@@ -79,7 +80,7 @@ func TestEveryDeviceOfEveryOperatorIsChecked(t *testing.T) {
 	perms := newRecordingPermissions()
 	f := &FlowEngine{permissionService: perms}
 
-	err := f.checkTopicAccess([]pipe.Operator{
+	err := f.checkTopicAccess(context.Background(), []pipe.Operator{
 		operatorWith("op-1", pipe.InputTopic{
 			Name: "t1", FilterType: access.FilterTypeDevice, FilterValue: "dev-a,dev-b",
 		}),
@@ -102,7 +103,7 @@ func TestADeniedDeviceRefusesTheDeployment(t *testing.T) {
 	perms := newRecordingPermissions(access.ResourceDevices)
 	f := &FlowEngine{permissionService: perms}
 
-	err := f.checkTopicAccess([]pipe.Operator{
+	err := f.checkTopicAccess(context.Background(), []pipe.Operator{
 		operatorWith("op-1", pipe.InputTopic{
 			Name: "t1", FilterType: access.FilterTypeDevice, FilterValue: "dev-a",
 		}),
@@ -117,7 +118,7 @@ func TestAnExternalOperatorInputIsCheckedAgainstItsPipeline(t *testing.T) {
 	perms := newRecordingPermissions()
 	f := &FlowEngine{permissionService: perms}
 
-	err := f.checkTopicAccess([]pipe.Operator{
+	err := f.checkTopicAccess(context.Background(), []pipe.Operator{
 		operatorWith("op-1", pipe.InputTopic{
 			Name: "t1", FilterType: access.FilterTypeOperator, FilterValue: "other-op:pipe-9",
 		}),

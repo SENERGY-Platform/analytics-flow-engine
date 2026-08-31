@@ -17,6 +17,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
@@ -67,14 +68,14 @@ func createOperatorConfig(parsedPipeline parser.Pipeline) (pipeline pipe.Pipelin
 	return pipeline
 }
 
-func createLocalDeviceTopic(deviceID, serviceID, userID, token string, deviceManagerService DeviceManagerService) (string, models.Service, error) {
+func createLocalDeviceTopic(ctx context.Context, deviceID, serviceID, userID, token string, deviceManagerService DeviceManagerService) (string, models.Service, error) {
 	// Load local device id and service name as they are used in local mqtt topics of the device
-	device, err := deviceManagerService.GetDevice(deviceID, userID, token)
+	device, err := deviceManagerService.GetDevice(ctx, deviceID, userID, token)
 	localService := models.Service{}
 	if err != nil {
 		return "", localService, err
 	}
-	deviceType, err := deviceManagerService.GetDeviceType(device.DeviceTypeId, userID, token)
+	deviceType, err := deviceManagerService.GetDeviceType(ctx, device.DeviceTypeId, userID, token)
 	if err != nil {
 		return "", localService, err
 	}
@@ -98,7 +99,7 @@ func createLocalValuePath(_ models.Service, path string) string {
 	return strings.Join(splittedPath[2:], ".")
 }
 
-func addOperatorConfigs(pipelineRequest lib.PipelineRequest,
+func addOperatorConfigs(ctx context.Context, pipelineRequest lib.PipelineRequest,
 	tmpPipeline pipe.Pipeline,
 	deviceManagerService DeviceManagerService,
 	userID, token string) (operators []pipe.Operator, err error) {
@@ -139,7 +140,7 @@ func addOperatorConfigs(pipelineRequest lib.PipelineRequest,
 								if len(filterIds) > 0 {
 									filterId = filterIds[topicKey]
 								}
-								topicName, localService, err = createLocalDeviceTopic(filterId, topicName, userID, token, deviceManagerService)
+								topicName, localService, err = createLocalDeviceTopic(ctx, filterId, topicName, userID, token, deviceManagerService)
 								if err != nil {
 									return
 								}

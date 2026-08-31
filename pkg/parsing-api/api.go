@@ -17,12 +17,12 @@
 package parsing_api
 
 import (
-	"encoding/json"
+	"context"
 	"net/http"
 	"strconv"
 
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/httpreq"
 	parser "github.com/SENERGY-Platform/analytics-parser/lib"
-	"github.com/parnurzeal/gorequest"
 	"github.com/pkg/errors"
 )
 
@@ -34,18 +34,22 @@ func NewParsingApi(url string) *ParsingApi {
 	return &ParsingApi{url}
 }
 
-func (a ParsingApi) GetPipeline(id string, userId string, authorization string) (p parser.Pipeline, err error) {
-	request := gorequest.New()
-	request.Get(a.url+"/flow/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
-	resp, body, e := request.End()
-	if resp.StatusCode != http.StatusOK {
-		err = errors.New("parser API - could not get pipeline from parsing service: " + strconv.Itoa(resp.StatusCode) + " " + body)
-		return
+func (a ParsingApi) GetPipeline(ctx context.Context, id string, userId string, authorization string) (p parser.Pipeline, err error) {
+	response, err := httpreq.Do(ctx, httpreq.Request{
+		Method: http.MethodGet,
+		URL:    a.url + "/flow/" + id,
+		Headers: map[string]string{
+			"X-UserId":      userId,
+			"Authorization": authorization,
+		},
+	})
+	if err != nil {
+		return p, errors.Wrap(err, "parser API - could not get pipeline from parsing service")
 	}
-	if len(e) > 0 {
-		err = errors.New("parser API - could not get pipeline from parsing service: an error occurred")
-		return
+	if response.StatusCode != http.StatusOK {
+		return p, errors.New("parser API - could not get pipeline from parsing service: " +
+			strconv.Itoa(response.StatusCode) + " " + response.Text())
 	}
-	err = json.Unmarshal([]byte(body), &p)
+	err = response.Decode(&p)
 	return
 }

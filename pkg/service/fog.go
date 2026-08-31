@@ -17,6 +17,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -40,24 +41,29 @@ func NewFogClient(pipelineService PipelineApiService) *FogClient {
 }
 
 func (f *FogClient) processMessage(message MQTT.Message) {
+	// An MQTT message carries no trace context: the fog agents publish plain
+	// payloads, and there is no header to extract one from. A background context, so
+	// the calls below still have one to be cancelled by and to log against, but the
+	// baggage stays empty here rather than being invented.
+	ctx := context.Background()
 	topic := message.Topic()
-	util.Logger.Debug("Received message on: " + topic)
+	util.Logger.DebugContext(ctx, "Received message on: "+topic)
 
 	if strings.HasSuffix(topic, "/operator/control/sync/request") {
 		userID := operatorLib.GetUserIDFromOperatorControlSyncTopic(topic)
-		f.sendActiveOperators(userID, "")
+		f.sendActiveOperators(ctx, userID, "")
 	}
 
 	if strings.HasSuffix(topic, "/upstream/sync/request") {
 		userID := upstreamLib.GetUserIDFromUpstreamControlSyncTopic(topic)
-		f.sendTopicsWithEnabledForward(userID, "")
+		f.sendTopicsWithEnabledForward(ctx, userID, "")
 	}
 }
 
-func (f *FogClient) sendActiveOperators(userID string, token string) {
-	pipelines, err := f.pipelineService.GetPipelines(userID, token)
+func (f *FogClient) sendActiveOperators(ctx context.Context, userID string, token string) {
+	pipelines, err := f.pipelineService.GetPipelines(ctx, userID, token)
 	if err != nil {
-		util.Logger.Error("cannot get pipelines", "error", err)
+		util.Logger.ErrorContext(ctx, "cannot get pipelines", "error", err)
 	}
 	var startCommands []operatorLib.StartOperatorControlCommand
 	for _, pipeline := range pipelines {
@@ -72,19 +78,19 @@ func (f *FogClient) sendActiveOperators(userID string, token string) {
 
 	syncMsgStr, err := json.Marshal(startCommands)
 	if err != nil {
-		util.Logger.Error("cannot marshal operator sync message", "error", err)
+		util.Logger.ErrorContext(ctx, "cannot marshal operator sync message", "error", err)
 	}
 	topic := operatorLib.GetOperatorControlSyncResponseTopic(userID)
 	err = publishMessage(topic, string(syncMsgStr))
 	if err != nil {
-		util.Logger.Error("cannot publish operator sync message", "error", err)
+		util.Logger.ErrorContext(ctx, "cannot publish operator sync message", "error", err)
 	}
 }
 
-func (f *FogClient) sendTopicsWithEnabledForward(userID string, token string) {
-	pipelines, err := f.pipelineService.GetPipelines(userID, token)
+func (f *FogClient) sendTopicsWithEnabledForward(ctx context.Context, userID string, token string) {
+	pipelines, err := f.pipelineService.GetPipelines(ctx, userID, token)
 	if err != nil {
-		util.Logger.Error("cannot get pipelines", "error", err)
+		util.Logger.ErrorContext(ctx, "cannot get pipelines", "error", err)
 	}
 
 	var topics []string
@@ -98,17 +104,17 @@ func (f *FogClient) sendTopicsWithEnabledForward(userID string, token string) {
 		}
 	}
 
-	util.Logger.Debug(fmt.Sprintf("sync %+v", topics))
+	util.Logger.DebugContext(ctx, fmt.Sprintf("sync %+v", topics))
 
 	syncMsg := upstreamLib.UpstreamSyncMessage{OperatorOutputTopics: topics}
 	syncMsgStr, err := json.Marshal(syncMsg)
 	if err != nil {
-		util.Logger.Error("cannot marshal upstream sync message", "error", err)
+		util.Logger.ErrorContext(ctx, "cannot marshal upstream sync message", "error", err)
 	}
 	topic := upstreamLib.GetUpstreamControlSyncResponseTopic(userID)
 	err = publishMessage(topic, string(syncMsgStr))
 	if err != nil {
-		util.Logger.Error("cannot publish upstream sync message", "error", err)
+		util.Logger.ErrorContext(ctx, "cannot publish upstream sync message", "error", err)
 	}
 }
 
@@ -144,7 +150,7 @@ func GenerateFogOperatorStartCommand(operator pipe.Operator, pipelineID string, 
 	}
 }
 
-func startFogOperator(operator pipe.Operator, pipelineConfig lib.PipelineConfig, userID string) error {
+func startFogOperator(ctx context.Context, operator pipe.Operator, pipelineConfig lib.PipelineConfig, userID string) error {
 	inputTopics := convertInputTopics(operator.InputTopics)
 
 	command := GenerateFogOperatorStartCommand(operator, pipelineConfig.PipelineId, inputTopics)
@@ -153,16 +159,16 @@ func startFogOperator(operator pipe.Operator, pipelineConfig lib.PipelineConfig,
 		return err
 	}
 	controlTopic := operatorLib.GetStartOperatorCloudTopic(userID)
-	util.Logger.Debug("publish start command for operator", "operator", operator, "topic", controlTopic)
+	util.Logger.DebugContext(ctx, "publish start command for operator", "operator", operator, "topic", controlTopic)
 	err = publishMessage(controlTopic, string(out))
 	if err != nil {
-		util.Logger.Error("cannot publish start command for operator", "error", err, "operator", operator)
+		util.Logger.ErrorContext(ctx, "cannot publish start command for operator", "error", err, "operator", operator)
 		return err
 	}
 	return nil
 }
 
-func stopFogOperator(pipelineId string, operator pipe.Operator, userID string) error {
+func stopFogOperator(ctx context.Context, pipelineId string, operator pipe.Operator, userID string) error {
 	command := &operatorLib.StopOperatorControlCommand{
 		OperatorIDs: operatorLib.OperatorIDs{
 			OperatorId:     operator.Id,
@@ -172,15 +178,15 @@ func stopFogOperator(pipelineId string, operator pipe.Operator, userID string) e
 	}
 	out, err := json.Marshal(command)
 	if err != nil {
-		util.Logger.Error("cannot unmarshal stop command for operator", "error", err, "operator", operator)
+		util.Logger.ErrorContext(ctx, "cannot unmarshal stop command for operator", "error", err, "operator", operator)
 		return err
 	}
 
 	controlTopic := operatorLib.GetStopOperatorCloudTopic(userID)
-	util.Logger.Debug("publish stop command for operator", "operator", operator, "topic", controlTopic)
+	util.Logger.DebugContext(ctx, "publish stop command for operator", "operator", operator, "topic", controlTopic)
 	err = publishMessage(controlTopic, string(out))
 	if err != nil {
-		util.Logger.Error("cannot publish stop command for operator", "error", err, "operator", operator)
+		util.Logger.ErrorContext(ctx, "cannot publish stop command for operator", "error", err, "operator", operator)
 		return err
 	}
 	return nil

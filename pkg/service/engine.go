@@ -17,6 +17,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib/access"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/baggage"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
@@ -66,13 +68,62 @@ func NewFlowEngine(
 	return f
 }
 
+// deploymentContext keeps the values of ctx — the trace and the baggage — but drops
+// its cancellation.
+//
+// Applied once, at the top of each method that changes something, and to the whole
+// method rather than to individual calls inside it. Starting, updating and deleting
+// a pipeline each write to two places that have to agree: the Kubernetes cluster and
+// the pipeline registry. A cancellation landing between them leaves them
+// disagreeing, and the disagreements are not harmless:
+//
+//   - Delete: the deployment is gone, the registry entry is not, and the startup
+//     sync recreates the deployment. A deleted pipeline comes back.
+//   - Start: the operators run, but the registry never gets the fog topics, the
+//     downstream instance ids or the baggage. Nothing repairs that.
+//   - The rollback of a failed start, and the teardown of a forwarding instance,
+//     have to run exactly when the request is already going wrong.
+//
+// Doing the work nobody is waiting for any more is the cheaper failure. The read
+// paths — GetPipelineStatus, GetPipelinesStatus — stay cancellable, because an
+// abandoned read costs nothing and leaves nothing behind.
+func deploymentContext(ctx context.Context) context.Context {
+	return context.WithoutCancel(ctx)
+}
+
+// checker binds ctx to the permission service.
+//
+// lib/access is a separate module, shared with the Operator Development
+// Environment, and its Checker interface has no context. Rather than change that
+// interface and break the other consumer, the context is bound here, so the calls
+// it makes still carry the trace and the baggage.
+func (f *FlowEngine) checker(ctx context.Context) access.Checker {
+	return boundChecker{ctx: ctx, service: f.permissionService}
+}
+
+type boundChecker struct {
+	ctx     context.Context
+	service PermissionApiService
+}
+
+func (b boundChecker) UserHasExecuteAccess(resource string, ids []string, authorization string) (bool, error) {
+	return b.service.UserHasExecuteAccess(b.ctx, resource, ids, authorization)
+}
+
+// syncPipelines runs at startup, outside any request. It recreates deployments the
+// registry knows about but the cluster does not — including their baggage labels,
+// which is the reason the baggage is stored on the pipeline rather than only read
+// off the request that created it.
 func (f *FlowEngine) syncPipelines() (err error) {
-	util.Logger.Info("syncing pipelines")
-	pipelines, err := f.pipelineService.GetPipelinesAdmin()
+	// No request to inherit from, and nothing to cancel this: it runs once while the
+	// service starts up, and it recreates deployments, so it is a write path too.
+	startupCtx := context.Background()
+	util.Logger.InfoContext(startupCtx, "syncing pipelines")
+	pipelines, err := f.pipelineService.GetPipelinesAdmin(startupCtx)
 	if err != nil {
 		return err
 	}
-	statusTemp, err := f.driver.GetPipelinesStatus()
+	statusTemp, err := f.driver.GetPipelinesStatus(startupCtx)
 	if err != nil {
 		return err
 	}
@@ -84,20 +135,23 @@ func (f *FlowEngine) syncPipelines() (err error) {
 		func(b lib.PipelineStatus) string { return strings.Replace(b.Name, "pipeline-", "", -1) },
 	)
 	if len(missing) > 0 {
-		util.Logger.Warn("found missing pipelines")
+		util.Logger.WarnContext(startupCtx, "found missing pipelines")
 		for _, item := range missing {
 			item.Image = ""
-			util.Logger.Warn("trying to recreate pipeline", "pipeline", item)
+			// The pipeline's own stored baggage, so these lines carry the same context
+			// as the ones the original request wrote. This is the case they are read in.
+			ctx := baggage.WithStored(startupCtx, item.Baggage)
+			util.Logger.WarnContext(ctx, "trying to recreate pipeline", "pipeline", item)
 			//first delete every resource that might still be present
-			err = f.stopOperators(item, "")
+			err = f.stopOperators(ctx, item, "")
 			if err != nil {
-				util.Logger.Error("cannot stop operators", "error", err)
+				util.Logger.ErrorContext(ctx, "cannot stop operators", "error", err)
 				return
 			}
 
 			pipeConfig := f.createPipelineConfig(item)
 			pipeConfig.UserId = item.UserId
-			_, err := f.startOperators(item, pipeConfig, "")
+			_, err := f.startOperators(ctx, item, pipeConfig, "")
 			if err != nil {
 				return fmt.Errorf("failed to start operators: %w", err)
 			}
@@ -105,57 +159,92 @@ func (f *FlowEngine) syncPipelines() (err error) {
 	}
 
 	if len(extra) > 0 {
-		util.Logger.Warn("found extra pipelines")
+		util.Logger.WarnContext(startupCtx, "found extra pipelines")
 		for _, item := range extra {
-			util.Logger.Warn("extra deployment", "deployment", item)
+			util.Logger.WarnContext(startupCtx, "extra deployment", "deployment", item)
 		}
 	}
 	return
 }
 
-func (f *FlowEngine) StartPipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline *pipe.Pipeline, err error) {
-	util.Logger.Debug("engine - start pipeline: " + pipelineRequest.Id)
-	pipeline, err = f.setupPipeline(pipelineRequest, userId, token)
+func (f *FlowEngine) StartPipeline(ctx context.Context, pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline *pipe.Pipeline, err error) {
+	ctx = deploymentContext(ctx)
+	util.Logger.DebugContext(ctx, "engine - start pipeline: "+pipelineRequest.Id)
+	pipeline, err = f.setupPipeline(ctx, pipelineRequest, userId, token)
 	if err != nil {
 		return
 	}
 
-	id, err := f.pipelineService.RegisterPipeline(pipeline, userId, token)
+	id, err := f.pipelineService.RegisterPipeline(ctx, pipeline, userId, token)
 	if err != nil {
 		return
 	}
 	pipeline.Id = id.String()
 
+	// The pipeline id only exists now, so it joins the baggage here rather than in
+	// the middleware. From this point on every log line of this request names the
+	// pipeline it is about, and the operators are labelled with it too.
+	ctx = withPipelineIdInBaggage(ctx, pipeline.Id)
+	pipeline.Baggage = baggage.FromContext(ctx)
+
 	pipeline.Operators = addPipelineIDToFogTopic(pipeline.Operators, pipeline.Id)
 	pipeConfig := f.createPipelineConfig(*pipeline)
 	pipeConfig.UserId = userId
-	newOperators, err := f.startOperators(*pipeline, pipeConfig, token)
+	newOperators, err := f.startOperators(ctx, *pipeline, pipeConfig, token)
 	if err != nil {
-		if delErr := f.pipelineService.DeletePipeline(pipeline.Id, userId, token); delErr != nil {
-			util.Logger.Error("failed to rollback pipeline registration", "error", delErr)
+		// The operators too, not only the registry entry. startOperators can fail after
+		// the deployment exists — while enabling the cloud-to-fog forwarding, say — and
+		// removing just the registration would leave a deployment in the cluster that
+		// nothing points at. The startup sync only logs those as "extra deployment".
+		if stopErr := f.stopOperators(ctx, *pipeline, token); stopErr != nil {
+			util.Logger.ErrorContext(ctx, "failed to roll back the started operators", "error", stopErr)
+		}
+		if delErr := f.pipelineService.DeletePipeline(ctx, pipeline.Id, userId, token); delErr != nil {
+			util.Logger.ErrorContext(ctx, "failed to rollback pipeline registration", "error", delErr)
 		}
 		return
 	}
 	pipeline.Operators = newOperators
-	err = f.pipelineService.UpdatePipeline(pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
+	err = f.pipelineService.UpdatePipeline(ctx, pipeline, userId, token) //update is needed to set correct fog output topics (with pipeline ID) and instance id for downstream config of fog operators
 	if err != nil {
 		return
 	}
-	util.Logger.Debug("started pipeline: "+pipeline.Id, "pipeline", pipeline)
+	util.Logger.DebugContext(ctx, "started pipeline: "+pipeline.Id, "pipeline", pipeline)
 	return
 }
 
-func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline *pipe.Pipeline, err error) {
-	util.Logger.Debug("engine - update pipeline: " + pipelineRequest.Id)
-	oldPipeline, err := f.pipelineService.GetPipeline(pipelineRequest.Id, userId, token)
+// withPipelineIdInBaggage adds the pipeline id to the baggage of ctx.
+//
+// A failure here is logged rather than returned: the id is a uuid and cannot be
+// rejected as a baggage value, and a pipeline that starts correctly must not be
+// refused over a log annotation.
+func withPipelineIdInBaggage(ctx context.Context, pipelineId string) context.Context {
+	withId, err := baggage.WithValue(ctx, baggage.PipelineIdKey, pipelineId)
+	if err != nil {
+		util.Logger.WarnContext(ctx, "could not add the pipeline id to the baggage",
+			"error", err, "pipelineId", pipelineId)
+		return ctx
+	}
+	return withId
+}
+
+func (f *FlowEngine) UpdatePipeline(ctx context.Context, pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline *pipe.Pipeline, err error) {
+	ctx = withPipelineIdInBaggage(deploymentContext(ctx), pipelineRequest.Id)
+	util.Logger.DebugContext(ctx, "engine - update pipeline: "+pipelineRequest.Id)
+	oldPipeline, err := f.pipelineService.GetPipeline(ctx, pipelineRequest.Id, userId, token)
 	if err != nil {
 		return
 	}
 
-	pipeline, err = f.setupPipeline(pipelineRequest, userId, token)
+	pipeline, err = f.setupPipeline(ctx, pipelineRequest, userId, token)
 	if err != nil {
 		return
 	}
+
+	// The stored baggage is the base and this request's is laid over it: otelx adds
+	// user_id and username to every request, so an update from any other caller
+	// would otherwise silently drop a smart service instance id set at creation.
+	pipeline.Baggage = baggage.Merge(oldPipeline.Baggage, baggage.FromContext(ctx))
 
 	// If consume all messages is the same, we can reuse the application IDs
 	if pipeline.ConsumeAllMessages == oldPipeline.ConsumeAllMessages {
@@ -170,9 +259,9 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId 
 		}
 	}
 
-	err = f.stopOperators(oldPipeline, token)
+	err = f.stopOperators(ctx, oldPipeline, token)
 	if err != nil {
-		util.Logger.Error("cannot stop operators", "error", err)
+		util.Logger.ErrorContext(ctx, "cannot stop operators", "error", err)
 		return
 	}
 
@@ -180,34 +269,34 @@ func (f *FlowEngine) UpdatePipeline(pipelineRequest lib.PipelineRequest, userId 
 	pipeline.Operators = addPipelineIDToFogTopic(pipeline.Operators, pipeline.Id)
 	pipeConfig := f.createPipelineConfig(*pipeline)
 	pipeConfig.UserId = userId
-	newOperators, err := f.startOperators(*pipeline, pipeConfig, token)
+	newOperators, err := f.startOperators(ctx, *pipeline, pipeConfig, token)
 	if err != nil {
-		util.Logger.Error("failed to start new operators, attempting to restart old pipeline", "error", err)
-		if _, err = f.startOperators(oldPipeline, f.createPipelineConfig(oldPipeline), token); err != nil {
-			util.Logger.Error("CRITICAL: failed to restart old pipeline", "error", err)
+		util.Logger.ErrorContext(ctx, "failed to start new operators, attempting to restart old pipeline", "error", err)
+		if _, err = f.startOperators(ctx, oldPipeline, f.createPipelineConfig(oldPipeline), token); err != nil {
+			util.Logger.ErrorContext(ctx, "CRITICAL: failed to restart old pipeline", "error", err)
 		}
 		return nil, fmt.Errorf("failed to start operators: %w", err)
 	}
 	pipeline.Operators = newOperators
-	err = f.pipelineService.UpdatePipeline(pipeline, userId, token)
-	util.Logger.Debug("updated pipeline: "+pipeline.Id, "pipeline", pipeline)
+	err = f.pipelineService.UpdatePipeline(ctx, pipeline, userId, token)
+	util.Logger.DebugContext(ctx, "updated pipeline: "+pipeline.Id, "pipeline", pipeline)
 	return
 }
 
-func (f *FlowEngine) setupPipeline(pipelineRequest lib.PipelineRequest, userId, token string) (*pipe.Pipeline, error) {
-	parsedPipeline, err := f.parsingService.GetPipeline(pipelineRequest.FlowId, userId, token)
+func (f *FlowEngine) setupPipeline(ctx context.Context, pipelineRequest lib.PipelineRequest, userId, token string) (*pipe.Pipeline, error) {
+	parsedPipeline, err := f.parsingService.GetPipeline(ctx, pipelineRequest.FlowId, userId, token)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = f.checkAccess(pipelineRequest, parsedPipeline.Operators, token); err != nil {
+	if err = f.checkAccess(ctx, pipelineRequest, parsedPipeline.Operators, token); err != nil {
 		return nil, lib.NewForbiddenError(fmt.Errorf("checkAccess failed: %w", err))
 	}
 
 	pipeline := setPipelineModel(pipelineRequest, parsedPipeline)
 	tmpPipeline := createOperatorConfig(parsedPipeline)
 
-	configuredOperators, err := addOperatorConfigs(pipelineRequest, tmpPipeline, f.deviceManagerService, userId, token)
+	configuredOperators, err := addOperatorConfigs(ctx, pipelineRequest, tmpPipeline, f.deviceManagerService, userId, token)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +306,7 @@ func (f *FlowEngine) setupPipeline(pipelineRequest lib.PipelineRequest, userId, 
 	// and the operators, which the request names directly; what a topic reads is
 	// decided by the parser and by addOperatorConfigs together, so checking the
 	// request would leave whatever those two add unchecked.
-	if err = f.checkTopicAccess(pipeline.Operators, token); err != nil {
+	if err = f.checkTopicAccess(ctx, pipeline.Operators, token); err != nil {
 		return nil, lib.NewForbiddenError(fmt.Errorf("checkAccess failed: %w", err))
 	}
 
@@ -267,13 +356,13 @@ func (f *FlowEngine) setPlatformOperatorConfig(operators []pipe.Operator) error 
 // topics from an experiment rather than from a pipeline request. Operator Lib
 // reads whatever its topics name over a shared database credential and checks
 // nothing itself, so this is the only place the rule is applied for a deployment.
-func (f *FlowEngine) checkTopicAccess(operators []pipe.Operator, token string) error {
+func (f *FlowEngine) checkTopicAccess(ctx context.Context, operators []pipe.Operator, token string) error {
 	internal := make([]string, 0, len(operators))
 	for _, operator := range operators {
 		internal = append(internal, operator.Id)
 	}
 	for _, operator := range operators {
-		err := access.CheckTopics(f.permissionService, token, operator.InputTopics,
+		err := access.CheckTopics(f.checker(ctx), token, operator.InputTopics,
 			access.Options{InternalOperatorIDs: internal})
 		if err != nil {
 			return fmt.Errorf("operator %s: %w", operator.Id, err)
@@ -282,39 +371,41 @@ func (f *FlowEngine) checkTopicAccess(operators []pipe.Operator, token string) e
 	return nil
 }
 
-func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err error) {
-	util.Logger.Debug("engine - delete pipeline: " + id)
-	pipeline, err := f.pipelineService.GetPipeline(id, userId, token)
+func (f *FlowEngine) DeletePipeline(ctx context.Context, id string, userId string, token string) (err error) {
+	ctx = withPipelineIdInBaggage(deploymentContext(ctx), id)
+	util.Logger.DebugContext(ctx, "engine - delete pipeline: "+id)
+	pipeline, err := f.pipelineService.GetPipeline(ctx, id, userId, token)
 	if err != nil {
 		return
 	}
-	err = f.stopOperators(pipeline, token)
+	err = f.stopOperators(ctx, pipeline, token)
 	if err != nil {
 		if !k8apierrors.IsNotFound(err) {
 			return
 		}
 	} else {
-		util.Logger.Debug("removed all operators for pipeline: " + id)
+		util.Logger.DebugContext(ctx, "removed all operators for pipeline: "+id)
 	}
-	err = f.pipelineService.DeletePipeline(id, userId, token)
+	err = f.pipelineService.DeletePipeline(ctx, id, userId, token)
 	if err != nil {
 		return
 	}
 	return
 }
 
-func (f *FlowEngine) GetPipelineStatus(id, userId, token string) (status lib.PipelineStatus, err error) {
-	_, err = f.pipelineService.GetPipeline(id, userId, token)
+func (f *FlowEngine) GetPipelineStatus(ctx context.Context, id, userId, token string) (status lib.PipelineStatus, err error) {
+	ctx = withPipelineIdInBaggage(ctx, id)
+	_, err = f.pipelineService.GetPipeline(ctx, id, userId, token)
 	if err != nil {
 		return
 	}
-	status, err = f.driver.GetPipelineStatus(id)
+	status, err = f.driver.GetPipelineStatus(ctx, id)
 	return
 }
 
-func (f *FlowEngine) GetPipelinesStatus(ids []string, userId, token string) (status []lib.PipelineStatus, err error) {
-	statusTemp, err := f.driver.GetPipelinesStatus()
-	pipes, err := f.pipelineService.GetPipelines(userId, token)
+func (f *FlowEngine) GetPipelinesStatus(ctx context.Context, ids []string, userId, token string) (status []lib.PipelineStatus, err error) {
+	statusTemp, err := f.driver.GetPipelinesStatus(ctx)
+	pipes, err := f.pipelineService.GetPipelines(ctx, userId, token)
 	if err != nil {
 		return
 	}
@@ -338,11 +429,11 @@ func (f *FlowEngine) GetPipelinesStatus(ids []string, userId, token string) (sta
 	return
 }
 
-func (f *FlowEngine) checkAccess(pipelineRequest lib.PipelineRequest, operators map[string]parser.Operator, token string) error {
+func (f *FlowEngine) checkAccess(ctx context.Context, pipelineRequest lib.PipelineRequest, operators map[string]parser.Operator, token string) error {
 	// What the request names directly. The ids its inputs name are authorized in
 	// checkTopicAccess instead, against the parsed topics rather than the request,
 	// because those are what the operators actually read.
-	if err := access.Check(f.permissionService, token,
+	if err := access.Check(f.checker(ctx), token,
 		access.ResourceFlows, []string{pipelineRequest.FlowId}); err != nil {
 		return err
 	}
@@ -352,7 +443,7 @@ func (f *FlowEngine) checkAccess(pipelineRequest lib.PipelineRequest, operators 
 		for _, op := range operators {
 			operatorIds = append(operatorIds, op.OperatorId)
 		}
-		ok, err := f.permissionService.UserHasExecuteAccess(access.ResourceOperators, operatorIds, token)
+		ok, err := f.permissionService.UserHasExecuteAccess(ctx, access.ResourceOperators, operatorIds, token)
 		if err != nil {
 			return err
 		}
@@ -411,12 +502,12 @@ func setPipelineModel(pipelineRequest lib.PipelineRequest, parsedPipeline parser
 	return pipeline
 }
 
-func (f *FlowEngine) stopOperators(pipeline pipe.Pipeline, token string) error {
+func (f *FlowEngine) stopOperators(ctx context.Context, pipeline pipe.Pipeline, token string) error {
 	localOperators, cloudOperators := seperateOperators(pipeline)
-	util.Logger.Debug("engine - stop operators for pipeline: "+pipeline.Id, "localOperators", localOperators, "cloudOperators", cloudOperators)
+	util.Logger.DebugContext(ctx, "engine - stop operators for pipeline: "+pipeline.Id, "localOperators", localOperators, "cloudOperators", cloudOperators)
 
 	if len(cloudOperators) > 0 {
-		err := f.driver.DeleteOperators(pipeline.Id, cloudOperators)
+		err := f.driver.DeleteOperators(ctx, pipeline.Id, cloudOperators)
 		if err != nil {
 			//ignore error if operator was not found
 			var notFoundErr *lib.NotFoundError
@@ -424,22 +515,22 @@ func (f *FlowEngine) stopOperators(pipeline pipe.Pipeline, token string) error {
 				return err
 			}
 		}
-		err = f.disableCloudToFogForwarding(cloudOperators, pipeline.Id, pipeline.UserId, token)
+		err = f.disableCloudToFogForwarding(ctx, cloudOperators, pipeline.Id, pipeline.UserId, token)
 		if err != nil {
-			util.Logger.Error("cannot disable cloud2fog forwarding", "error", err)
+			util.Logger.ErrorContext(ctx, "cannot disable cloud2fog forwarding", "error", err)
 			return err
 		}
 	}
 
 	if len(localOperators) > 0 {
 		for _, operator := range localOperators {
-			util.Logger.Debug("engine - stop local Operator: " + operator.Name)
-			err := stopFogOperator(pipeline.Id,
+			util.Logger.DebugContext(ctx, "engine - stop local Operator: "+operator.Name)
+			err := stopFogOperator(ctx, pipeline.Id,
 				operator, pipeline.UserId)
 			if err != nil {
 				return err
 			}
-			err = f.disableFogToCloudForwarding(operator, pipeline.Id, pipeline.UserId, token)
+			err = f.disableFogToCloudForwarding(ctx, operator, pipeline.Id, pipeline.UserId, token)
 			if err != nil {
 				return err
 			}
@@ -448,26 +539,27 @@ func (f *FlowEngine) stopOperators(pipeline pipe.Pipeline, token string) error {
 	return nil
 }
 
-func (f *FlowEngine) startOperators(pipeline pipe.Pipeline, pipeConfig lib.PipelineConfig, token string) (newOperators []pipe.Operator, err error) {
+func (f *FlowEngine) startOperators(ctx context.Context, pipeline pipe.Pipeline, pipeConfig lib.PipelineConfig, token string) (newOperators []pipe.Operator, err error) {
 	localOperators, cloudOperators := seperateOperators(pipeline)
 
 	if len(cloudOperators) > 0 {
-		util.Logger.Debug("try to start cloud operators")
-		err = retry(6, 10*time.Second, func() (err error) {
+		util.Logger.DebugContext(ctx, "try to start cloud operators")
+		err = retry(ctx, 6, 10*time.Second, func() (err error) {
 			return f.driver.CreateOperators(
+				ctx,
 				pipeline.Id,
 				cloudOperators,
 				pipeConfig,
 			)
 		})
 		if err != nil {
-			util.Logger.Error("cannot start cloud operators", "error", err)
+			util.Logger.ErrorContext(ctx, "cannot start cloud operators", "error", err)
 			return
 		} else {
-			util.Logger.Debug("engine - successfully started cloud operators - " + pipeline.Id)
-			cloudOperatorsWithDownstreamID, err2 := f.enableCloudToFogForwarding(cloudOperators, pipeline.Id, pipeline.UserId, token)
+			util.Logger.DebugContext(ctx, "engine - successfully started cloud operators - "+pipeline.Id)
+			cloudOperatorsWithDownstreamID, err2 := f.enableCloudToFogForwarding(ctx, cloudOperators, pipeline.Id, pipeline.UserId, token)
 			if err2 != nil {
-				util.Logger.Error("cannot enable cloud2fog forwarding", "error", err2)
+				util.Logger.ErrorContext(ctx, "cannot enable cloud2fog forwarding", "error", err2)
 				err = err2
 				return
 			}
@@ -476,15 +568,15 @@ func (f *FlowEngine) startOperators(pipeline pipe.Pipeline, pipeConfig lib.Pipel
 	}
 	if len(localOperators) > 0 {
 		for _, operator := range localOperators {
-			util.Logger.Debug("try to start local operator: " + operator.Name + " for pipeline: " + pipeline.Id)
-			err = startFogOperator(operator, pipeConfig, pipeline.UserId)
+			util.Logger.DebugContext(ctx, "try to start local operator: "+operator.Name+" for pipeline: "+pipeline.Id)
+			err = startFogOperator(ctx, operator, pipeConfig, pipeline.UserId)
 			if err != nil {
-				util.Logger.Error("cannot start local operator", "error", err, "operator", operator)
+				util.Logger.ErrorContext(ctx, "cannot start local operator", "error", err, "operator", operator)
 				return
 			}
-			util.Logger.Debug("engine - successfully started local operator: " + operator.Name + " for pipeline: " + pipeline.Id)
+			util.Logger.DebugContext(ctx, "engine - successfully started local operator: "+operator.Name+" for pipeline: "+pipeline.Id)
 
-			err = f.enableFogToCloudForwarding(operator, pipeline.Id, pipeline.UserId)
+			err = f.enableFogToCloudForwarding(ctx, operator, pipeline.Id, pipeline.UserId)
 			if err != nil {
 				return
 			}
@@ -494,13 +586,13 @@ func (f *FlowEngine) startOperators(pipeline pipe.Pipeline, pipeConfig lib.Pipel
 	return
 }
 
-func (f *FlowEngine) enableCloudToFogForwarding(operators []pipe.Operator, pipelineID, userID, token string) (newOperators []pipe.Operator, err error) {
+func (f *FlowEngine) enableCloudToFogForwarding(ctx context.Context, operators []pipe.Operator, pipelineID, userID, token string) (newOperators []pipe.Operator, err error) {
 	for _, operator := range operators {
 		if operator.DownstreamConfig.Enabled {
-			util.Logger.Debug("Try to enable Cloud2Fog Forwarding for operator: " + operator.Id)
-			createdInstance, err := f.kafak2mqttService.StartOperatorInstance(operator.Name, operator.Id, pipelineID, userID, token)
+			util.Logger.DebugContext(ctx, "Try to enable Cloud2Fog Forwarding for operator: "+operator.Id)
+			createdInstance, err := f.kafak2mqttService.StartOperatorInstance(ctx, operator.Name, operator.Id, pipelineID, userID, token)
 			if err != nil {
-				util.Logger.Error("cannot enable cloud2fog forwarding", "error", err, "operator", operator)
+				util.Logger.ErrorContext(ctx, "cannot enable cloud2fog forwarding", "error", err, "operator", operator)
 				return []pipe.Operator{}, err
 			}
 			operator.DownstreamConfig.InstanceID = createdInstance.Id
@@ -511,69 +603,69 @@ func (f *FlowEngine) enableCloudToFogForwarding(operators []pipe.Operator, pipel
 	return
 }
 
-func (f *FlowEngine) enableFogToCloudForwarding(operator pipe.Operator, _, userID string) error {
+func (f *FlowEngine) enableFogToCloudForwarding(ctx context.Context, operator pipe.Operator, _, userID string) error {
 	if operator.UpstreamConfig.Enabled {
-		util.Logger.Debug("Try to enable Fog2Cloud Forwarding for operator: " + operator.Id)
+		util.Logger.DebugContext(ctx, "Try to enable Fog2Cloud Forwarding for operator: "+operator.Id)
 
 		command := &upstreamLib.UpstreamControlMessage{
 			OperatorOutputTopic: operator.OutputTopic,
 		}
 		message, err := json.Marshal(command)
 		if err != nil {
-			util.Logger.Error("cannot unmarshal enable fog2cloud message for operator: "+operator.Name+" - "+operator.Id, "error", err)
+			util.Logger.ErrorContext(ctx, "cannot unmarshal enable fog2cloud message for operator: "+operator.Name+" - "+operator.Id, "error", err)
 			return err
 		}
 		topic := upstreamLib.GetUpstreamEnableCloudTopic(userID)
-		util.Logger.Debug("try to publish enable forwarding command for operator: " + operator.Name + " - " + operator.Id + " to topic: " + topic)
+		util.Logger.DebugContext(ctx, "try to publish enable forwarding command for operator: "+operator.Name+" - "+operator.Id+" to topic: "+topic)
 		err = publishMessage(topic, string(message))
 		if err != nil {
-			util.Logger.Error("cannot publish enable fog2cloud message for operator: "+operator.Name+" - "+operator.Id, "error", err)
+			util.Logger.ErrorContext(ctx, "cannot publish enable fog2cloud message for operator: "+operator.Name+" - "+operator.Id, "error", err)
 			return err
 		}
-		util.Logger.Debug("published enable forwarding command for operator: " + operator.Name + " - " + operator.Id + " to topic: " + topic)
+		util.Logger.DebugContext(ctx, "published enable forwarding command for operator: "+operator.Name+" - "+operator.Id+" to topic: "+topic)
 	}
 	return nil
 }
 
-func (f *FlowEngine) disableCloudToFogForwarding(operators []pipe.Operator, pipelineID, userID, token string) error {
+func (f *FlowEngine) disableCloudToFogForwarding(ctx context.Context, operators []pipe.Operator, pipelineID, userID, token string) error {
 	for _, operator := range operators {
 		downstreamConfig := operator.DownstreamConfig
 		if downstreamConfig.Enabled {
-			util.Logger.Debug("Try to disable Cloud2Fog Forwarding for operator: " + operator.Id)
+			util.Logger.DebugContext(ctx, "Try to disable Cloud2Fog Forwarding for operator: "+operator.Id)
 			if downstreamConfig.InstanceID == "" {
-				util.Logger.Warn("No instance ID set for operator: " + operator.Id)
+				util.Logger.WarnContext(ctx, "No instance ID set for operator: "+operator.Id)
 				continue
 			}
-			err := f.kafak2mqttService.RemoveInstance(downstreamConfig.InstanceID, pipelineID, userID, token)
+			err := f.kafak2mqttService.RemoveInstance(ctx, downstreamConfig.InstanceID, pipelineID, userID, token)
 			if err != nil {
-				util.Logger.Error("cannot disable cloud2fog forwarding", "error", err, "operator", operator)
+				util.Logger.ErrorContext(ctx, "cannot disable cloud2fog forwarding", "error", err, "operator", operator)
 				return err
 			}
-			util.Logger.Debug("Disabled Cloud2Fog Forwarding for operator: " + operator.Id)
+			util.Logger.DebugContext(ctx, "Disabled Cloud2Fog Forwarding for operator: "+operator.Id)
 		} else {
-			util.Logger.Debug("Operator " + operator.Id + " has no downstream forwarding enabled")
+			util.Logger.DebugContext(ctx, "Operator "+operator.Id+" has no downstream forwarding enabled")
 		}
 	}
 	return nil
 }
 
-func (f *FlowEngine) disableFogToCloudForwarding(operator pipe.Operator, _, userID, _ string) error {
+func (f *FlowEngine) disableFogToCloudForwarding(ctx context.Context, operator pipe.Operator, _, userID, _ string) error {
 	if operator.UpstreamConfig.Enabled {
 		command := &upstreamLib.UpstreamControlMessage{
 			OperatorOutputTopic: operator.OutputTopic,
 		}
 		message, err := json.Marshal(command)
 		if err != nil {
-			util.Logger.Error("cannot unmarshal disable fog2cloud message for operator: "+operator.Name+" - "+operator.Id, "error", err)
+			util.Logger.ErrorContext(ctx, "cannot unmarshal disable fog2cloud message for operator: "+operator.Name+" - "+operator.Id, "error", err)
 			return err
 		}
-		util.Logger.Debug("try to publish disable forwarding command for operator: " + operator.Name + " - " + operator.Id)
+		util.Logger.DebugContext(ctx, "try to publish disable forwarding command for operator: "+operator.Name+" - "+operator.Id)
 		err = publishMessage(upstreamLib.GetUpstreamDisableCloudTopic(userID), string(message))
 		if err != nil {
-			util.Logger.Error("cannot publish disable fog2cloud message for operator: "+operator.Name+" - "+operator.Id, "error", err)
+			util.Logger.ErrorContext(ctx, "cannot publish disable fog2cloud message for operator: "+operator.Name+" - "+operator.Id, "error", err)
 		}
 	} else {
-		util.Logger.Debug("Operator " + operator.Id + " has no upstream forwarding enabled")
+		util.Logger.DebugContext(ctx, "Operator "+operator.Id+" has no upstream forwarding enabled")
 	}
 	return nil
 }
@@ -586,6 +678,10 @@ func (f *FlowEngine) createPipelineConfig(pipeline pipe.Pipeline) lib.PipelineCo
 		ConsumerOffset: "latest",
 		Metrics:        true, // always enable metrics SNRGY-3068 pipeline.Metrics,
 		PipelineId:     pipeline.Id,
+		// Taken off the pipeline rather than off the request context, so that a
+		// deployment recreated by syncPipelines gets the same labels as the one the
+		// original request produced.
+		Baggage: pipeline.Baggage,
 	}
 	if pipeline.ConsumeAllMessages {
 		pipeConfig.ConsumerOffset = "earliest"

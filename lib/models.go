@@ -79,6 +79,10 @@ type PipelineConfig struct {
 	FlowId         string
 	PipelineId     string
 	UserId         string
+	// Baggage is the caller's OpenTelemetry context, carried here because both
+	// drivers build the same operator deployment out of this struct and both have
+	// to label it and hand it to the containers the same way.
+	Baggage map[string]string
 }
 
 type PipelineStatus struct {

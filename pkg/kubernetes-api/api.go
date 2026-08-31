@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/baggage"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	pipe_lib "github.com/SENERGY-Platform/analytics-pipeline/lib"
@@ -69,7 +70,7 @@ func NewKubernetes(r2cfg *config.Rancher2Config, debug bool) (kube *Kubernetes, 
 	}
 	util.Logger.Debug("loaded clientset")
 
-	pods, err := clientset.CoreV1().Pods(r2cfg.NamespaceId).List(context.TODO(), metav1.ListOptions{})
+	pods, err := clientset.CoreV1().Pods(r2cfg.NamespaceId).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +79,7 @@ func NewKubernetes(r2cfg *config.Rancher2Config, debug bool) (kube *Kubernetes, 
 	return &Kubernetes{clientset: clientset, autoscalerClientset: autoscalerClientSet, r2cfg: r2cfg}, nil
 }
 
-func (k *Kubernetes) CreateOperators(pipelineId string, inputs []pipe_lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
+func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inputs []pipe_lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
 	var containers []apiv1.Container
 	var volumes []apiv1.Volume
 	metricsBasePort := 8080
@@ -136,6 +137,14 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []pipe_lib.Operat
 			},
 		}
 
+		// The operator libraries read this and put the entries into every log record
+		// they write. The pod labels below cover the same ground for the log
+		// aggregation, which sees the container from the outside; this covers the
+		// operator process, which is the only place that knows what it is doing.
+		if header := baggage.Header(pipeConfig.Baggage); header != "" {
+			envs = append(envs, apiv1.EnvVar{Name: baggage.EnvVar, Value: header})
+		}
+
 		if pipeConfig.Metrics {
 			metricsPort := metricsBasePort + i
 			envs = append(envs, apiv1.EnvVar{Name: "METRICS", Value: "true"}, apiv1.EnvVar{Name: "METRICS_PORT", Value: strconv.Itoa(metricsPort)})
@@ -151,7 +160,7 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []pipe_lib.Operat
 		if operator.PersistData {
 			volumeName := getOperatorName(pipelineId, operator)[0]
 			pvc := k.makePVC(volumeName, "50M")
-			_, err = pvcClient.Create(context.TODO(), pvc, metav1.CreateOptions{})
+			_, err = pvcClient.Create(ctx, pvc, metav1.CreateOptions{})
 			volumeMounts = append(volumeMounts, apiv1.VolumeMount{
 				Name:      volumeName,
 				MountPath: "/opt/data",
@@ -201,11 +210,15 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []pipe_lib.Operat
 			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
+					// On the pod template rather than the deployment: the log aggregation
+					// reads pod labels, and the deployment's own labels never reach a log
+					// line. Not on the selector either, which must keep matching the pods
+					// of a deployment created before the baggage existed.
+					Labels: baggage.AddLabels(ctx, map[string]string{
 						"flowId":     pipeConfig.FlowId,
 						"pipelineId": pipelineId,
 						"user":       pipeConfig.UserId,
-					},
+					}, pipeConfig.Baggage),
 				},
 				Spec: apiv1.PodSpec{
 					Volumes:    volumes,
@@ -216,12 +229,12 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []pipe_lib.Operat
 	}
 
 	// Create Deployment
-	util.Logger.Debug("creating deployment")
-	result, err := deploymentsClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
+	util.Logger.DebugContext(ctx, "creating deployment")
+	result, err := deploymentsClient.Create(ctx, deployment, metav1.CreateOptions{})
 	if err != nil {
 		return
 	}
-	util.Logger.Debug(fmt.Sprintf("created deployment %s", result.GetObjectMeta().GetName()))
+	util.Logger.DebugContext(ctx, fmt.Sprintf("created deployment %s", result.GetObjectMeta().GetName()))
 
 	// Create Vertical Pod Autoscaler
 	updateAutoMode := v1.UpdateModeRecreate
@@ -243,21 +256,21 @@ func (k *Kubernetes) CreateOperators(pipelineId string, inputs []pipe_lib.Operat
 		},
 	}
 
-	util.Logger.Debug("creating autoscaler")
+	util.Logger.DebugContext(ctx, "creating autoscaler")
 	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(k.r2cfg.NamespaceId)
-	vpaResult, err := verticalAutoscalerClient.Create(context.TODO(), vpa, metav1.CreateOptions{})
+	vpaResult, err := verticalAutoscalerClient.Create(ctx, vpa, metav1.CreateOptions{})
 	if err != nil {
 		return
 	}
-	util.Logger.Debug(fmt.Sprintf("created vpa %s", vpaResult.GetObjectMeta().GetName()))
+	util.Logger.DebugContext(ctx, fmt.Sprintf("created vpa %s", vpaResult.GetObjectMeta().GetName()))
 	return
 }
 
-func (k *Kubernetes) DeleteOperator(string, pipe_lib.Operator) (err error) {
+func (k *Kubernetes) DeleteOperator(context.Context, string, pipe_lib.Operator) (err error) {
 	return
 }
 
-func (k *Kubernetes) DeleteOperators(pipelineId string, operators []pipe_lib.Operator) (err error) {
+func (k *Kubernetes) DeleteOperators(ctx context.Context, pipelineId string, operators []pipe_lib.Operator) (err error) {
 	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
 	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(k.r2cfg.NamespaceId)
 	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(k.r2cfg.NamespaceId)
@@ -266,57 +279,57 @@ func (k *Kubernetes) DeleteOperators(pipelineId string, operators []pipe_lib.Ope
 	for _, operator := range operators {
 		if operator.PersistData {
 			volumeName := getOperatorName(pipelineId, operator)[0]
-			util.Logger.Debug("deleting volume " + volumeName)
-			err = pvcClient.Delete(context.TODO(), volumeName, metav1.DeleteOptions{})
-			util.Logger.Debug(fmt.Sprintf("deleted volume %s", volumeName))
+			util.Logger.DebugContext(ctx, "deleting volume "+volumeName)
+			err = pvcClient.Delete(ctx, volumeName, metav1.DeleteOptions{})
+			util.Logger.DebugContext(ctx, fmt.Sprintf("deleted volume %s", volumeName))
 		}
 		autoscalerCheckpointId := getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
-		util.Logger.Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
-		err = verticalAutoscalerCheckpointClient.Delete(context.TODO(), autoscalerCheckpointId, metav1.DeleteOptions{})
+		util.Logger.DebugContext(ctx, "try to delete autoscaler checkpoint: "+autoscalerCheckpointId)
+		err = verticalAutoscalerCheckpointClient.Delete(ctx, autoscalerCheckpointId, metav1.DeleteOptions{})
 		if err != nil {
 			if k8s_errors.IsNotFound(err) {
-				util.Logger.Debug("autoscaler checkpoint not found: " + autoscalerCheckpointId)
+				util.Logger.DebugContext(ctx, "autoscaler checkpoint not found: "+autoscalerCheckpointId)
 			} else {
 				return
 			}
 		} else {
-			util.Logger.Debug("deleted autoscaler checkpoint: " + autoscalerCheckpointId)
+			util.Logger.DebugContext(ctx, "deleted autoscaler checkpoint: "+autoscalerCheckpointId)
 		}
 	}
 
-	util.Logger.Debug("deleting deployment " + pipelineId)
+	util.Logger.DebugContext(ctx, "deleting deployment "+pipelineId)
 	deletePolicy := metav1.DeletePropagationForeground
 
-	err = deploymentsClient.Delete(context.TODO(), getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1], metav1.DeleteOptions{
+	err = deploymentsClient.Delete(ctx, getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1], metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	})
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
-			util.Logger.Debug("deployment not found: " + getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1])
+			util.Logger.DebugContext(ctx, "deployment not found: "+getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1])
 		} else {
 			return
 		}
 	} else {
-		util.Logger.Debug(fmt.Sprintf("deleted deployment %s", pipelineId))
+		util.Logger.DebugContext(ctx, fmt.Sprintf("deleted deployment %s", pipelineId))
 	}
 
-	util.Logger.Debug("deleting autoscaler " + pipelineId)
-	err = verticalAutoscalerClient.Delete(context.TODO(), getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1]+"-vpa", metav1.DeleteOptions{})
+	util.Logger.DebugContext(ctx, "deleting autoscaler "+pipelineId)
+	err = verticalAutoscalerClient.Delete(ctx, getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1]+"-vpa", metav1.DeleteOptions{})
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
-			util.Logger.Debug("autoscaler not found: " + pipelineId)
+			util.Logger.DebugContext(ctx, "autoscaler not found: "+pipelineId)
 		} else {
 			return
 		}
 	} else {
-		util.Logger.Debug(fmt.Sprintf("deleted autoscaler %s", pipelineId))
+		util.Logger.DebugContext(ctx, fmt.Sprintf("deleted autoscaler %s", pipelineId))
 	}
 	return
 }
 
-func (k *Kubernetes) GetPipelineStatus(pipelineId string) (pipeStatus lib.PipelineStatus, err error) {
+func (k *Kubernetes) GetPipelineStatus(ctx context.Context, pipelineId string) (pipeStatus lib.PipelineStatus, err error) {
 	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
-	pipe, err := deploymentsClient.Get(context.TODO(), getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1], metav1.GetOptions{})
+	pipe, err := deploymentsClient.Get(ctx, getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1], metav1.GetOptions{})
 	if err != nil {
 		return
 	}
@@ -328,9 +341,9 @@ func (k *Kubernetes) GetPipelineStatus(pipelineId string) (pipeStatus lib.Pipeli
 	return pipeStatus, err
 }
 
-func (k *Kubernetes) GetPipelinesStatus() (pipeStatus []lib.PipelineStatus, err error) {
+func (k *Kubernetes) GetPipelinesStatus(ctx context.Context) (pipeStatus []lib.PipelineStatus, err error) {
 	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
-	pipes, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{})
+	pipes, err := deploymentsClient.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return
 	}

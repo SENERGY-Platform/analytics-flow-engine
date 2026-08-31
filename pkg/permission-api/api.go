@@ -17,6 +17,8 @@
 package permission_api
 
 import (
+	"context"
+
 	"github.com/SENERGY-Platform/permissions-v2/pkg/client"
 )
 
@@ -32,8 +34,10 @@ func NewPermissionApi(url string) *PermissionApi {
 // UserHasExecuteAccess reports whether the token holder may execute every one of
 // the given ids. All of them, not any: the caller is about to read all of them,
 // so a partial answer is a denial.
-func (a PermissionApi) UserHasExecuteAccess(resource string, ids []string, authorization string) (result bool, err error) {
-	response, err, _ := a.c.CheckMultiplePermissions(authorization, resource, ids, client.Execute)
+func (a PermissionApi) UserHasExecuteAccess(ctx context.Context, resource string, ids []string, authorization string) (result bool, err error) {
+	// The Context variant, so the trace and the baggage reach permissions-v2: its
+	// non-context methods pass context.TODO() and drop both.
+	response, err, _ := a.c.CheckMultiplePermissionsContext(ctx, authorization, resource, ids, client.Execute)
 	if err != nil {
 		return false, err
 	}

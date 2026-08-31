@@ -17,16 +17,16 @@
 package pipeline_api
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/httpreq"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 	"github.com/google/uuid"
-	"github.com/parnurzeal/gorequest"
 )
 
 type PipelineResponse struct {
@@ -41,135 +41,119 @@ func NewPipelineApi(url string) *PipelineApi {
 	return &PipelineApi{url}
 }
 
-func (p *PipelineApi) RegisterPipeline(pipeline *pipe.Pipeline, userId string, authorization string) (id uuid.UUID, err error) {
-	request := gorequest.New()
-	request.Post(p.url+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization).Send(pipeline)
-	resp, body, e := request.End()
-	if resp.StatusCode != http.StatusOK {
-		err = errors.New("pipeline API - could not register pipeline at pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
-		return
+func (p *PipelineApi) RegisterPipeline(ctx context.Context, pipeline *pipe.Pipeline, userId string, authorization string) (id uuid.UUID, err error) {
+	response, err := p.do(ctx, http.MethodPost, "/pipeline", pipeline, userId, authorization)
+	if err != nil {
+		return id, fmt.Errorf("pipeline API - could not register pipeline at pipeline registry: %w", err)
 	}
-	if len(e) > 0 {
-		err = errors.New("pipeline API - could not register pipeline at pipeline registry: an error occurred")
-		return
+	if response.StatusCode != http.StatusOK {
+		return id, errors.New("pipeline API - could not register pipeline at pipeline registry: " +
+			strconv.Itoa(response.StatusCode) + " " + response.Text())
 	}
 	var res PipelineResponse
-	if err = json.Unmarshal([]byte(body), &res); err != nil {
-		err = errors.New("pipeline API - could not parse pipeline response: " + err.Error())
-		return
+	if err = response.Decode(&res); err != nil {
+		return id, errors.New("pipeline API - could not parse pipeline response: " + err.Error())
 	}
-	id = res.Id
-	return
+	return res.Id, nil
 }
 
-func (p *PipelineApi) UpdatePipeline(pipeline *pipe.Pipeline, userId string, authorization string) (err error) {
-	request := gorequest.New()
-	request.Put(p.url+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization).Send(pipeline)
-	resp, body, e := request.End()
-	if resp.StatusCode != http.StatusOK {
-		err = errors.New("pipeline API - could not register pipeline at pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
-	}
-	if len(e) > 0 {
-		err = errors.New("pipeline API - could not register pipeline at pipeline registry: an error occurred")
-	}
-	return
-}
-
-func (p *PipelineApi) GetPipeline(id string, userId string, authorization string) (pipe pipe.Pipeline, err error) {
-	request := gorequest.New()
-	request.Get(p.url+"/pipeline/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
-	resp, body, e := request.End()
-	if len(e) > 0 {
-		return pipe, errors.New("pipeline API - could not get pipeline from pipeline registry: an error occurred")
-	}
-	if resp.StatusCode == http.StatusNotFound {
-		return pipe, lib.NewNotFoundError(fmt.Errorf("could not find pipeline %s", id))
-	}
-	if resp.StatusCode == http.StatusForbidden {
-		err = lib.NewForbiddenError(lib.NewNotFoundError(fmt.Errorf("could not access pipeline %s", id)))
-		return
-	}
-	if resp.StatusCode != 200 {
-		return pipe, errors.New("pipeline API - could not get pipeline from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
-	}
-	err = json.Unmarshal([]byte(body), &pipe)
+func (p *PipelineApi) UpdatePipeline(ctx context.Context, pipeline *pipe.Pipeline, userId string, authorization string) (err error) {
+	response, err := p.do(ctx, http.MethodPut, "/pipeline", pipeline, userId, authorization)
 	if err != nil {
-		err = errors.New("pipeline API  - could not parse pipeline: " + err.Error())
-		return
+		return fmt.Errorf("pipeline API - could not update pipeline at pipeline registry: %w", err)
 	}
-	return
+	if response.StatusCode != http.StatusOK {
+		return errors.New("pipeline API - could not update pipeline at pipeline registry: " +
+			strconv.Itoa(response.StatusCode) + " " + response.Text())
+	}
+	return nil
 }
 
-func (p *PipelineApi) GetPipelines(userId string, authorization string) (pipelines []pipe.Pipeline, err error) {
-	request := gorequest.New()
-	request.Get(p.url+"/pipeline").Set("X-UserId", userId).Set("Authorization", authorization)
-	resp, body, e := request.End()
-	if len(e) > 0 {
-		err = errors.New("pipeline API - could not get pipelines from pipeline registry: an error occurred")
-		return
+func (p *PipelineApi) GetPipeline(ctx context.Context, id string, userId string, authorization string) (result pipe.Pipeline, err error) {
+	response, err := p.do(ctx, http.MethodGet, "/pipeline/"+id, nil, userId, authorization)
+	if err != nil {
+		return result, fmt.Errorf("pipeline API - could not get pipeline from pipeline registry: %w", err)
 	}
-	if resp.StatusCode == http.StatusNotFound {
-		err = lib.NewNotFoundError(lib.NewNotFoundError(fmt.Errorf("could not find pipelines")))
-		return
+	switch response.StatusCode {
+	case http.StatusNotFound:
+		return result, lib.NewNotFoundError(fmt.Errorf("could not find pipeline %s", id))
+	case http.StatusForbidden:
+		return result, lib.NewForbiddenError(lib.NewNotFoundError(fmt.Errorf("could not access pipeline %s", id)))
+	case http.StatusOK:
+	default:
+		return result, errors.New("pipeline API - could not get pipeline from pipeline registry: " +
+			strconv.Itoa(response.StatusCode) + " " + response.Text())
 	}
-	if resp.StatusCode == http.StatusForbidden {
-		err = lib.NewForbiddenError(lib.NewNotFoundError(fmt.Errorf("could not access pipelines")))
-		return
+	if err = response.Decode(&result); err != nil {
+		return result, errors.New("pipeline API  - could not parse pipeline: " + err.Error())
 	}
-	if resp.StatusCode != 200 {
-		err = errors.New("pipeline API - could not get pipelines from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
-		return
+	return result, nil
+}
+
+func (p *PipelineApi) GetPipelines(ctx context.Context, userId string, authorization string) (pipelines []pipe.Pipeline, err error) {
+	response, err := p.do(ctx, http.MethodGet, "/pipeline", nil, userId, authorization)
+	if err != nil {
+		return nil, fmt.Errorf("pipeline API - could not get pipelines from pipeline registry: %w", err)
+	}
+	return decodePipelines(response, "pipelines")
+}
+
+// GetPipelinesAdmin reads every pipeline, for the startup sync. It runs outside any
+// request, hence the admin headers rather than a caller's token; ctx carries no
+// baggage there and is only what makes the call cancellable.
+func (p *PipelineApi) GetPipelinesAdmin(ctx context.Context) (pipelines []pipe.Pipeline, err error) {
+	response, err := httpreq.Do(ctx, httpreq.Request{
+		Method: http.MethodGet,
+		URL:    p.url + "/admin/pipeline",
+		Headers: map[string]string{
+			"X-UserId":     "admin",
+			"X-User-Roles": "admin",
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("pipeline API - could not get admin pipelines from pipeline registry: %w", err)
+	}
+	return decodePipelines(response, "admin pipelines")
+}
+
+func (p *PipelineApi) DeletePipeline(ctx context.Context, id string, userId string, authorization string) (err error) {
+	response, err := p.do(ctx, http.MethodDelete, "/pipeline/"+id, nil, userId, authorization)
+	if err != nil {
+		return fmt.Errorf("pipeline API - could not delete pipeline from pipeline registry: %w", err)
+	}
+	if response.StatusCode != http.StatusOK {
+		return errors.New("pipeline API - could not delete pipeline from pipeline registry: " +
+			strconv.Itoa(response.StatusCode) + " " + response.Text())
+	}
+	return nil
+}
+
+func (p *PipelineApi) do(ctx context.Context, method, path string, body any, userId, authorization string) (httpreq.Response, error) {
+	return httpreq.Do(ctx, httpreq.Request{
+		Method: method,
+		URL:    p.url + path,
+		Body:   body,
+		Headers: map[string]string{
+			"X-UserId":      userId,
+			"Authorization": authorization,
+		},
+	})
+}
+
+func decodePipelines(response httpreq.Response, what string) ([]pipe.Pipeline, error) {
+	switch response.StatusCode {
+	case http.StatusNotFound:
+		return nil, lib.NewNotFoundError(fmt.Errorf("could not find %s", what))
+	case http.StatusForbidden:
+		return nil, lib.NewForbiddenError(lib.NewNotFoundError(fmt.Errorf("could not access %s", what)))
+	case http.StatusOK:
+	default:
+		return nil, errors.New("pipeline API - could not get " + what + " from pipeline registry: " +
+			strconv.Itoa(response.StatusCode) + " " + response.Text())
 	}
 	var pResponse lib.PipelinesResponse
-	err = json.Unmarshal([]byte(body), &pResponse)
-	if err != nil {
-		err = errors.New("pipeline API  - could not parse pipelines: " + err.Error())
-		return
+	if err := response.Decode(&pResponse); err != nil {
+		return nil, errors.New("pipeline API  - could not parse " + what + ": " + err.Error())
 	}
-	pipelines = pResponse.Data
-	return
-}
-
-func (p *PipelineApi) GetPipelinesAdmin() (pipelines []pipe.Pipeline, err error) {
-	request := gorequest.New()
-	request.Get(p.url+"/admin/pipeline").Set("X-UserId", "admin").Set("X-User-Roles", "admin")
-	resp, body, e := request.End()
-	if len(e) > 0 {
-		err = errors.New("pipeline API - could not get admin pipelines from pipeline registry: an error occurred")
-		return
-	}
-	if resp.StatusCode == http.StatusNotFound {
-		err = lib.NewNotFoundError(lib.NewNotFoundError(fmt.Errorf("could not find admin pipelines")))
-		return
-	}
-	if resp.StatusCode == http.StatusForbidden {
-		err = lib.NewForbiddenError(lib.NewNotFoundError(fmt.Errorf("could not access admin pipelines")))
-		return
-	}
-	if resp.StatusCode != 200 {
-		err = errors.New("pipeline API - could not get admin pipelines from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
-		return
-	}
-	var pResponse lib.PipelinesResponse
-	err = json.Unmarshal([]byte(body), &pResponse)
-	if err != nil {
-		err = errors.New("pipeline API  - could not parse admin pipelines: " + err.Error())
-		return
-	}
-	pipelines = pResponse.Data
-	return
-}
-
-func (p *PipelineApi) DeletePipeline(id string, userId string, authorization string) (err error) {
-	request := gorequest.New()
-	request.Delete(p.url+"/pipeline/"+id).Set("X-UserId", userId).Set("Authorization", authorization)
-	resp, body, e := request.End()
-	if resp.StatusCode != 200 {
-		err = errors.New("pipeline API - could not delete pipeline from pipeline registry: " + strconv.Itoa(resp.StatusCode) + " " + body)
-	}
-	if len(e) > 0 {
-		err = errors.New("pipeline API - could not delete pipeline from pipeline registry: an error occurred")
-		return
-	}
-	return
+	return pResponse.Data, nil
 }

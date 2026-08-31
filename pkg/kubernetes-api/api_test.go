@@ -1,6 +1,7 @@
 package kubernetes_api
 
 import (
+	"context"
 	"testing"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
@@ -65,7 +66,7 @@ func TestKubernetes_CreateOperators(t *testing.T) {
 			DownstreamConfig: pipe.DownstreamConfig{},
 		},
 	}
-	err = driver.CreateOperators(pipelineId, ops, lib.PipelineConfig{
+	err = driver.CreateOperators(context.Background(), pipelineId, ops, lib.PipelineConfig{
 		WindowTime:     30,
 		MergeStrategy:  "inner",
 		Metrics:        false,
@@ -106,7 +107,7 @@ func TestKubernetes_DeleteOperators(t *testing.T) {
 			DownstreamConfig: pipe.DownstreamConfig{},
 		},
 	}
-	err = driver.DeleteOperators(pipelineId, ops)
+	err = driver.DeleteOperators(context.Background(), pipelineId, ops)
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -120,7 +121,7 @@ func TestKubernetes_GetPipelineStatus(t *testing.T) {
 		return
 	}
 	pipelineId := testPipeId
-	_, err = driver.GetPipelineStatus(pipelineId)
+	_, err = driver.GetPipelineStatus(context.Background(), pipelineId)
 	if err != nil {
 		t.Error(err.Error())
 		return

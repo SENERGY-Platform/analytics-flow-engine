@@ -17,7 +17,7 @@
 package rancher2_api
 
 import (
-	"crypto/tls"
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -25,14 +25,19 @@ import (
 	"time"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/baggage"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/httpreq"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 
 	"encoding/json"
-
-	"github.com/parnurzeal/gorequest"
 )
+
+// DummyOperatorId stands in where getOperatorName is called for the deployment name
+// rather than for an operator's own name: only the first eight characters of the id
+// are used, and the deployment name does not depend on them.
+const DummyOperatorId = "v3-123456789"
 
 type Rancher2 struct {
 	url       string
@@ -49,23 +54,36 @@ func NewRancher2(url string, accessKey string, secretKey string, stackId string,
 	return &Rancher2{url, kubeUrl, accessKey, secretKey, stackId, r2cfg}
 }
 
-func (r *Rancher2) GetPipelineStatus(pipelineId string) (status lib.PipelineStatus, err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e := request.Get(r.kubeUrl + "apps.deployments/analytics-pipelines/pipeline-" + pipelineId).Send(nil).End()
-	if len(e) > 0 {
-		err = errors.New("rancher2 API - could not request deployment - " + e[0].Error())
+// do issues a request against the Rancher API with this driver's credentials.
+//
+// The status handling stays at the call sites: what a 404 means differs per call —
+// a failure when reading a deployment, success when deleting one that is already
+// gone.
+func (r *Rancher2) do(ctx context.Context, method, url string, body any) (httpreq.Response, error) {
+	return httpreq.Do(ctx, httpreq.Request{
+		Method:    method,
+		URL:       url,
+		Body:      body,
+		BasicAuth: &httpreq.BasicAuth{User: r.accessKey, Password: r.secretKey},
+	})
+}
+
+func (r *Rancher2) GetPipelineStatus(ctx context.Context, pipelineId string) (status lib.PipelineStatus, err error) {
+	response, err := r.do(ctx, http.MethodGet, r.kubeUrl+"apps.deployments/analytics-pipelines/pipeline-"+pipelineId, nil)
+	if err != nil {
+		err = errors.New("rancher2 API - could not request deployment - " + err.Error())
 		return
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		err = errors.New("rancher2 API - deployment response is not ok - " + strconv.Itoa(resp.StatusCode) + " - " + body)
+	if response.StatusCode != http.StatusOK {
+		err = errors.New("rancher2 API - deployment response is not ok - " + strconv.Itoa(response.StatusCode) + " - " + response.Text())
 		return
 	}
 
 	var deployment DeploymentResponse
-	err = json.Unmarshal([]byte(body), &deployment)
+	err = response.Decode(&deployment)
 	if err != nil {
-		util.Logger.Error("rancher2 API - cannot unmarshal deployment response", "error", err)
+		util.Logger.ErrorContext(ctx, "rancher2 API - cannot unmarshal deployment response", "error", err)
 		return
 	}
 	status = lib.PipelineStatus{
@@ -76,23 +94,22 @@ func (r *Rancher2) GetPipelineStatus(pipelineId string) (status lib.PipelineStat
 	return
 }
 
-func (r *Rancher2) GetPipelinesStatus() (status []lib.PipelineStatus, err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e := request.Get(r.kubeUrl + "apps.deployments/analytics-pipelines").Send(nil).End()
-	if len(e) > 0 {
-		err = errors.New("rancher2 API - could not get pipelines status - " + e[0].Error())
+func (r *Rancher2) GetPipelinesStatus(ctx context.Context) (status []lib.PipelineStatus, err error) {
+	response, err := r.do(ctx, http.MethodGet, r.kubeUrl+"apps.deployments/analytics-pipelines", nil)
+	if err != nil {
+		err = errors.New("rancher2 API - could not get pipelines status - " + err.Error())
 		return
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		err = errors.New("rancher2 API - could not get pipelines status - " + strconv.Itoa(resp.StatusCode) + " - " + body)
+	if response.StatusCode != http.StatusOK {
+		err = errors.New("rancher2 API - could not get pipelines status - " + strconv.Itoa(response.StatusCode) + " - " + response.Text())
 		return
 	}
 
 	var deployments DeploymentsResponse
-	err = json.Unmarshal([]byte(body), &deployments)
+	err = response.Decode(&deployments)
 	if err != nil {
-		util.Logger.Error("rancher2 API - cannot unmarshal deployment response", "error", err)
+		util.Logger.ErrorContext(ctx, "rancher2 API - cannot unmarshal deployment response", "error", err)
 		return
 	}
 	for _, deployment := range deployments.Data {
@@ -106,13 +123,15 @@ func (r *Rancher2) GetPipelinesStatus() (status []lib.PipelineStatus, err error)
 	return
 }
 
-func (r *Rancher2) CreateOperators(pipelineId string, inputs []pipe.Operator, pipeConfig lib.PipelineConfig) (err error) {
+func (r *Rancher2) CreateOperators(ctx context.Context, pipelineId string, inputs []pipe.Operator, pipeConfig lib.PipelineConfig) (err error) {
 	var containers []Container
 	var volumes []Volume
 	basePort := 8080
 	for i, operator := range inputs {
 		operatorRequestConfig, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
-		labels := map[string]string{"operatorId": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId, "user": pipeConfig.UserId}
+		labels := baggage.AddLabels(ctx,
+			map[string]string{"operatorId": operator.Id, "flowId": pipeConfig.FlowId, "pipeId": pipelineId, "user": pipeConfig.UserId},
+			pipeConfig.Baggage)
 		env := map[string]string{
 			"ZK_QUORUM":                         r.r2cfg.Zookeeper,
 			"CONFIG_BOOTSTRAP_SERVERS":          r.r2cfg.KafkaBootstrap,
@@ -145,6 +164,12 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []pipe.Operator, pi
 		if operator.OutputTopic != "" {
 			env["OUTPUT"] = operator.OutputTopic
 		}
+		// Read by the operator libraries, which put the entries into every log record
+		// they write. The labels above cover the same ground for the log aggregation,
+		// which only sees the container from the outside.
+		if header := baggage.Header(pipeConfig.Baggage); header != "" {
+			env[baggage.EnvVar] = header
+		}
 
 		var r2Env []Env
 		for k, v := range env {
@@ -156,7 +181,7 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []pipe.Operator, pi
 		container.Env = r2Env
 
 		if operator.PersistData {
-			err = r.createPersistentVolumeClaim(r.getOperatorName(pipelineId, operator)[0])
+			err = r.createPersistentVolumeClaim(ctx, r.getOperatorName(pipelineId, operator)[0])
 			vm := VolumeMount{
 				Name:      r.getOperatorName(pipelineId, operator)[0],
 				MountPath: "/opt/data",
@@ -181,49 +206,51 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []pipe.Operator, pi
 		containers = append(containers, container)
 	}
 	time.Sleep(3 * time.Second)
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	reqBody := &WorkloadRequest{
-		Name:        r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1],
+		Name:        r.getOperatorName(pipelineId, pipe.Operator{Id: DummyOperatorId})[1],
 		NamespaceId: r.r2cfg.NamespaceId,
 		Volumes:     volumes,
 		Containers:  containers,
 		Scheduling:  Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
-		Labels:      map[string]string{"flowId": pipeConfig.FlowId, "pipelineId": pipelineId, "user": pipeConfig.UserId},
-		Selector:    Selector{MatchLabels: map[string]string{"pipelineId": pipelineId}},
+		Labels: baggage.AddLabels(ctx,
+			map[string]string{"flowId": pipeConfig.FlowId, "pipelineId": pipelineId, "user": pipeConfig.UserId},
+			pipeConfig.Baggage),
+		Selector: Selector{MatchLabels: map[string]string{"pipelineId": pipelineId}},
 	}
 
-	resp, body, e := request.Post(r.url + "projects/" + r.r2cfg.ProjectId + "/workloads").Send(reqBody).End()
-	if len(e) > 0 {
-		util.Logger.Error("rancher2 API - could not create operators ", "error", e)
-		err = errors.New("rancher2 API -  could not create operators - an error occurred")
-		return
+	response, err := r.do(ctx, http.MethodPost, r.url+"projects/"+r.r2cfg.ProjectId+"/workloads", reqBody)
+	if err != nil {
+		util.Logger.ErrorContext(ctx, "rancher2 API - could not create operators ", "error", err)
+		return errors.New("rancher2 API -  could not create operators - an error occurred")
 	}
-	if resp.StatusCode != http.StatusCreated {
+	if response.StatusCode != http.StatusCreated {
 		errBody := ErrorBody{}
-		err = json.Unmarshal([]byte(body), &errBody)
-		if err != nil {
-			return err
+		if decodeErr := response.Decode(&errBody); decodeErr != nil {
+			return decodeErr
 		}
+		// AlreadyExists is the ordinary answer to a retry, and the autoscaler below
+		// still has to be created for the workload that is already there.
 		if errBody.Code != "AlreadyExists" {
-			err = errors.New("rancher2 API - could not create operators " + errBody.Code)
+			// Returned here rather than remembered across the autoscaler call. err is the
+			// named return value, and the autoscaler's own assignment to it would set it
+			// back to nil: the caller would be told the operators started while Rancher
+			// had refused the workload, and the pipeline would run nothing at all.
+			return errors.New("rancher2 API - could not create operators " + errBody.Code)
 		}
-	}
-	if len(e) > 0 {
-		err = errors.New("rancher2 API -  could not create operators - an error occurred")
 	}
 
 	autoscaleRequest := AutoscalingRequest{
 		ApiVersion: "autoscaling.k8s.io/v1",
 		Kind:       "VerticalPodAutoscaler",
 		Metadata: AutoscalingRequestMetadata{
-			Name:      r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1] + "-vpa",
+			Name:      r.getOperatorName(pipelineId, pipe.Operator{Id: DummyOperatorId})[1] + "-vpa",
 			Namespace: r.r2cfg.NamespaceId,
 		},
 		Spec: AutoscalingRequestSpec{
 			TargetRef: AutoscalingRequestTargetRef{
 				ApiVersion: "apps/v1",
 				Kind:       "Deployment",
-				Name:       r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1],
+				Name:       r.getOperatorName(pipelineId, pipe.Operator{Id: DummyOperatorId})[1],
 			},
 			UpdatePolicy: AutoscalingRequestUpdatePolicy{UpdateMode: "Auto"},
 			ResourcePolicy: ResourcePolicy{
@@ -239,196 +266,168 @@ func (r *Rancher2) CreateOperators(pipelineId string, inputs []pipe.Operator, pi
 			},
 		},
 	}
-	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e = request.Post(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers").
-		Send(autoscaleRequest).End()
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
-		err = errors.New("rancher2 API - could not create vpa " + body)
+	// Its own variable, so a later edit cannot silently overwrite an error the
+	// workload call above wanted to report.
+	vpaResponse, err := r.do(ctx, http.MethodPost, r.kubeUrl+"autoscaling.k8s.io.verticalpodautoscalers", autoscaleRequest)
+	if err != nil {
+		return errors.New("rancher2 API -  could not create operator vpa - an error occurred")
 	}
-	if len(e) > 0 {
-		err = errors.New("rancher2 API -  could not create operator vpa - an error occurred")
+	if vpaResponse.StatusCode != http.StatusCreated && vpaResponse.StatusCode != http.StatusConflict {
+		err = errors.New("rancher2 API - could not create vpa " + vpaResponse.Text())
 	}
 	return
 }
 
-func (r *Rancher2) DeleteOperators(pipelineId string, operators []pipe.Operator) (err error) {
+func (r *Rancher2) DeleteOperators(ctx context.Context, pipelineId string, operators []pipe.Operator) (err error) {
+	deploymentName := r.getOperatorName(pipelineId, pipe.Operator{Id: DummyOperatorId})[1]
+
 	//Delete Workload
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e := request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/workloads/deployment:" +
-		r.r2cfg.NamespaceId + ":" + r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1]).End()
-	if resp.StatusCode != http.StatusNoContent {
+	response, err := r.do(ctx, http.MethodDelete, r.url+"projects/"+r.r2cfg.ProjectId+"/workloads/deployment:"+
+		r.r2cfg.NamespaceId+":"+deploymentName, nil)
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	if response.StatusCode != http.StatusNoContent {
 		switch {
-		case resp.StatusCode == http.StatusNotFound:
-			util.Logger.Error("cannot delete operator " + r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1] + " as it does not exist")
+		case response.StatusCode == http.StatusNotFound:
+			util.Logger.ErrorContext(ctx, "cannot delete operator "+deploymentName+" as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
-			err = errors.New("rancher2 API - could not delete operator " + body)
+			err = errors.New("rancher2 API - could not delete operator " + response.Text())
 		}
-		return
-	}
-	if len(e) > 0 {
-		err = ErrSomethingWentWrong
 		return
 	}
 
 	// Delete Service
-	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e = request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/services/" +
-		r.r2cfg.NamespaceId + ":" + r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1]).End()
-	if resp.StatusCode != http.StatusNoContent {
+	response, err = r.do(ctx, http.MethodDelete, r.url+"projects/"+r.r2cfg.ProjectId+"/services/"+
+		r.r2cfg.NamespaceId+":"+deploymentName, nil)
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	if response.StatusCode != http.StatusNoContent {
 		switch {
-		case resp.StatusCode == http.StatusNotFound:
-			util.Logger.Debug("cannot delete operator service " + r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1] + " as it does not exist")
+		case response.StatusCode == http.StatusNotFound:
+			util.Logger.DebugContext(ctx, "cannot delete operator service "+deploymentName+" as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
-			err = errors.New("rancher2 API - could not delete operator service " + body)
+			err = errors.New("rancher2 API - could not delete operator service " + response.Text())
 		}
-		return
-	}
-	if len(e) > 0 {
-		err = ErrSomethingWentWrong
 		return
 	}
 
 	// Delete Autoscaler
-	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers/" +
-		r.r2cfg.NamespaceId +
-		"/" +
-		r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1] + "-vpa").
-		End()
-	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
-		switch {
-		case resp.StatusCode == http.StatusNotFound:
-			util.Logger.Debug("cannot delete operator vpa " + r.getOperatorName(pipelineId, pipe.Operator{Id: "v3-123456789"})[1] + "-vpa" + " as it does not exist")
-			return // dont have to delete whats already deleted
-		default:
-			err = errors.New("rancher2 API - could not delete operator vpa " + body)
-		}
-		return
+	response, err = r.do(ctx, http.MethodDelete, r.kubeUrl+"autoscaling.k8s.io.verticalpodautoscalers/"+
+		r.r2cfg.NamespaceId+"/"+deploymentName+"-vpa", nil)
+	if err != nil {
+		return ErrSomethingWentWrong
 	}
-	if len(e) > 0 {
-		err = ErrSomethingWentWrong
+	if response.StatusCode != http.StatusNoContent && response.StatusCode != http.StatusNotFound {
+		err = errors.New("rancher2 API - could not delete operator vpa " + response.Text())
 		return
 	}
 
+	// Collected rather than returned on the first failure: every operator has its own
+	// volume and its own autoscaler checkpoint, and stopping at the first one that
+	// resists leaves the rest of them behind. The old code overwrote each error with
+	// the next call's, so a volume that could not be deleted was reported as a
+	// successful delete and the claim stayed for good.
+	var cleanupErrs []error
 	for _, operator := range operators {
 		// Delete Volume
 		if operator.PersistData {
-			err = r.deletePersistentVolumeClaim(r.getOperatorName(pipelineId, operator)[0])
-		}
-		// Delete AutoscalerCheckpoint
-		autoscalerCheckpointId := r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
-		util.Logger.Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
-		request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-		resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
-			r.r2cfg.NamespaceId +
-			"/" + autoscalerCheckpointId).End()
-		if resp.StatusCode != http.StatusNoContent {
-			err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
-			// There must no checkpoint exists
-			if resp.StatusCode == http.StatusNotFound {
-				util.Logger.Error("cannot delete autoscaler checkpoint " + autoscalerCheckpointId + " as it does not exist")
-				err = nil
-			} else {
-				return
+			if volumeErr := r.deletePersistentVolumeClaim(ctx, r.getOperatorName(pipelineId, operator)[0]); volumeErr != nil {
+				cleanupErrs = append(cleanupErrs, volumeErr)
 			}
 		}
-		if len(e) > 0 {
-			err = ErrSomethingWentWrong
-			return
+		// Delete AutoscalerCheckpoint
+		if checkpointErr := r.deleteAutoscalerCheckpoint(ctx, pipelineId, operator); checkpointErr != nil {
+			cleanupErrs = append(cleanupErrs, checkpointErr)
 		}
 	}
 
-	return
+	return errors.Join(cleanupErrs...)
 }
 
-func (r *Rancher2) DeleteOperator(pipelineId string, operator pipe.Operator) (err error) {
+// deleteAutoscalerCheckpoint removes one operator's autoscaler checkpoint. A
+// checkpoint that is not there is not a failure: it only exists once the
+// autoscaler has produced a recommendation.
+func (r *Rancher2) deleteAutoscalerCheckpoint(ctx context.Context, pipelineId string, operator pipe.Operator) error {
+	autoscalerCheckpointId := r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
+	util.Logger.DebugContext(ctx, "try to delete autoscaler checkpoint: "+autoscalerCheckpointId)
+	response, err := r.do(ctx, http.MethodDelete, r.kubeUrl+"autoscaling.k8s.io.verticalpodautoscalercheckpoints/"+
+		r.r2cfg.NamespaceId+"/"+autoscalerCheckpointId, nil)
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	if response.StatusCode == http.StatusNotFound {
+		util.Logger.DebugContext(ctx, "cannot delete autoscaler checkpoint "+autoscalerCheckpointId+" as it does not exist")
+		return nil
+	}
+	if response.StatusCode != http.StatusNoContent {
+		return errors.New("rancher2 API - could not delete operator vpa checkpoint " + response.Text())
+	}
+	return nil
+}
+
+func (r *Rancher2) DeleteOperator(ctx context.Context, pipelineId string, operator pipe.Operator) (err error) {
+	deploymentName := r.getOperatorName(pipelineId, operator)[1]
 
 	// Delete AutoscalerCheckpoint
-	autoscalerCheckpointId := r.getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
-	util.Logger.Debug("try to delete autoscaler checkpoint: " + autoscalerCheckpointId)
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e := request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
-		r.r2cfg.NamespaceId +
-		"/" + autoscalerCheckpointId).End()
-	if resp.StatusCode != http.StatusNoContent {
-		err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
-		// There must no checkpoint exists
-		if resp.StatusCode == http.StatusNotFound {
-			util.Logger.Error("cannot delete autoscaler checkpoint " + autoscalerCheckpointId + " as it does not exist")
-			err = nil
-		} else {
-			return
-		}
-	}
-	if len(e) > 0 {
-		err = ErrSomethingWentWrong
+	err = r.deleteAutoscalerCheckpoint(ctx, pipelineId, operator)
+	if err != nil {
 		return
 	}
 
 	//Delete Workload
-	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e = request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/workloads/deployment:" +
-		r.r2cfg.NamespaceId + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
-	if resp.StatusCode != http.StatusNoContent {
+	response, err := r.do(ctx, http.MethodDelete, r.url+"projects/"+r.r2cfg.ProjectId+"/workloads/deployment:"+
+		r.r2cfg.NamespaceId+":"+deploymentName, nil)
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	if response.StatusCode != http.StatusNoContent {
 		switch {
-		case resp.StatusCode == http.StatusNotFound:
-			util.Logger.Error("cannot delete operator " + r.getOperatorName(pipelineId, operator)[1] + " as it does not exist")
+		case response.StatusCode == http.StatusNotFound:
+			util.Logger.ErrorContext(ctx, "cannot delete operator "+deploymentName+" as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
-			err = errors.New("rancher2 API - could not delete operator " + body)
+			err = errors.New("rancher2 API - could not delete operator " + response.Text())
 		}
-		return
-	}
-	if len(e) > 0 {
-		err = ErrSomethingWentWrong
 		return
 	}
 
 	// Delete Volume
 	if operator.PersistData {
-		err = r.deletePersistentVolumeClaim(r.getOperatorName(pipelineId, operator)[0])
+		err = r.deletePersistentVolumeClaim(ctx, r.getOperatorName(pipelineId, operator)[0])
+		if err != nil {
+			return
+		}
 	}
 
 	// Delete Service
-	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e = request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/services/" +
-		r.r2cfg.NamespaceId + ":" + r.getOperatorName(pipelineId, operator)[1]).End()
-	if resp.StatusCode != http.StatusNoContent {
+	response, err = r.do(ctx, http.MethodDelete, r.url+"projects/"+r.r2cfg.ProjectId+"/services/"+
+		r.r2cfg.NamespaceId+":"+deploymentName, nil)
+	if err != nil {
+		return ErrSomethingWentWrong
+	}
+	if response.StatusCode != http.StatusNoContent {
 		switch {
-		case resp.StatusCode == http.StatusNotFound:
-			util.Logger.Debug("cannot delete operator service " + r.getOperatorName(pipelineId, operator)[1] + " as it does not exist")
+		case response.StatusCode == http.StatusNotFound:
+			util.Logger.DebugContext(ctx, "cannot delete operator service "+deploymentName+" as it does not exist")
 			return // dont have to delete whats already deleted
 		default:
-			err = errors.New("rancher2 API - could not delete operator service " + body)
+			err = errors.New("rancher2 API - could not delete operator service " + response.Text())
 		}
-		return
-	}
-	if len(e) > 0 {
-		err = ErrSomethingWentWrong
 		return
 	}
 
 	// Delete Autoscaler
-	request = gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e = request.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers/" +
-		r.r2cfg.NamespaceId +
-		"/" +
-		r.getOperatorName(pipelineId, operator)[1] + "-vpa").
-		End()
-	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
-		switch {
-		case resp.StatusCode == http.StatusNotFound:
-			util.Logger.Debug("cannot delete operator vpa " + r.getOperatorName(pipelineId, operator)[1] + "-vpa" + " as it does not exist")
-			return // dont have to delete whats already deleted
-		default:
-			err = errors.New("rancher2 API - could not delete operator vpa " + body)
-		}
-		return
+	response, err = r.do(ctx, http.MethodDelete, r.kubeUrl+"autoscaling.k8s.io.verticalpodautoscalers/"+
+		r.r2cfg.NamespaceId+"/"+deploymentName+"-vpa", nil)
+	if err != nil {
+		return ErrSomethingWentWrong
 	}
-	if len(e) > 0 {
-		err = ErrSomethingWentWrong
+	if response.StatusCode != http.StatusNoContent && response.StatusCode != http.StatusNotFound {
+		err = errors.New("rancher2 API - could not delete operator vpa " + response.Text())
 		return
 	}
 
@@ -439,8 +438,7 @@ func (r *Rancher2) getOperatorName(pipelineId string, operator pipe.Operator) []
 	return []string{"operator-" + pipelineId + "-" + operator.Id[0:8], "pipeline-" + pipelineId}
 }
 
-func (r *Rancher2) createPersistentVolumeClaim(name string) (err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
+func (r *Rancher2) createPersistentVolumeClaim(ctx context.Context, name string) (err error) {
 	reqBody := &VolumeClaimRequest{
 		Name:           name,
 		NamespaceId:    r.r2cfg.NamespaceId,
@@ -448,13 +446,13 @@ func (r *Rancher2) createPersistentVolumeClaim(name string) (err error) {
 		Resources:      Resources{Requests: map[string]string{"storage": "50M"}},
 		StorageClassId: *r.r2cfg.StorageDriver,
 	}
-	resp, body, e := request.Post(r.url + "projects/" + r.r2cfg.ProjectId + "/persistentvolumeclaims").Send(reqBody).End()
-	if len(e) > 0 {
+	response, err := r.do(ctx, http.MethodPost, r.url+"projects/"+r.r2cfg.ProjectId+"/persistentvolumeclaims", reqBody)
+	if err != nil {
 		return errors.New("rancher2 API - could not create PersistentVolumeClaim: an error occurred")
 	}
-	if resp.StatusCode != http.StatusCreated {
+	if response.StatusCode != http.StatusCreated {
 		errBody := ErrorBody{}
-		err = json.Unmarshal([]byte(body), &errBody)
+		err = response.Decode(&errBody)
 		if err != nil {
 			return err
 		}
@@ -463,34 +461,33 @@ func (r *Rancher2) createPersistentVolumeClaim(name string) (err error) {
 	return nil
 }
 
-func (r *Rancher2) deletePersistentVolumeClaim(name string) (err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: false})
-	resp, body, e := request.Delete(r.url + "projects/" + r.r2cfg.ProjectId + "/persistentVolumeClaims/" +
-		r.r2cfg.NamespaceId + ":" + name).End()
-	if len(e) > 0 {
-		err = ErrSomethingWentWrong
-		return
+func (r *Rancher2) deletePersistentVolumeClaim(ctx context.Context, name string) (err error) {
+	claimUrl := r.url + "projects/" + r.r2cfg.ProjectId + "/persistentVolumeClaims/" + r.r2cfg.NamespaceId + ":" + name
+
+	response, err := r.do(ctx, http.MethodDelete, claimUrl, nil)
+	if err != nil {
+		return ErrSomethingWentWrong
 	}
-	if resp.StatusCode == http.StatusNotFound {
-		util.Logger.Error("Cant delete persistent volume claim as it does not exist", "name", name)
-		err = nil
-		return
+	if response.StatusCode == http.StatusNotFound {
+		util.Logger.ErrorContext(ctx, "Cant delete persistent volume claim as it does not exist", "name", name)
+		return nil
 	}
-	if resp.StatusCode != http.StatusOK {
-		err = errors.New("rancher2 API - could not delete PersistentVolumeClaim " + body)
-		return
+	if response.StatusCode != http.StatusOK {
+		return errors.New("rancher2 API - could not delete PersistentVolumeClaim " + response.Text())
 	}
-	for i := 0; ; i++ {
-		if i >= (24 - 1) {
-			err = errors.New("rancher2 API - could not delete PersistentVolumeClaim in time")
-			break
-		}
+	// Rancher answers the delete before the claim is gone, so wait for it to
+	// disappear. Up to 23 polls at 15 seconds, which is where the number comes from.
+	for i := 0; i < 24-1; i++ {
 		time.Sleep(15 * time.Second)
-		resp, _, e = request.Get(r.url + "projects/" + r.r2cfg.ProjectId + "/persistentVolumeClaims/" +
-			r.r2cfg.NamespaceId + ":" + name).End()
-		if resp.StatusCode == http.StatusNotFound {
-			return
+		response, err = r.do(ctx, http.MethodGet, claimUrl, nil)
+		// Checked now, where it used to be ignored: a failing poll left the previous
+		// response in place and the loop read a status that was no longer current.
+		if err != nil {
+			return ErrSomethingWentWrong
+		}
+		if response.StatusCode == http.StatusNotFound {
+			return nil
 		}
 	}
-	return
+	return errors.New("rancher2 API - could not delete PersistentVolumeClaim in time")
 }

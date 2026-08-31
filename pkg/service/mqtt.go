@@ -17,6 +17,7 @@
 package service
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -36,7 +37,9 @@ var qos *int
 var retained *bool
 var fogClient *FogClient
 
-func ConnectMQTTBroker(config config.MqttConfig, pipelineService PipelineApiService) error {
+// ConnectMQTTBroker takes the process context so the broker callbacks, which paho
+// invokes without one of their own, still have something to log against.
+func ConnectMQTTBroker(ctx context.Context, config config.MqttConfig, pipelineService PipelineApiService) error {
 	//MQTT.DEBUG = log.New(os.Stdout, "", 0)
 	//MQTT.ERROR = log.New(os.Stdout, "", 0)
 
@@ -48,7 +51,7 @@ func ConnectMQTTBroker(config config.MqttConfig, pipelineService PipelineApiServ
 		upstreamLib.GetUpstreamControlSyncTriggerSubTopic(): byte(0),
 		operatorLib.GetOperatorControlSyncTriggerSubTopic(): byte(0),
 	}
-	util.Logger.Info("subscribing to topics: " + fmt.Sprintf("%v", topics))
+	util.Logger.InfoContext(ctx, "subscribing to topics: "+fmt.Sprintf("%v", topics))
 
 	qos = flag.Int("qos", 2, "The QoS to subscribe to messages at")
 	retained = flag.Bool("retained", false, "Are the messages sent with the retained flag")
@@ -62,14 +65,14 @@ func ConnectMQTTBroker(config config.MqttConfig, pipelineService PipelineApiServ
 		SetClientID(*clientId).
 		SetCleanSession(true).
 		SetConnectionLostHandler(func(c MQTT.Client, err error) {
-			util.Logger.Error("mqtt connection lost: ", "error", err)
+			util.Logger.ErrorContext(ctx, "mqtt connection lost: ", "error", err)
 		}).
 		SetConnectionAttemptHandler(func(broker *url.URL, tlsCfg *tls.Config) *tls.Config {
-			util.Logger.Info("connecting to broker "+broker.String(), "broker", broker.String())
+			util.Logger.InfoContext(ctx, "connecting to broker "+broker.String(), "broker", broker.String())
 			return tlsCfg
 		}).
 		SetReconnectingHandler(func(mqttClient MQTT.Client, opt *MQTT.ClientOptions) {
-			util.Logger.Info("reconnecting to broker "+opt.Servers[0].String(), "broker", opt.Servers[0].String())
+			util.Logger.InfoContext(ctx, "reconnecting to broker "+opt.Servers[0].String(), "broker", opt.Servers[0].String())
 		}).
 		SetAutoReconnect(true)
 
@@ -87,14 +90,14 @@ func ConnectMQTTBroker(config config.MqttConfig, pipelineService PipelineApiServ
 		if token := c.SubscribeMultiple(topics, onMessageReceived); token.Wait() && token.Error() != nil {
 			panic(token.Error())
 		}
-		util.Logger.Info("Subscribed to topics: " + fmt.Sprintf("%v", topics))
+		util.Logger.InfoContext(ctx, "Subscribed to topics: "+fmt.Sprintf("%v", topics))
 	}
 
 	client = MQTT.NewClient(connOpts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return fmt.Errorf("Cant connect to broker %s: %s\n", hostname, token.Error())
 	} else {
-		util.Logger.Info("Connected to broker " + *server)
+		util.Logger.InfoContext(ctx, "Connected to broker "+*server)
 		fogClient = NewFogClient(pipelineService)
 	}
 	return nil
@@ -109,6 +112,8 @@ func publishMessage(topic string, message string) error {
 }
 
 func onMessageReceived(_ MQTT.Client, message MQTT.Message) {
+	// paho hands over no context, and an MQTT message carries no trace context to
+	// extract one from; processMessage explains why it starts a background one.
 	util.Logger.Debug("Received message on topic: "+message.Topic(), "message", message.Payload())
 	go fogClient.processMessage(message)
 }

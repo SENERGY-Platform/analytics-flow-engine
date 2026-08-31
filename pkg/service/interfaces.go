@@ -17,6 +17,8 @@
 package service
 
 import (
+	"context"
+
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 	"github.com/SENERGY-Platform/models/go/models"
@@ -26,41 +28,48 @@ import (
 	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 )
 
+// Every method takes a context so that the trace and the baggage of the caller
+// reach the service on the other side. Without it each of these calls starts a
+// trace of its own and the log lines it produces there cannot be tied back to the
+// request that caused them.
+//
+// The context the Driver gets is deliberately not cancellable: see the comment on
+// FlowEngine.deploymentContext.
 type Driver interface {
-	CreateOperators(pipelineId string, input []pipe.Operator, pipelineConfig lib.PipelineConfig) error
+	CreateOperators(ctx context.Context, pipelineId string, input []pipe.Operator, pipelineConfig lib.PipelineConfig) error
 	/*
 		DeleteOperator deletes an operator in the given pipeline
 		Deprecated: Use DeleteOperators instead.
 	*/
-	DeleteOperator(pipelineId string, input pipe.Operator) error
-	DeleteOperators(pipelineId string, inputs []pipe.Operator) error
-	GetPipelineStatus(pipelineId string) (lib.PipelineStatus, error)
-	GetPipelinesStatus() ([]lib.PipelineStatus, error)
+	DeleteOperator(ctx context.Context, pipelineId string, input pipe.Operator) error
+	DeleteOperators(ctx context.Context, pipelineId string, inputs []pipe.Operator) error
+	GetPipelineStatus(ctx context.Context, pipelineId string) (lib.PipelineStatus, error)
+	GetPipelinesStatus(ctx context.Context) ([]lib.PipelineStatus, error)
 }
 
 type ParsingApiService interface {
-	GetPipeline(id string, userId string, authorization string) (p parser.Pipeline, err error)
+	GetPipeline(ctx context.Context, id string, userId string, authorization string) (p parser.Pipeline, err error)
 }
 
 type PermissionApiService interface {
-	UserHasExecuteAccess(resource string, ids []string, authorization string) (bool, error)
+	UserHasExecuteAccess(ctx context.Context, resource string, ids []string, authorization string) (bool, error)
 }
 
 type Kafka2MqttApiService interface {
-	StartOperatorInstance(operatorName, operatorID string, pipelineID, userI, token string) (kafka2mqtt_api.Instance, error)
-	RemoveInstance(id, pipelineID, userID, token string) error
+	StartOperatorInstance(ctx context.Context, operatorName, operatorID string, pipelineID, userI, token string) (kafka2mqtt_api.Instance, error)
+	RemoveInstance(ctx context.Context, id, pipelineID, userID, token string) error
 }
 
 type DeviceManagerService interface {
-	GetDevice(deviceID, userID, token string) (models.Device, error)
-	GetDeviceType(deviceTypeID, userID, token string) (models.DeviceType, error)
+	GetDevice(ctx context.Context, deviceID, userID, token string) (models.Device, error)
+	GetDeviceType(ctx context.Context, deviceTypeID, userID, token string) (models.DeviceType, error)
 }
 
 type PipelineApiService interface {
-	RegisterPipeline(pipeline *pipe.Pipeline, userId string, authorization string) (id uuid.UUID, err error)
-	UpdatePipeline(pipeline *pipe.Pipeline, userId string, authorization string) (err error)
-	GetPipeline(id string, userId string, authorization string) (pipe pipe.Pipeline, err error)
-	GetPipelines(userId string, authorization string) (pipelines []pipe.Pipeline, err error)
-	GetPipelinesAdmin() (pipelines []pipe.Pipeline, err error)
-	DeletePipeline(id string, userId string, authorization string) (err error)
+	RegisterPipeline(ctx context.Context, pipeline *pipe.Pipeline, userId string, authorization string) (id uuid.UUID, err error)
+	UpdatePipeline(ctx context.Context, pipeline *pipe.Pipeline, userId string, authorization string) (err error)
+	GetPipeline(ctx context.Context, id string, userId string, authorization string) (pipe pipe.Pipeline, err error)
+	GetPipelines(ctx context.Context, userId string, authorization string) (pipelines []pipe.Pipeline, err error)
+	GetPipelinesAdmin(ctx context.Context) (pipelines []pipe.Pipeline, err error)
+	DeletePipeline(ctx context.Context, id string, userId string, authorization string) (err error)
 }

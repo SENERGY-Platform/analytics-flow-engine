@@ -1,12 +1,14 @@
 package devicemanagerapi
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
-	"github.com/SENERGY-Platform/models/go/models"
-	"github.com/parnurzeal/gorequest"
+	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/httpreq"
+	"github.com/SENERGY-Platform/models/go/models"
 )
 
 type DeviceManagerApi struct {
@@ -17,40 +19,36 @@ func NewDeviceManagerApi(url string) *DeviceManagerApi {
 	return &DeviceManagerApi{url}
 }
 
-func (api *DeviceManagerApi) GetDeviceType(deviceTypeID, userID, authorization string) (deviceType models.DeviceType, err error) {
-	request := gorequest.New()
-	request.Get(api.url+"/device-types/"+deviceTypeID).Set("X-UserId", userID).Set("Authorization", authorization)
-
-	resp, body, e := request.Send(nil).End()
-	if len(e) > 0 {
-	}
-	if resp.StatusCode != http.StatusOK {
-		err = errors.New("device manager API - could not get device type: " + strconv.Itoa(resp.StatusCode) + " " + body)
-		return
-	}
-	err = json.Unmarshal([]byte(body), &deviceType)
-	if err != nil {
-		err = errors.New("Cant unmarshal device type: " + err.Error())
-		return
-	}
+func (api *DeviceManagerApi) GetDeviceType(ctx context.Context, deviceTypeID, userID, authorization string) (deviceType models.DeviceType, err error) {
+	err = api.get(ctx, "/device-types/"+deviceTypeID, userID, authorization, "device type", &deviceType)
 	return
 }
 
-func (api *DeviceManagerApi) GetDevice(deviceID, userID, authorization string) (device models.Device, err error) {
-	request := gorequest.New()
-	request.Get(api.url+"/devices/"+deviceID).Set("X-UserId", userID).Set("Authorization", authorization)
-
-	resp, body, e := request.Send(nil).End()
-	if len(e) > 0 {
-	}
-	if resp.StatusCode != http.StatusOK {
-		err = errors.New("device manager API - could not get device: " + strconv.Itoa(resp.StatusCode) + " " + body)
-		return
-	}
-	err = json.Unmarshal([]byte(body), &device)
-	if err != nil {
-		err = errors.New("Cant unmarshal device: " + err.Error())
-		return
-	}
+func (api *DeviceManagerApi) GetDevice(ctx context.Context, deviceID, userID, authorization string) (device models.Device, err error) {
+	err = api.get(ctx, "/devices/"+deviceID, userID, authorization, "device", &device)
 	return
+}
+
+func (api *DeviceManagerApi) get(ctx context.Context, path, userID, authorization, what string, target any) error {
+	response, err := httpreq.Do(ctx, httpreq.Request{
+		Method: http.MethodGet,
+		URL:    api.url + path,
+		Headers: map[string]string{
+			"X-UserId":      userID,
+			"Authorization": authorization,
+		},
+	})
+	// Returned rather than swallowed. This used to be an empty if body, so an
+	// unreachable device manager fell through to reading a nil response.
+	if err != nil {
+		return fmt.Errorf("device manager API - could not get %s: %w", what, err)
+	}
+	if response.StatusCode != http.StatusOK {
+		return errors.New("device manager API - could not get " + what + ": " +
+			strconv.Itoa(response.StatusCode) + " " + response.Text())
+	}
+	if err = response.Decode(target); err != nil {
+		return fmt.Errorf("device manager API - could not unmarshal %s: %w", what, err)
+	}
+	return nil
 }

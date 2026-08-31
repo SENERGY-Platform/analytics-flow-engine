@@ -69,6 +69,11 @@ type Config struct {
 	// operator reads is decided by its input topics. What the move buys is one place
 	// to change when that is addressed.
 	TimescaleConnection string `json:"timescale_connection" env_var:"TIMESCALE_CONNECTION"`
+	// OtelEndpoint is the OTLP collector traces are exported to. Empty means the
+	// in-cluster Jaeger the otelx default names, which is what every deployment
+	// uses; the knob exists so a local run can point somewhere else instead of
+	// exporting into a void.
+	OtelEndpoint string `json:"otel_endpoint" env_var:"OTEL_ENDPOINT"`
 }
 
 func New(path string) (*Config, error) {

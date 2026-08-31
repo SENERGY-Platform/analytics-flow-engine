@@ -17,6 +17,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -123,11 +124,11 @@ func TestParser_createPipeline(t *testing.T) {
 type MockDeviceManagerService struct {
 }
 
-func (m MockDeviceManagerService) GetDevice(_, _, _ string) (models.Device, error) {
+func (m MockDeviceManagerService) GetDevice(_ context.Context, _, _, _ string) (models.Device, error) {
 	return models.Device{}, nil
 }
 
-func (m MockDeviceManagerService) GetDeviceType(_, _, _ string) (models.DeviceType, error) {
+func (m MockDeviceManagerService) GetDeviceType(_ context.Context, _, _, _ string) (models.DeviceType, error) {
 	return models.DeviceType{}, nil
 }
 
@@ -248,7 +249,7 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 	}
 	pipeline := createOperatorConfig(parsedPipeline)
 	deviceManagerService := MockDeviceManagerService{}
-	configuredOperators, err := addOperatorConfigs(pipelineRequest, pipeline, deviceManagerService, "", "")
+	configuredOperators, err := addOperatorConfigs(context.Background(), pipelineRequest, pipeline, deviceManagerService, "", "")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -370,12 +371,12 @@ func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 		fmt.Println(err)
 	}
 	pipeline := createOperatorConfig(parsedPipeline)
-	configuredOperators, err := addOperatorConfigs(pipelineRequest, pipeline, MockDeviceManagerService{}, "", "")
+	configuredOperators, err := addOperatorConfigs(context.Background(), pipelineRequest, pipeline, MockDeviceManagerService{}, "", "")
 	if err != nil {
 		fmt.Println(err)
 	}
 	pipeline.Operators = configuredOperators
-	configuredOperators, err = addOperatorConfigs(pipelineRequest2, pipeline, MockDeviceManagerService{}, "", "")
+	configuredOperators, err = addOperatorConfigs(context.Background(), pipelineRequest2, pipeline, MockDeviceManagerService{}, "", "")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -519,12 +520,12 @@ func TestParser_addStartingOperatorConfigsTwoTimes(t *testing.T) {
 		fmt.Println(err)
 	}
 	pipeline := createOperatorConfig(parsedPipeline)
-	configuredOperators, err := addOperatorConfigs(pipelineRequest, pipeline, MockDeviceManagerService{}, "", "")
+	configuredOperators, err := addOperatorConfigs(context.Background(), pipelineRequest, pipeline, MockDeviceManagerService{}, "", "")
 	if err != nil {
 		fmt.Println(err)
 	}
 	pipeline.Operators = configuredOperators
-	configuredOperators, err = addOperatorConfigs(pipelineRequest2, pipeline, MockDeviceManagerService{}, "", "")
+	configuredOperators, err = addOperatorConfigs(context.Background(), pipelineRequest2, pipeline, MockDeviceManagerService{}, "", "")
 	if err != nil {
 		fmt.Println(err)
 	}

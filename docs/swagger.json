@@ -366,6 +366,13 @@
         "github_com_SENERGY-Platform_analytics-pipeline_lib.Pipeline": {
             "type": "object",
             "properties": {
+                "baggage": {
+                    "description": "Baggage is the OpenTelemetry context the caller that started this pipeline\nsent along, plus the pipeline's own id. The flow engine turns it into pod\nlabels and hands it to every operator, so a log line from an operator can be\ntraced back to, for example, the smart service instance it belongs to.\n\nStored here rather than only applied at deploy time because a pipeline\noutlives the request that created it: the flow engine recreates missing\ndeployments on startup and rebuilds them on every update, and would have\nnowhere to read the context back from.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
                 "consumeAllMessages": {
                     "type": "boolean"
                 },

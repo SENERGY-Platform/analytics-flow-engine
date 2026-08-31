@@ -45,7 +45,7 @@ func main() {
 		os.Exit(ec)
 	}()
 
-	srvInfoHdl := srv_info_hdl.New("analytics-flow-engine", Version)
+	srvInfoHdl := srv_info_hdl.New(api.ServiceName, Version)
 
 	config.ParseFlags()
 
@@ -58,21 +58,26 @@ func main() {
 
 	util.InitStructLogger(cfg.Logger.Level)
 
-	util.Logger.Info(srvInfoHdl.Name(), "version", srvInfoHdl.Version())
-	util.Logger.Info("config: " + sb_util.ToJsonStr(cfg))
+	// The process context. Created here rather than further down because the
+	// OpenTelemetry setup is tied to the process lifetime and because everything
+	// below logs against it.
+	ctx, cf := context.WithCancel(context.Background())
+
+	util.Logger.InfoContext(ctx, srvInfoHdl.Name(), "version", srvInfoHdl.Version())
+	util.Logger.InfoContext(ctx, "config: "+sb_util.ToJsonStr(cfg))
 
 	pipelineService := pipeline_api.NewPipelineApi(cfg.PipelineApiEndpoint)
 
-	err = service.ConnectMQTTBroker(cfg.Mqtt, pipelineService)
+	err = service.ConnectMQTTBroker(ctx, cfg.Mqtt, pipelineService)
 	if err != nil {
-		util.Logger.Error("error connecting to mqtt broker", "error", err)
+		util.Logger.ErrorContext(ctx, "error connecting to mqtt broker", "error", err)
 		ec = 1
 		return
 	}
 
-	httpHandler, err := api.CreateServer(cfg, pipelineService)
+	httpHandler, err := api.CreateServer(ctx, cfg, pipelineService)
 	if err != nil {
-		util.Logger.Error("error creating http engine", "error", err)
+		util.Logger.ErrorContext(ctx, "error creating http engine", "error", err)
 		ec = 1
 		return
 	}
@@ -87,8 +92,6 @@ func main() {
 		Addr:    bindAddress,
 		Handler: httpHandler}
 
-	ctx, cf := context.WithCancel(context.Background())
-
 	go func() {
 		util.Wait(ctx, util.Logger, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 		cf()
@@ -100,9 +103,9 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		util.Logger.Info("starting http server")
+		util.Logger.InfoContext(ctx, "starting http server")
 		if err = httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			util.Logger.Error("starting server failed", attributes.ErrorKey, err)
+			util.Logger.ErrorContext(ctx, "starting server failed", attributes.ErrorKey, err)
 			ec = 1
 		}
 		cf()
@@ -112,19 +115,19 @@ func main() {
 	go func() {
 		defer wg.Done()
 		<-ctx.Done()
-		util.Logger.Info("stopping http server")
+		util.Logger.InfoContext(ctx, "stopping http server")
 		ctxWt, cf2 := context.WithTimeout(context.Background(), time.Second*5)
 		defer cf2()
 		if err := httpServer.Shutdown(ctxWt); err != nil {
-			util.Logger.Error("stopping server failed", attributes.ErrorKey, err)
+			util.Logger.ErrorContext(ctx, "stopping server failed", attributes.ErrorKey, err)
 			ec = 1
 		} else {
-			util.Logger.Info("http server stopped")
+			util.Logger.InfoContext(ctx, "http server stopped")
 		}
 
-		util.Logger.Info("closing mqtt connection")
+		util.Logger.InfoContext(ctx, "closing mqtt connection")
 		service.CloseMQTTConnection()
-		util.Logger.Info("mqtt connection closed")
+		util.Logger.InfoContext(ctx, "mqtt connection closed")
 	}()
 
 	wg.Wait()

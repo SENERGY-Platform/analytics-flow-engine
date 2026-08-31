@@ -17,6 +17,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -32,7 +33,7 @@ func StringInSlice(a string, list []string) bool {
 	return false
 }
 
-func retry(attempts int, sleep time.Duration, f func() error) (err error) {
+func retry(ctx context.Context, attempts int, sleep time.Duration, f func() error) (err error) {
 	for i := 0; ; i++ {
 		err = f()
 		if err == nil {
@@ -45,7 +46,7 @@ func retry(attempts int, sleep time.Duration, f func() error) (err error) {
 
 		time.Sleep(sleep)
 
-		util.Logger.Debug("retrying after error", "error", err, "attempt", i+1, "of", attempts)
+		util.Logger.DebugContext(ctx, "retrying after error", "error", err, "attempt", i+1, "of", attempts)
 	}
 	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
 }
