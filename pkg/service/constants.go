@@ -16,12 +16,6 @@
 
 package service
 
-const RequestDeviceId = "deviceId"
-const RequestOperatorId = "operatorId"
-const RequestImportId = "ImportId"
-
-const PermissionResourceDevices = "devices"
-const PermissionResourceAnalyticsPipelines = "analytics-pipelines"
-const PermissionResourceOperators = "analytics-operators"
-const PermissionResourceFlows = "analytics-flows"
-const PermissionResourceImports = "import-instances"
+// The permission resource names and the deployed filter-type spellings both live
+// in lib/access now, because the Operator Development Environment applies the
+// same rule and two copies would drift.

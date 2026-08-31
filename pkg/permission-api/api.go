@@ -29,13 +29,19 @@ func NewPermissionApi(url string) *PermissionApi {
 	return &PermissionApi{url: url, c: client.New(url)}
 }
 
+// UserHasExecuteAccess reports whether the token holder may execute every one of
+// the given ids. All of them, not any: the caller is about to read all of them,
+// so a partial answer is a denial.
 func (a PermissionApi) UserHasExecuteAccess(resource string, ids []string, authorization string) (result bool, err error) {
 	response, err, _ := a.c.CheckMultiplePermissions(authorization, resource, ids, client.Execute)
 	if err != nil {
 		return false, err
 	}
-	for _, access := range response {
-		if !access {
+	// Ranged over the ids rather than over the response: an id the service did not
+	// answer for is simply absent from the map, and ranging over what came back
+	// would take silence for a yes.
+	for _, id := range ids {
+		if !response[id] {
 			return false, nil
 		}
 	}

@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib/access"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
@@ -207,7 +208,36 @@ func (f *FlowEngine) setupPipeline(pipelineRequest lib.PipelineRequest, userId, 
 	}
 	pipeline.Operators = configuredOperators
 
+	// Only here are the input topics final. checkAccess above authorized the flow
+	// and the operators, which the request names directly; what a topic reads is
+	// decided by the parser and by addOperatorConfigs together, so checking the
+	// request would leave whatever those two add unchecked.
+	if err = f.checkTopicAccess(pipeline.Operators, token); err != nil {
+		return nil, lib.NewForbiddenError(fmt.Errorf("checkAccess failed: %w", err))
+	}
+
 	return pipeline, nil
+}
+
+// checkTopicAccess authorizes what the operators are about to read.
+//
+// Shared with the Operator Development Environment, which builds the same input
+// topics from an experiment rather than from a pipeline request. Operator Lib
+// reads whatever its topics name over a shared database credential and checks
+// nothing itself, so this is the only place the rule is applied for a deployment.
+func (f *FlowEngine) checkTopicAccess(operators []pipe.Operator, token string) error {
+	internal := make([]string, 0, len(operators))
+	for _, operator := range operators {
+		internal = append(internal, operator.Id)
+	}
+	for _, operator := range operators {
+		err := access.CheckTopics(f.permissionService, token, operator.InputTopics,
+			access.Options{InternalOperatorIDs: internal})
+		if err != nil {
+			return fmt.Errorf("operator %s: %w", operator.Id, err)
+		}
+	}
+	return nil
 }
 
 func (f *FlowEngine) DeletePipeline(id string, userId string, token string) (err error) {
@@ -267,30 +297,12 @@ func (f *FlowEngine) GetPipelinesStatus(ids []string, userId, token string) (sta
 }
 
 func (f *FlowEngine) checkAccess(pipelineRequest lib.PipelineRequest, operators map[string]parser.Operator, token string) error {
-	deviceIds, _, pipelineIds, importIds := getFilterIdsFromPipelineRequest(pipelineRequest)
-
-	checks := []struct {
-		resource string
-		ids      []string
-		msg      string
-	}{
-		{PermissionResourceFlows, []string{pipelineRequest.FlowId}, "flow: " + pipelineRequest.FlowId},
-		{PermissionResourceDevices, deviceIds, "one or more devices"},
-		{PermissionResourceAnalyticsPipelines, pipelineIds, "one or more pipelines"},
-		{PermissionResourceImports, importIds, "one or more imports"},
-	}
-
-	for _, c := range checks {
-		if len(c.ids) == 0 {
-			continue
-		}
-		ok, err := f.permissionService.UserHasExecuteAccess(c.resource, c.ids, token)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return fmt.Errorf("engine - user does not have the rights to execute %s", c.msg)
-		}
+	// What the request names directly. The ids its inputs name are authorized in
+	// checkTopicAccess instead, against the parsed topics rather than the request,
+	// because those are what the operators actually read.
+	if err := access.Check(f.permissionService, token,
+		access.ResourceFlows, []string{pipelineRequest.FlowId}); err != nil {
+		return err
 	}
 
 	if len(operators) > 0 {
@@ -298,7 +310,7 @@ func (f *FlowEngine) checkAccess(pipelineRequest lib.PipelineRequest, operators 
 		for _, op := range operators {
 			operatorIds = append(operatorIds, op.OperatorId)
 		}
-		ok, err := f.permissionService.UserHasExecuteAccess(PermissionResourceOperators, operatorIds, token)
+		ok, err := f.permissionService.UserHasExecuteAccess(access.ResourceOperators, operatorIds, token)
 		if err != nil {
 			return err
 		}
@@ -537,29 +549,4 @@ func (f *FlowEngine) createPipelineConfig(pipeline pipe.Pipeline) lib.PipelineCo
 		pipeConfig.ConsumerOffset = "earliest"
 	}
 	return pipeConfig
-}
-
-func getFilterIdsFromPipelineRequest(pipelineRequest lib.PipelineRequest) (deviceIds []string, operatorIds []string, pipelineIds []string, importIds []string) {
-	for _, node := range pipelineRequest.Nodes {
-		for _, input := range node.Inputs {
-			ids := strings.Split(input.FilterIds, ",")
-			switch input.FilterType {
-			case RequestDeviceId:
-				deviceIds = append(deviceIds, ids...)
-			case RequestImportId:
-				importIds = append(importIds, ids...)
-			case RequestOperatorId:
-				for _, v := range ids {
-					parts := strings.SplitN(strings.TrimSpace(v), ":", 2)
-					if len(parts) != 2 {
-						util.Logger.Warn("malformed operator filter ID: " + v)
-						continue
-					}
-					operatorIds = append(operatorIds, parts[0])
-					pipelineIds = append(pipelineIds, parts[1])
-				}
-			}
-		}
-	}
-	return
 }
