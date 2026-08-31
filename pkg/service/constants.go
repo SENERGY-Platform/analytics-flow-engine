@@ -19,3 +19,7 @@ package service
 // The permission resource names and the deployed filter-type spellings both live
 // in lib/access now, because the Operator Development Environment applies the
 // same rule and two copies would drift.
+
+// OperatorConfigTsConn is the key Operator Lib reads its timescale DSN from, in
+// operator_lib/util/model.py. A wire contract, not an internal name.
+const OperatorConfigTsConn = "ts_conn"

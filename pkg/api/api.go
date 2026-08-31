@@ -72,7 +72,7 @@ func CreateServer(cfg *config.Config, pipelineService service.PipelineApiService
 	permission := permission_api.NewPermissionApi(cfg.PermissionApiEndpoint)
 	kafka2mqtt := kafka2mqtt_api.NewKafka2MqttApi(cfg.Kafka2MqttApiEndpoint, &cfg.Mqtt)
 	deviceManager := devicemanager_api.NewDeviceManagerApi(cfg.DeviceManagerApiEndpoint)
-	flowEngine := service.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService)
+	flowEngine := service.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService, cfg.TimescaleConnection)
 
 	port := strconv.FormatInt(int64(cfg.ServerPort), 10)
 	util.Logger.Info("Starting api server at port " + port)
