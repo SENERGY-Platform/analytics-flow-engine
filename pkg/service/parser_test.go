@@ -272,6 +272,41 @@ func TestParser_addStartingOperatorConfigs(t *testing.T) {
 	}
 }
 
+func TestParser_addOperatorConfigsKeepsInputSelectionAspectIds(t *testing.T) {
+	var pipelineRequest lib.PipelineRequest
+	err := json.Unmarshal(parseJsonFile("testdata/request1.json", pipelineRequest), &pipelineRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsedPipeline parser.Pipeline
+	err = json.Unmarshal(parseJsonFile("testdata/pipeline1.json", parsedPipeline), &parsedPipeline)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var selections []pipe.InputSelection
+	err = json.Unmarshal([]byte(`[{"inputName":"value","aspectId":"urn:a","aspectIds":["urn:a","urn:b"],"functionId":"urn:f"}]`), &selections)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodeId := pipelineRequest.Nodes[0].NodeId
+	pipelineRequest.Nodes[0].InputSelections = selections
+
+	operators, err := addOperatorConfigs(context.Background(), pipelineRequest, createOperatorConfig(parsedPipeline), MockDeviceManagerService{}, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, operator := range operators {
+		if operator.Id != nodeId {
+			continue
+		}
+		if len(operator.InputSelections) != 1 || !reflect.DeepEqual(operator.InputSelections[0].AspectIds, []string{"urn:a", "urn:b"}) {
+			t.Errorf("aspect ids of the input selection were not kept: %#v", operator.InputSelections)
+		}
+		return
+	}
+	t.Errorf("no operator %s in the result", nodeId)
+}
+
 func TestParser_addStartingOperatorConfigsTwoTimesSimple(t *testing.T) {
 	sid := ""
 	id, _ := uuid.Parse("00000000-0000-0000-0000-000000000000")
