@@ -28,6 +28,7 @@ import (
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib/access"
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib/exports"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/baggage"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	parser "github.com/SENERGY-Platform/analytics-parser/lib"
@@ -50,6 +51,9 @@ type FlowEngine struct {
 	// rather than in the drivers because both of them build the same operator
 	// config, and a fog operator must not receive it at all.
 	timescaleConnection string
+	// exportLister looks up the exports of imports. Nil when no analytics-serving
+	// endpoint is configured; operators then read imports from Kafka.
+	exportLister exports.Lister
 }
 
 func NewFlowEngine(
@@ -59,8 +63,18 @@ func NewFlowEngine(
 	kafak2mqttService Kafka2MqttApiService,
 	deviceManagerService DeviceManagerService,
 	pipelineService PipelineApiService,
-	timescaleConnection string) *FlowEngine {
-	f := &FlowEngine{driver, parsingService, permissionService, kafak2mqttService, deviceManagerService, pipelineService, timescaleConnection}
+	timescaleConnection string,
+	exportLister exports.Lister) *FlowEngine {
+	f := &FlowEngine{
+		driver:               driver,
+		parsingService:       parsingService,
+		permissionService:    permissionService,
+		kafak2mqttService:    kafak2mqttService,
+		deviceManagerService: deviceManagerService,
+		pipelineService:      pipelineService,
+		timescaleConnection:  timescaleConnection,
+		exportLister:         exportLister,
+	}
 	err := f.syncPipelines()
 	if err != nil {
 		util.Logger.Error("failed to sync pipelines", "error", err)
@@ -311,6 +325,10 @@ func (f *FlowEngine) setupPipeline(ctx context.Context, pipelineRequest lib.Pipe
 	}
 
 	if err = f.setPlatformOperatorConfig(pipeline.Operators); err != nil {
+		return nil, err
+	}
+
+	if err = f.setImportExports(ctx, pipeline.Operators, token); err != nil {
 		return nil, err
 	}
 

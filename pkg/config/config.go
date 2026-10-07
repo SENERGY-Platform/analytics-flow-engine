@@ -55,6 +55,11 @@ type Config struct {
 	Kafka2MqttApiEndpoint    string         `json:"kafka2mqtt_api_endpoint" env_var:"KAFKA2MQTT_API_ENDPOINT"`
 	DeviceManagerApiEndpoint string         `json:"device_manager_api_endpoint" env_var:"DEVICE_MANAGER_API_ENDPOINT"`
 	PipelineApiEndpoint      string         `json:"pipeline_api_endpoint" env_var:"PIPELINE_API_ENDPOINT"`
+	// AnalyticsServingApiEndpoint is where the exports of an import are looked up
+	// at deployment, so an operator can read the import's history from timescale
+	// instead of its short-lived Kafka topic. Empty, the default, switches the
+	// lookup off: operators read imports from Kafka as before.
+	AnalyticsServingApiEndpoint string `json:"analytics_serving_api_endpoint" env_var:"ANALYTICS_SERVING_API_ENDPOINT"`
 	// TimescaleConnection is the DSN a cloud operator reads history through, set on
 	// every one of them as the ts_conn of its operator config.
 	//

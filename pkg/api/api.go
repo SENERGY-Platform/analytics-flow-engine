@@ -26,6 +26,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/SENERGY-Platform/analytics-flow-engine/lib/exports"
+	analytics_serving_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/analytics-serving-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	devicemanager_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/device-manager-api"
 	kafka2mqtt_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
@@ -84,7 +86,16 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 	permission := permission_api.NewPermissionApi(cfg.PermissionApiEndpoint)
 	kafka2mqtt := kafka2mqtt_api.NewKafka2MqttApi(cfg.Kafka2MqttApiEndpoint, &cfg.Mqtt)
 	deviceManager := devicemanager_api.NewDeviceManagerApi(cfg.DeviceManagerApiEndpoint)
-	flowEngine := service.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService, cfg.TimescaleConnection)
+	// A nil interface, not a nil *AnalyticsServingApi: the engine tests the interface
+	// against nil to tell the two modes apart.
+	var exportLister exports.Lister
+	if cfg.AnalyticsServingApiEndpoint != "" {
+		exportLister = analytics_serving_api.NewAnalyticsServingApi(cfg.AnalyticsServingApiEndpoint)
+		util.Logger.InfoContext(ctx, "import exports: resolving the history of imports from analytics-serving exports")
+	} else {
+		util.Logger.InfoContext(ctx, "import exports: analytics_serving_api_endpoint is empty, operators read imports from Kafka")
+	}
+	flowEngine := service.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService, cfg.TimescaleConnection, exportLister)
 
 	port := strconv.FormatInt(int64(cfg.ServerPort), 10)
 	util.Logger.InfoContext(ctx, "Starting api server at port "+port)
