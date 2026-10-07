@@ -32,9 +32,10 @@ type Kubernetes struct {
 	clientset           *kubernetes.Clientset
 	autoscalerClientset *autoscaler.Clientset
 	r2cfg               *config.Rancher2Config
+	operatorResources   map[string]config.OperatorResource
 }
 
-func NewKubernetes(r2cfg *config.Rancher2Config, debug bool) (kube *Kubernetes, err error) {
+func NewKubernetes(r2cfg *config.Rancher2Config, operatorResources map[string]config.OperatorResource, debug bool) (kube *Kubernetes, err error) {
 	var restConfig *rest.Config
 
 	if debug {
@@ -76,7 +77,7 @@ func NewKubernetes(r2cfg *config.Rancher2Config, debug bool) (kube *Kubernetes, 
 	}
 	util.Logger.Debug("succesfully tested connection", "pods", len(pods.Items))
 
-	return &Kubernetes{clientset: clientset, autoscalerClientset: autoscalerClientSet, r2cfg: r2cfg}, nil
+	return &Kubernetes{clientset: clientset, autoscalerClientset: autoscalerClientSet, r2cfg: r2cfg, operatorResources: operatorResources}, nil
 }
 
 func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inputs []pipe_lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
@@ -176,6 +177,10 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 			})
 		}
 
+		resources, resErr := containerResources(operator.ImageId, k.operatorResources)
+		if resErr != nil {
+			return resErr
+		}
 		container := apiv1.Container{
 			Name:            operator.OperatorId + "--" + operator.Id,
 			Image:           operator.ImageId,
@@ -183,16 +188,7 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 			Env:             envs,
 			Ports:           ports,
 			VolumeMounts:    volumeMounts,
-			Resources: apiv1.ResourceRequirements{
-				Limits: apiv1.ResourceList{
-					apiv1.ResourceCPU:    resource.MustParse("500m"),
-					apiv1.ResourceMemory: resource.MustParse("512Mi"),
-				},
-				Requests: apiv1.ResourceList{
-					apiv1.ResourceCPU:    resource.MustParse("100m"),
-					apiv1.ResourceMemory: resource.MustParse("128Mi"),
-				},
-			},
+			Resources:       resources,
 		}
 		containers = append(containers, container)
 	}
@@ -387,4 +383,28 @@ func (k *Kubernetes) makePVC(name string, size string) *apiv1.PersistentVolumeCl
 		},
 	}
 	return &pvc
+}
+
+// containerResources builds the requests and limits of an operator container from
+// the quantities config.ResourcesFor resolves for its image.
+func containerResources(image string, overrides map[string]config.OperatorResource) (apiv1.ResourceRequirements, error) {
+	res := config.ResourcesFor(image, overrides)
+	var quantities [4]resource.Quantity
+	for i, v := range []string{res.CPULimit, res.MemoryLimit, res.CPURequest, res.MemoryRequest} {
+		q, err := resource.ParseQuantity(v)
+		if err != nil {
+			return apiv1.ResourceRequirements{}, fmt.Errorf("operator resources of image %s: invalid quantity %q: %w", image, v, err)
+		}
+		quantities[i] = q
+	}
+	return apiv1.ResourceRequirements{
+		Limits: apiv1.ResourceList{
+			apiv1.ResourceCPU:    quantities[0],
+			apiv1.ResourceMemory: quantities[1],
+		},
+		Requests: apiv1.ResourceList{
+			apiv1.ResourceCPU:    quantities[2],
+			apiv1.ResourceMemory: quantities[3],
+		},
+	}, nil
 }

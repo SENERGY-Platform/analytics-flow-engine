@@ -18,6 +18,7 @@ package rancher2_api
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -36,6 +37,7 @@ func TestRancher2_createPersistentVolumeClaim(t *testing.T) {
 		cfg.Rancher2.SecretKey,
 		cfg.Rancher2.StackId,
 		&cfg.Rancher2,
+		cfg.OperatorResources,
 	)
 	name := "test"
 	err = driver.createPersistentVolumeClaim(context.Background(), name)
@@ -51,4 +53,28 @@ func TestRancher2_createPersistentVolumeClaim(t *testing.T) {
 		return
 	}
 
+}
+
+func TestContainerResources(t *testing.T) {
+	overrides := map[string]config.OperatorResource{
+		"ghcr.io/senergy-platform/consumption-forecast-operator": {MemoryLimit: "2Gi", MemoryRequest: "1Gi"},
+	}
+
+	got := containerResources("ghcr.io/senergy-platform/consumption-forecast-operator:prod", overrides)
+	want := ContainerResources{
+		Limits:   map[string]string{"memory": "2Gi", "cpu": "500m"},
+		Requests: map[string]string{"memory": "1Gi", "cpu": "100m"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("containerResources = %+v, want %+v", got, want)
+	}
+
+	got = containerResources("nginx:1.12", overrides)
+	want = ContainerResources{
+		Limits:   map[string]string{"memory": "512Mi", "cpu": "500m"},
+		Requests: map[string]string{"memory": "128Mi", "cpu": "100m"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("containerResources of an image without override = %+v, want %+v", got, want)
+	}
 }

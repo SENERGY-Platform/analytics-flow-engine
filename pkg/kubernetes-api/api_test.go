@@ -9,6 +9,8 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 	"github.com/google/uuid"
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var testPipeId = "test-pipe-12345678"
@@ -19,7 +21,7 @@ func getClient() (client *Kubernetes, err error) {
 		return
 	}
 	util.InitStructLogger("debug")
-	client, err = NewKubernetes(&cfg.Rancher2, true)
+	client, err = NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, true)
 	if err != nil {
 		return
 	}
@@ -33,7 +35,7 @@ func TestKubernetes_createClient(t *testing.T) {
 		return
 	}
 	util.InitStructLogger("debug")
-	_, err = NewKubernetes(&cfg.Rancher2, true)
+	_, err = NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, true)
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -125,5 +127,45 @@ func TestKubernetes_GetPipelineStatus(t *testing.T) {
 	if err != nil {
 		t.Error(err.Error())
 		return
+	}
+}
+
+func TestContainerResources(t *testing.T) {
+	overrides := map[string]config.OperatorResource{
+		"ghcr.io/senergy-platform/consumption-forecast-operator": {MemoryLimit: "2Gi", MemoryRequest: "1Gi"},
+	}
+
+	got, err := containerResources("ghcr.io/senergy-platform/consumption-forecast-operator:prod", overrides)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name string
+		got  resource.Quantity
+		want string
+	}{
+		{"memory limit", got.Limits[apiv1.ResourceMemory], "2Gi"},
+		{"memory request", got.Requests[apiv1.ResourceMemory], "1Gi"},
+		{"cpu limit", got.Limits[apiv1.ResourceCPU], "500m"},
+		{"cpu request", got.Requests[apiv1.ResourceCPU], "100m"},
+	} {
+		if want := resource.MustParse(c.want); c.got.Cmp(want) != 0 {
+			t.Errorf("%s = %s, want %s", c.name, c.got.String(), c.want)
+		}
+	}
+
+	got, err = containerResources("nginx:1.12", overrides)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := resource.MustParse("512Mi"); got.Limits.Memory().Cmp(want) != 0 {
+		t.Errorf("memory limit of an image without override = %s, want 512Mi", got.Limits.Memory().String())
+	}
+}
+
+func TestContainerResourcesRejectsAnUnparsableQuantity(t *testing.T) {
+	overrides := map[string]config.OperatorResource{"nginx": {MemoryLimit: "lots"}}
+	if _, err := containerResources("nginx:1.12", overrides); err == nil {
+		t.Error("expected an error for an unparsable quantity instead of a panic or a silent default")
 	}
 }

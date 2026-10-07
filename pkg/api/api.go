@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"regexp"
 	"slices"
@@ -72,15 +73,18 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 			cfg.Rancher2.SecretKey,
 			cfg.Rancher2.StackId,
 			&cfg.Rancher2,
+			cfg.OperatorResources,
 		)
 		break
 	default:
-		driver, err = kubernetes_api.NewKubernetes(&cfg.Rancher2, cfg.Debug)
+		driver, err = kubernetes_api.NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, cfg.Debug)
 		if err != nil {
 			util.Logger.ErrorContext(ctx, "Error creating driver", "error", err)
 			return
 		}
 	}
+
+	logOperatorResources(ctx, cfg.OperatorResources)
 
 	parser := parsing_api.NewParsingApi(cfg.ParserApiEndpoint)
 	permission := permission_api.NewPermissionApi(cfg.PermissionApiEndpoint)
@@ -241,4 +245,20 @@ func isValidUserId(id string) bool {
 	}
 	matched, _ := regexp.MatchString(`^[a-zA-Z0-9_-]+$`, id)
 	return matched
+}
+
+// logOperatorResources logs the resolved values of every image with an override,
+// so a deployment shows at startup what its operators will get.
+func logOperatorResources(ctx context.Context, overrides map[string]config.OperatorResource) {
+	if len(overrides) == 0 {
+		util.Logger.InfoContext(ctx, "operator resources: no per-image overrides, all operators get the defaults")
+		return
+	}
+	for _, image := range slices.Sorted(maps.Keys(overrides)) {
+		res := config.ResourcesFor(image, overrides)
+		util.Logger.InfoContext(ctx, "operator resources: per-image override",
+			"image", image,
+			"memory_limit", res.MemoryLimit, "memory_request", res.MemoryRequest,
+			"cpu_limit", res.CPULimit, "cpu_request", res.CPURequest)
+	}
 }

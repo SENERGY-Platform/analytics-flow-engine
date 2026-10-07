@@ -46,12 +46,14 @@ type Rancher2 struct {
 	secretKey string
 	stackId   string
 	r2cfg     *config.Rancher2Config
+
+	operatorResources map[string]config.OperatorResource
 }
 
-func NewRancher2(url string, accessKey string, secretKey string, stackId string, r2cfg *config.Rancher2Config) *Rancher2 {
+func NewRancher2(url string, accessKey string, secretKey string, stackId string, r2cfg *config.Rancher2Config, operatorResources map[string]config.OperatorResource) *Rancher2 {
 	kubeUrl := strings.TrimSuffix(url, "v3/") + "k8s/clusters/" +
 		strings.Split(r2cfg.ProjectId, ":")[0] + "/v1/"
-	return &Rancher2{url, kubeUrl, accessKey, secretKey, stackId, r2cfg}
+	return &Rancher2{url, kubeUrl, accessKey, secretKey, stackId, r2cfg, operatorResources}
 }
 
 // do issues a request against the Rancher API with this driver's credentials.
@@ -192,16 +194,7 @@ func (r *Rancher2) CreateOperators(ctx context.Context, pipelineId string, input
 				PersistentVolumeClaim: PersistentVolumeClaim{PersistentVolumeClaimId: r.getOperatorName(pipelineId, operator)[0]}},
 			)
 		}
-		container.Resources = ContainerResources{
-			Requests: map[string]string{
-				"memory": "128Mi",
-				"cpu":    "100m",
-			},
-			Limits: map[string]string{
-				"memory": "512Mi",
-				"cpu":    "500m",
-			},
-		}
+		container.Resources = containerResources(operator.ImageId, r.operatorResources)
 		container.Labels = labels
 		containers = append(containers, container)
 	}
@@ -490,4 +483,20 @@ func (r *Rancher2) deletePersistentVolumeClaim(ctx context.Context, name string)
 		}
 	}
 	return errors.New("rancher2 API - could not delete PersistentVolumeClaim in time")
+}
+
+// containerResources maps the quantities config.ResourcesFor resolves for an
+// image onto the Rancher workload request.
+func containerResources(image string, overrides map[string]config.OperatorResource) ContainerResources {
+	res := config.ResourcesFor(image, overrides)
+	return ContainerResources{
+		Requests: map[string]string{
+			"memory": res.MemoryRequest,
+			"cpu":    res.CPURequest,
+		},
+		Limits: map[string]string{
+			"memory": res.MemoryLimit,
+			"cpu":    res.CPULimit,
+		},
+	}
 }

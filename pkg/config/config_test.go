@@ -48,3 +48,35 @@ func TestTheTimescaleConnectionIsOverridableFromTheEnvironment(t *testing.T) {
 			cfg.TimescaleConnection)
 	}
 }
+
+func TestOperatorResourcesAreEmptyByDefault(t *testing.T) {
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if len(cfg.OperatorResources) != 0 {
+		t.Errorf("operator_resources = %v, want none so every operator keeps the defaults", cfg.OperatorResources)
+	}
+}
+
+func TestOperatorResourcesAreReadFromTheEnvironment(t *testing.T) {
+	t.Setenv("OPERATOR_RESOURCES", `{"ghcr.io/senergy-platform/consumption-forecast-operator":{"memory_limit":"2Gi","memory_request":"1Gi"}}`)
+
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	got := cfg.OperatorResources["ghcr.io/senergy-platform/consumption-forecast-operator"]
+	if got.MemoryLimit != "2Gi" || got.MemoryRequest != "1Gi" {
+		t.Errorf("operator_resources = %+v, want the environment's memory_limit 2Gi and memory_request 1Gi", got)
+	}
+}
+
+func TestInvalidOperatorResourcesFailTheStart(t *testing.T) {
+	// A request alone above the default limit of 512Mi.
+	t.Setenv("OPERATOR_RESOURCES", `{"ghcr.io/senergy-platform/consumption-forecast-operator":{"memory_request":"1Gi"}}`)
+
+	if _, err := New(""); err == nil {
+		t.Error("New accepted a memory request above the default limit; the deployment would be refused later, per pipeline")
+	}
+}

@@ -79,6 +79,10 @@ type Config struct {
 	// uses; the knob exists so a local run can point somewhere else instead of
 	// exporting into a void.
 	OtelEndpoint string `json:"otel_endpoint" env_var:"OTEL_ENDPOINT"`
+	// OperatorResources overrides the resources of operator containers per image
+	// repository (no tag, no digest); see OperatorResource. Images not named here
+	// keep the defaults.
+	OperatorResources map[string]OperatorResource `json:"operator_resources" env_var:"OPERATOR_RESOURCES"`
 }
 
 func New(path string) (*Config, error) {
@@ -100,5 +104,8 @@ func New(path string) (*Config, error) {
 		TimescaleConnection: "postgresql://postgres:tea@timescale-db.timescale.svc.cluster.local/postgres",
 	}
 	err := sb_config_hdl.Load(&cfg, nil, envTypeParser, nil, path)
+	if err == nil {
+		err = ValidateOperatorResources(cfg.OperatorResources)
+	}
 	return &cfg, err
 }
