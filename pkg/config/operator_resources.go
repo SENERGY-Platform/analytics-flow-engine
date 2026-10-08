@@ -25,11 +25,13 @@ import (
 )
 
 // The resources every operator container gets unless OperatorResources names its image.
+// The CPU request is near what operators use (10 to 25m by their VPAs); a request far above
+// the recommendation makes the VPA updater evict a new pipeline's pod right after it starts.
 const (
 	DefaultOperatorMemoryLimit   = "512Mi"
 	DefaultOperatorMemoryRequest = "128Mi"
 	DefaultOperatorCPULimit      = "500m"
-	DefaultOperatorCPURequest    = "100m"
+	DefaultOperatorCPURequest    = "25m"
 )
 
 // OperatorVPAMinReplicas lets the VPA updater evict the single pod of a pipeline. Its

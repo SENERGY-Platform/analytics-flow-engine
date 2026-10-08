@@ -147,7 +147,7 @@ func TestContainerResources(t *testing.T) {
 		{"memory limit", got.Limits[apiv1.ResourceMemory], "2Gi"},
 		{"memory request", got.Requests[apiv1.ResourceMemory], "1Gi"},
 		{"cpu limit", got.Limits[apiv1.ResourceCPU], "500m"},
-		{"cpu request", got.Requests[apiv1.ResourceCPU], "100m"},
+		{"cpu request", got.Requests[apiv1.ResourceCPU], "25m"},
 	} {
 		if want := resource.MustParse(c.want); c.got.Cmp(want) != 0 {
 			t.Errorf("%s = %s, want %s", c.name, c.got.String(), c.want)

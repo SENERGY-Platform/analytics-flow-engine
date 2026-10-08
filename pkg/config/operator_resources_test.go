@@ -27,7 +27,7 @@ var defaultResources = ContainerResources{
 	MemoryLimit:   "512Mi",
 	MemoryRequest: "128Mi",
 	CPULimit:      "500m",
-	CPURequest:    "100m",
+	CPURequest:    "25m",
 }
 
 func TestResourcesFor(t *testing.T) {
@@ -53,7 +53,7 @@ func TestResourcesFor(t *testing.T) {
 		{
 			"partial entry keeps the other defaults, registry port kept",
 			"registry.example.org:5000/team/op:1.2", overrides,
-			ContainerResources{MemoryLimit: "1Gi", MemoryRequest: "128Mi", CPULimit: "500m", CPURequest: "100m"},
+			ContainerResources{MemoryLimit: "1Gi", MemoryRequest: "128Mi", CPULimit: "500m", CPURequest: "25m"},
 		},
 		{"registry port is not a tag", "registry.example.org:5000/team/other", overrides, defaultResources},
 	}

@@ -65,7 +65,7 @@ func TestContainerResources(t *testing.T) {
 	got := containerResources("ghcr.io/senergy-platform/consumption-forecast-operator:prod", overrides)
 	want := ContainerResources{
 		Limits:   map[string]string{"memory": "2Gi", "cpu": "500m"},
-		Requests: map[string]string{"memory": "1Gi", "cpu": "100m"},
+		Requests: map[string]string{"memory": "1Gi", "cpu": "25m"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("containerResources = %+v, want %+v", got, want)
@@ -74,7 +74,7 @@ func TestContainerResources(t *testing.T) {
 	got = containerResources("nginx:1.12", overrides)
 	want = ContainerResources{
 		Limits:   map[string]string{"memory": "512Mi", "cpu": "500m"},
-		Requests: map[string]string{"memory": "128Mi", "cpu": "100m"},
+		Requests: map[string]string{"memory": "128Mi", "cpu": "25m"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("containerResources of an image without override = %+v, want %+v", got, want)
