@@ -169,3 +169,13 @@ func TestContainerResourcesRejectsAnUnparsableQuantity(t *testing.T) {
 		t.Error("expected an error for an unparsable quantity instead of a panic or a silent default")
 	}
 }
+
+func TestNewVPALetsTheUpdaterEvictASinglePod(t *testing.T) {
+	vpa := newVPA("pipeline-x")
+	if vpa.Name != "pipeline-x-vpa" || vpa.Spec.TargetRef.Name != "pipeline-x" {
+		t.Fatalf("names: %s targets %s", vpa.Name, vpa.Spec.TargetRef.Name)
+	}
+	if min := vpa.Spec.UpdatePolicy.MinReplicas; min == nil || *min != 1 {
+		t.Fatalf("minReplicas = %v, want 1", min)
+	}
+}

@@ -233,24 +233,7 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 	util.Logger.DebugContext(ctx, fmt.Sprintf("created deployment %s", result.GetObjectMeta().GetName()))
 
 	// Create Vertical Pod Autoscaler
-	updateAutoMode := v1.UpdateModeRecreate
-	vpa := &v1.VerticalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1] + "-vpa",
-		},
-		Spec: v1.VerticalPodAutoscalerSpec{
-			TargetRef:    &autoscaling.CrossVersionObjectReference{Kind: "Deployment", Name: getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1]},
-			UpdatePolicy: &v1.PodUpdatePolicy{UpdateMode: &updateAutoMode},
-			ResourcePolicy: &v1.PodResourcePolicy{ContainerPolicies: []v1.ContainerResourcePolicy{{
-				ContainerName: "*",
-				MaxAllowed: apiv1.ResourceList{
-					apiv1.ResourceCPU:    resource.MustParse("1000m"),
-					apiv1.ResourceMemory: resource.MustParse("4000Mi"),
-				},
-			}}},
-			Recommenders: nil,
-		},
-	}
+	vpa := newVPA(getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1])
 
 	util.Logger.DebugContext(ctx, "creating autoscaler")
 	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(k.r2cfg.NamespaceId)
@@ -407,4 +390,27 @@ func containerResources(image string, overrides map[string]config.OperatorResour
 			apiv1.ResourceMemory: quantities[3],
 		},
 	}, nil
+}
+
+// newVPA is the VerticalPodAutoscaler of the pipeline deployment named deployment.
+func newVPA(deployment string) *v1.VerticalPodAutoscaler {
+	updateAutoMode := v1.UpdateModeRecreate
+	minReplicas := config.OperatorVPAMinReplicas
+	return &v1.VerticalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: deployment + "-vpa",
+		},
+		Spec: v1.VerticalPodAutoscalerSpec{
+			TargetRef:    &autoscaling.CrossVersionObjectReference{Kind: "Deployment", Name: deployment},
+			UpdatePolicy: &v1.PodUpdatePolicy{UpdateMode: &updateAutoMode, MinReplicas: &minReplicas},
+			ResourcePolicy: &v1.PodResourcePolicy{ContainerPolicies: []v1.ContainerResourcePolicy{{
+				ContainerName: "*",
+				MaxAllowed: apiv1.ResourceList{
+					apiv1.ResourceCPU:    resource.MustParse("1000m"),
+					apiv1.ResourceMemory: resource.MustParse("4000Mi"),
+				},
+			}}},
+			Recommenders: nil,
+		},
+	}
 }

@@ -18,7 +18,9 @@ package rancher2_api
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,5 +78,18 @@ func TestContainerResources(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("containerResources of an image without override = %+v, want %+v", got, want)
+	}
+}
+
+func TestVPARequestLetsTheUpdaterEvictASinglePod(t *testing.T) {
+	body, err := json.Marshal(vpaRequest("pipeline-x", "ns"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), `"updatePolicy":{"updateMode":"Auto","minReplicas":1}`) {
+		t.Fatalf("vpa request: %s", body)
+	}
+	if !strings.Contains(string(body), `"name":"pipeline-x-vpa","namespace":"ns"`) {
+		t.Fatalf("vpa request: %s", body)
 	}
 }

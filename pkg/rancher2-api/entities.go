@@ -112,7 +112,8 @@ type AutoscalingRequestTargetRef struct {
 }
 
 type AutoscalingRequestUpdatePolicy struct {
-	UpdateMode string `json:"updateMode,omitempty"`
+	UpdateMode  string `json:"updateMode,omitempty"`
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
 }
 
 type ResourcePolicy struct {

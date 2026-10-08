@@ -32,6 +32,11 @@ const (
 	DefaultOperatorCPURequest    = "100m"
 )
 
+// OperatorVPAMinReplicas lets the VPA updater evict the single pod of a pipeline. Its
+// global default of 2 skips every pipeline, so a recommendation only reached a pod that
+// was recreated for another reason and an OOM loop never healed.
+const OperatorVPAMinReplicas int32 = 1
+
 // OperatorResource overrides the default resources of one operator image. An
 // empty field keeps the default; the values are Kubernetes quantities.
 type OperatorResource struct {

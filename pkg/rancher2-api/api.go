@@ -232,20 +232,36 @@ func (r *Rancher2) CreateOperators(ctx context.Context, pipelineId string, input
 		}
 	}
 
-	autoscaleRequest := AutoscalingRequest{
+	autoscaleRequest := vpaRequest(r.getOperatorName(pipelineId, pipe.Operator{Id: DummyOperatorId})[1], r.r2cfg.NamespaceId)
+	// Its own variable, so a later edit cannot silently overwrite an error the
+	// workload call above wanted to report.
+	vpaResponse, err := r.do(ctx, http.MethodPost, r.kubeUrl+"autoscaling.k8s.io.verticalpodautoscalers", autoscaleRequest)
+	if err != nil {
+		return errors.New("rancher2 API -  could not create operator vpa - an error occurred")
+	}
+	if vpaResponse.StatusCode != http.StatusCreated && vpaResponse.StatusCode != http.StatusConflict {
+		err = errors.New("rancher2 API - could not create vpa " + vpaResponse.Text())
+	}
+	return
+}
+
+// vpaRequest is the VerticalPodAutoscaler of the pipeline deployment named deployment.
+func vpaRequest(deployment string, namespace string) AutoscalingRequest {
+	minReplicas := config.OperatorVPAMinReplicas
+	return AutoscalingRequest{
 		ApiVersion: "autoscaling.k8s.io/v1",
 		Kind:       "VerticalPodAutoscaler",
 		Metadata: AutoscalingRequestMetadata{
-			Name:      r.getOperatorName(pipelineId, pipe.Operator{Id: DummyOperatorId})[1] + "-vpa",
-			Namespace: r.r2cfg.NamespaceId,
+			Name:      deployment + "-vpa",
+			Namespace: namespace,
 		},
 		Spec: AutoscalingRequestSpec{
 			TargetRef: AutoscalingRequestTargetRef{
 				ApiVersion: "apps/v1",
 				Kind:       "Deployment",
-				Name:       r.getOperatorName(pipelineId, pipe.Operator{Id: DummyOperatorId})[1],
+				Name:       deployment,
 			},
-			UpdatePolicy: AutoscalingRequestUpdatePolicy{UpdateMode: "Auto"},
+			UpdatePolicy: AutoscalingRequestUpdatePolicy{UpdateMode: "Auto", MinReplicas: &minReplicas},
 			ResourcePolicy: ResourcePolicy{
 				ContainerPolicies: []ContainerPolicy{
 					{
@@ -259,16 +275,6 @@ func (r *Rancher2) CreateOperators(ctx context.Context, pipelineId string, input
 			},
 		},
 	}
-	// Its own variable, so a later edit cannot silently overwrite an error the
-	// workload call above wanted to report.
-	vpaResponse, err := r.do(ctx, http.MethodPost, r.kubeUrl+"autoscaling.k8s.io.verticalpodautoscalers", autoscaleRequest)
-	if err != nil {
-		return errors.New("rancher2 API -  could not create operator vpa - an error occurred")
-	}
-	if vpaResponse.StatusCode != http.StatusCreated && vpaResponse.StatusCode != http.StatusConflict {
-		err = errors.New("rancher2 API - could not create vpa " + vpaResponse.Text())
-	}
-	return
 }
 
 func (r *Rancher2) DeleteOperators(ctx context.Context, pipelineId string, operators []pipe.Operator) (err error) {
