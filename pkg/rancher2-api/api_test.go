@@ -86,7 +86,7 @@ func TestVPARequestLetsTheUpdaterEvictASinglePod(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(body), `"updatePolicy":{"updateMode":"Auto","minReplicas":1}`) {
+	if !strings.Contains(string(body), `"updatePolicy":{"updateMode":"Recreate","minReplicas":1}`) {
 		t.Fatalf("vpa request: %s", body)
 	}
 	if !strings.Contains(string(body), `"name":"pipeline-x-vpa","namespace":"ns"`) {

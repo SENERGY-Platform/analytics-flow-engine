@@ -261,7 +261,7 @@ func vpaRequest(deployment string, namespace string) AutoscalingRequest {
 				Kind:       "Deployment",
 				Name:       deployment,
 			},
-			UpdatePolicy: AutoscalingRequestUpdatePolicy{UpdateMode: "Auto", MinReplicas: &minReplicas},
+			UpdatePolicy: AutoscalingRequestUpdatePolicy{UpdateMode: "Recreate", MinReplicas: &minReplicas},
 			ResourcePolicy: ResourcePolicy{
 				ContainerPolicies: []ContainerPolicy{
 					{
