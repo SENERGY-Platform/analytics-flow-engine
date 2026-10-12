@@ -91,8 +91,6 @@ func TestInvalidOperatorResourcesFailTheStart(t *testing.T) {
 func TestConfigJsonHidesCredentials(t *testing.T) {
 	secrets := map[string]string{
 		"BROKER_PASSWORD":      "broker-password-from-env",
-		"RANCHER2_ACCESS_KEY":  "rancher-access-key-from-env",
-		"RANCHER2_SECRET_KEY":  "rancher-secret-key-from-env",
 		"TIMESCALE_CONNECTION": "postgresql://ops:timescale-password-from-env@timescale.example.org/db",
 	}
 	for k, v := range secrets {
@@ -106,7 +104,7 @@ func TestConfigJsonHidesCredentials(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, secret := range []string{"broker-password-from-env", "rancher-access-key-from-env", "rancher-secret-key-from-env", "timescale-password-from-env"} {
+	for _, secret := range []string{"broker-password-from-env", "timescale-password-from-env"} {
 		if strings.Contains(string(b), secret) {
 			t.Errorf("config JSON contains %q: %s", secret, b)
 		}
@@ -116,7 +114,6 @@ func TestConfigJsonHidesCredentials(t *testing.T) {
 func TestConfigFileSetsCredentials(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	file := `{"mqtt": {"broker_password": "broker-password-from-file"},
-		"rancher2": {"access_key": "rancher-access-key-from-file", "secret_key": "rancher-secret-key-from-file"},
 		"timescale_connection": "postgresql://ops:timescale-password-from-file@timescale.example.org/db"}`
 	if err := os.WriteFile(path, []byte(file), 0600); err != nil {
 		t.Fatal(err)
@@ -125,8 +122,8 @@ func TestConfigFileSetsCredentials(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := []string{cfg.Mqtt.BrokerPassword.Value(), cfg.Rancher2.AccessKey.Value(), cfg.Rancher2.SecretKey.Value(), cfg.TimescaleConnection.Value()}
-	want := []string{"broker-password-from-file", "rancher-access-key-from-file", "rancher-secret-key-from-file", "postgresql://ops:timescale-password-from-file@timescale.example.org/db"}
+	got := []string{cfg.Mqtt.BrokerPassword.Value(), cfg.TimescaleConnection.Value()}
+	want := []string{"broker-password-from-file", "postgresql://ops:timescale-password-from-file@timescale.example.org/db"}
 	for i := range want {
 		if got[i] != want[i] {
 			t.Errorf("credential %d from file = %q, want %q", i, got[i], want[i])

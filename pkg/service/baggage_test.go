@@ -34,7 +34,7 @@ func init() {
 }
 
 // recordingDriver keeps the PipelineConfig it was handed, which is where the
-// baggage has to arrive for either driver to be able to label anything.
+// baggage has to arrive for the driver to be able to label anything.
 type recordingDriver struct {
 	configs     []lib.PipelineConfig
 	deleteCalls int

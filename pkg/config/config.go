@@ -32,15 +32,10 @@ type LoggerConfig struct {
 }
 
 type Rancher2Config struct {
-	Endpoint       string                 `json:"endpoint" env_var:"RANCHER2_ENDPOINT"`
-	AccessKey      sb_config_types.Secret `json:"access_key" env_var:"RANCHER2_ACCESS_KEY"`
-	SecretKey      sb_config_types.Secret `json:"secret_key" env_var:"RANCHER2_SECRET_KEY"`
-	StackId        string                 `json:"stack_id" env_var:"RANCHER2_STACK_ID"`
-	ProjectId      string                 `json:"project_id" env_var:"RANCHER2_PROJECT_ID"`
-	NamespaceId    string                 `json:"namespace_id" env_var:"RANCHER2_NAMESPACE_ID"`
-	StorageDriver  *string                `json:"storage_driver" env_var:"RANCHER2_STORAGE_DRIVER"`
-	Zookeeper      string                 `json:"zookeeper" env_var:"ZOOKEEPER"`
-	KafkaBootstrap string                 `json:"kafka_bootstrap" env_var:"KAFKA_BOOTSTRAP"`
+	NamespaceId    string  `json:"namespace_id" env_var:"RANCHER2_NAMESPACE_ID"`
+	StorageDriver  *string `json:"storage_driver" env_var:"RANCHER2_STORAGE_DRIVER"`
+	Zookeeper      string  `json:"zookeeper" env_var:"ZOOKEEPER"`
+	KafkaBootstrap string  `json:"kafka_bootstrap" env_var:"KAFKA_BOOTSTRAP"`
 }
 
 type Config struct {
@@ -48,7 +43,6 @@ type Config struct {
 	Logger                   LoggerConfig   `json:"logger" env_var:"LOGGER_CONFIG"`
 	URLPrefix                string         `json:"url_prefix" env_var:"URL_PREFIX"`
 	ServerPort               int            `json:"server_port" env_var:"SERVER_PORT"`
-	Driver                   string         `json:"driver" env_var:"DRIVER"`
 	Rancher2                 Rancher2Config `json:"rancher2" env_var:"RANCHER2_CONFIG"`
 	Debug                    bool           `json:"debug" env_var:"DEBUG"`
 	ParserApiEndpoint        string         `json:"parser_api_endpoint" env_var:"PARSER_API_ENDPOINT"`
@@ -93,11 +87,9 @@ func New(path string) (*Config, error) {
 			BrokerUser:     "",
 			BrokerPassword: "",
 		},
-		Driver:     "kubernetes",
 		ServerPort: 8000,
 		Debug:      false,
 		Rancher2: Rancher2Config{
-			ProjectId:      "_:_",
 			Zookeeper:      "zookeeper.kafka:2181",
 			KafkaBootstrap: "kafka.kafka:9092",
 		},

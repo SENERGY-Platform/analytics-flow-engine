@@ -24,8 +24,8 @@
 //
 // Deliberately thin: it returns the status code and the raw body rather than
 // decoding or classifying anything. The clients differ in what a status means to
-// them — a 404 from the pipeline registry is a typed NotFoundError, a 404 from
-// Rancher while deleting is success — so that judgement stays with them.
+// them — a 404 from the pipeline registry is a typed NotFoundError — so that
+// judgement stays with them.
 package httpreq
 
 import (
@@ -41,20 +41,13 @@ import (
 	"github.com/SENERGY-Platform/gin-middleware/otelx"
 )
 
-// BasicAuth is the credential pair the Rancher API is addressed with.
-type BasicAuth struct {
-	User     string
-	Password string
-}
-
 type Request struct {
 	Method string
 	URL    string
 	// Body is JSON-encoded when it is not nil. A string or a []byte is sent as it
 	// stands, for the callers that marshalled it themselves.
-	Body      any
-	Headers   map[string]string
-	BasicAuth *BasicAuth
+	Body    any
+	Headers map[string]string
 }
 
 type Response struct {
@@ -72,10 +65,8 @@ func (r Response) Decode(target any) error {
 	return json.Unmarshal(r.Body, target)
 }
 
-// client deliberately has no timeout of its own. The Rancher workload calls are the
-// slowest thing this service does — one of them waits minutes for a volume to
-// disappear — and a fixed number here would cut them off at a value nobody chose.
-// The request library this replaced had no timeout either.
+// client deliberately has no timeout of its own: a fixed number here would cut calls
+// off at a value nobody chose. The request library this replaced had no timeout either.
 //
 // On the read paths the deadline therefore comes from the caller's request context.
 // On the deployment paths it does not: those run on a context with the cancellation
@@ -124,9 +115,6 @@ func Do(ctx context.Context, request Request) (Response, error) {
 			continue
 		}
 		req.Header.Set(key, value)
-	}
-	if request.BasicAuth != nil {
-		req.SetBasicAuth(request.BasicAuth.User, request.BasicAuth.Password)
 	}
 
 	// The whole point of the package: the trace id and the baggage go onto the wire

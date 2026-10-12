@@ -137,23 +137,6 @@ func TestDoWithoutBodySendsNoContentType(t *testing.T) {
 	}
 }
 
-func TestDoSendsBasicAuth(t *testing.T) {
-	server, got := serverRecording(t, http.StatusOK, "{}")
-
-	_, err := Do(context.Background(), Request{
-		Method:    http.MethodGet,
-		URL:       server.URL + "/x",
-		BasicAuth: &BasicAuth{User: "key", Password: "secret"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	user, password, ok := parseBasicAuth(got.header.Get("Authorization"))
-	if !ok || user != "key" || password != "secret" {
-		t.Errorf("expected basic auth, got %q", got.header.Get("Authorization"))
-	}
-}
-
 func TestDoSkipsEmptyHeaders(t *testing.T) {
 	// The clients pass whatever they were given, and an unauthenticated internal
 	// call has no token. An empty Authorization header is worse than none: it makes
@@ -238,11 +221,4 @@ func TestDoReadsAnErrorBody(t *testing.T) {
 	if response.Text() != `{"message":"invalid label"}` {
 		t.Errorf("expected the error body, got %q", response.Text())
 	}
-}
-
-// parseBasicAuth reuses the standard library's parser through a throwaway request,
-// so the test does not re-implement base64 decoding.
-func parseBasicAuth(header string) (string, string, bool) {
-	req := &http.Request{Header: http.Header{"Authorization": []string{header}}}
-	return req.BasicAuth()
 }

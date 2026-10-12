@@ -35,7 +35,6 @@ import (
 	kubernetes_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kubernetes-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
 	permission_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/permission-api"
-	rancher2_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/rancher2-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/service"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	gin_mw "github.com/SENERGY-Platform/gin-middleware"
@@ -64,24 +63,10 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 		return nil, fmt.Errorf("failed to set up OpenTelemetry: %w", err)
 	}
 
-	var driver service.Driver
-	switch selectedDriver := cfg.Driver; selectedDriver {
-	case "rancher":
-		driver = rancher2_api.NewRancher2(
-			cfg.Rancher2.Endpoint,
-			cfg.Rancher2.AccessKey.Value(),
-			cfg.Rancher2.SecretKey.Value(),
-			cfg.Rancher2.StackId,
-			&cfg.Rancher2,
-			cfg.OperatorResources,
-		)
-		break
-	default:
-		driver, err = kubernetes_api.NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, cfg.Debug)
-		if err != nil {
-			util.Logger.ErrorContext(ctx, "Error creating driver", "error", err)
-			return
-		}
+	driver, err := kubernetes_api.NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, cfg.Debug)
+	if err != nil {
+		util.Logger.ErrorContext(ctx, "Error creating driver", "error", err)
+		return
 	}
 
 	logOperatorResources(ctx, cfg.OperatorResources)
