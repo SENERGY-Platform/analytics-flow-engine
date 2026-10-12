@@ -24,20 +24,15 @@ import (
 	"testing"
 )
 
-// The address Operator Lib carried as Config.ts_conn until this took over. A
-// deployment that upgrades the library and does not touch the flow engine must
-// keep reaching the same database, so the default moving is not a behaviour
-// change for anybody.
-const operatorLibDefault = "postgresql://postgres:tea@timescale-db.timescale.svc.cluster.local/postgres"
-
-func TestTheTimescaleDefaultIsTheOneOperatorLibCarried(t *testing.T) {
+// The DSN carries a password, so it must come from the deployment and never from
+// a value compiled into a public repository.
+func TestTheTimescaleConnectionHasNoDefault(t *testing.T) {
 	cfg, err := New("")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if cfg.TimescaleConnection.Value() != operatorLibDefault {
-		t.Errorf("timescale_connection = %q, want the address Operator Lib defaulted to, %q",
-			cfg.TimescaleConnection.Value(), operatorLibDefault)
+	if cfg.TimescaleConnection.Value() != "" {
+		t.Error("timescale_connection has a compiled-in default, want it empty")
 	}
 }
 

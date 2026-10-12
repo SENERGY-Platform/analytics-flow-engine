@@ -58,11 +58,8 @@ type Config struct {
 	// TimescaleConnection is the DSN a cloud operator reads history through, set on
 	// every one of them as the ts_conn of its operator config.
 	//
-	// The default is the in-cluster address Operator Lib used to carry compiled in.
-	// Moving it here changes nothing about which database is reached; what it
-	// changes is that the value now has an owner. A deployment whose timescale is
-	// somewhere else sets it, which was impossible while the only copy lived in a
-	// library and reached every operator through a release.
+	// No default: the DSN carries a password, so the deployment sets it from a
+	// secret. Unset, starting a cloud operator is refused (setPlatformOperatorConfig).
 	//
 	// It stays the same shared credential either way, which is the part SNRGY-4637
 	// is about and this does not solve: it reaches every series, and which series an
@@ -93,8 +90,6 @@ func New(path string) (*Config, error) {
 			Zookeeper:      "zookeeper.kafka:2181",
 			KafkaBootstrap: "kafka.kafka:9092",
 		},
-		// The address Operator Lib carried as its own default until this took over.
-		TimescaleConnection: "postgresql://postgres:tea@timescale-db.timescale.svc.cluster.local/postgres",
 	}
 	err := sb_config_hdl.Load(&cfg, nil, envTypeParser, nil, path)
 	if err == nil {

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
+	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 )
 
 func StringInSlice(a string, list []string) bool {
@@ -85,4 +86,34 @@ func containsKeyInSlice[T any](slice []T, key string, keyFunc func(T) string) bo
 		}
 	}
 	return false
+}
+
+// redactPipeline returns a copy of pipeline that is safe to log: ts_conn is the
+// shared timescale DSN and carries its password.
+func redactPipeline(pipeline pipe.Pipeline) pipe.Pipeline {
+	pipeline.Operators = redactOperators(pipeline.Operators)
+	return pipeline
+}
+
+func redactOperators(operators []pipe.Operator) []pipe.Operator {
+	redacted := make([]pipe.Operator, len(operators))
+	for i, operator := range operators {
+		redacted[i] = redactOperator(operator)
+	}
+	return redacted
+}
+
+// redactOperator copies the config before masking, because the map is shared with
+// the operator the engine goes on to deploy.
+func redactOperator(operator pipe.Operator) pipe.Operator {
+	if _, ok := operator.Config[OperatorConfigTsConn]; !ok {
+		return operator
+	}
+	config := make(map[string]string, len(operator.Config))
+	for key, value := range operator.Config {
+		config[key] = value
+	}
+	config[OperatorConfigTsConn] = "***"
+	operator.Config = config
+	return operator
 }

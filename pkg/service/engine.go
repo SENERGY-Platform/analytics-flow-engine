@@ -155,7 +155,7 @@ func (f *FlowEngine) syncPipelines() (err error) {
 			// The pipeline's own stored baggage, so these lines carry the same context
 			// as the ones the original request wrote. This is the case they are read in.
 			ctx := baggage.WithStored(startupCtx, item.Baggage)
-			util.Logger.WarnContext(ctx, "trying to recreate pipeline", "pipeline", item)
+			util.Logger.WarnContext(ctx, "trying to recreate pipeline", "pipeline", redactPipeline(item))
 			//first delete every resource that might still be present
 			err = f.stopOperators(ctx, item, "")
 			if err != nil {
@@ -223,7 +223,7 @@ func (f *FlowEngine) StartPipeline(ctx context.Context, pipelineRequest lib.Pipe
 	if err != nil {
 		return
 	}
-	util.Logger.DebugContext(ctx, "started pipeline: "+pipeline.Id, "pipeline", pipeline)
+	util.Logger.DebugContext(ctx, "started pipeline: "+pipeline.Id, "pipeline", redactPipeline(*pipeline))
 	return
 }
 
@@ -293,7 +293,7 @@ func (f *FlowEngine) UpdatePipeline(ctx context.Context, pipelineRequest lib.Pip
 	}
 	pipeline.Operators = newOperators
 	err = f.pipelineService.UpdatePipeline(ctx, pipeline, userId, token)
-	util.Logger.DebugContext(ctx, "updated pipeline: "+pipeline.Id, "pipeline", pipeline)
+	util.Logger.DebugContext(ctx, "updated pipeline: "+pipeline.Id, "pipeline", redactPipeline(*pipeline))
 	return
 }
 
@@ -522,7 +522,7 @@ func setPipelineModel(pipelineRequest lib.PipelineRequest, parsedPipeline parser
 
 func (f *FlowEngine) stopOperators(ctx context.Context, pipeline pipe.Pipeline, token string) error {
 	localOperators, cloudOperators := seperateOperators(pipeline)
-	util.Logger.DebugContext(ctx, "engine - stop operators for pipeline: "+pipeline.Id, "localOperators", localOperators, "cloudOperators", cloudOperators)
+	util.Logger.DebugContext(ctx, "engine - stop operators for pipeline: "+pipeline.Id, "localOperators", localOperators, "cloudOperators", redactOperators(cloudOperators))
 
 	if len(cloudOperators) > 0 {
 		err := f.driver.DeleteOperators(ctx, pipeline.Id, cloudOperators)
@@ -610,7 +610,7 @@ func (f *FlowEngine) enableCloudToFogForwarding(ctx context.Context, operators [
 			util.Logger.DebugContext(ctx, "Try to enable Cloud2Fog Forwarding for operator: "+operator.Id)
 			createdInstance, err := f.kafak2mqttService.StartOperatorInstance(ctx, operator.Name, operator.Id, pipelineID, userID, token)
 			if err != nil {
-				util.Logger.ErrorContext(ctx, "cannot enable cloud2fog forwarding", "error", err, "operator", operator)
+				util.Logger.ErrorContext(ctx, "cannot enable cloud2fog forwarding", "error", err, "operator", redactOperator(operator))
 				return []pipe.Operator{}, err
 			}
 			operator.DownstreamConfig.InstanceID = createdInstance.Id
@@ -656,7 +656,7 @@ func (f *FlowEngine) disableCloudToFogForwarding(ctx context.Context, operators 
 			}
 			err := f.kafak2mqttService.RemoveInstance(ctx, downstreamConfig.InstanceID, pipelineID, userID, token)
 			if err != nil {
-				util.Logger.ErrorContext(ctx, "cannot disable cloud2fog forwarding", "error", err, "operator", operator)
+				util.Logger.ErrorContext(ctx, "cannot disable cloud2fog forwarding", "error", err, "operator", redactOperator(operator))
 				return err
 			}
 			util.Logger.DebugContext(ctx, "Disabled Cloud2Fog Forwarding for operator: "+operator.Id)
