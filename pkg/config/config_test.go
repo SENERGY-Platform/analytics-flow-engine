@@ -16,7 +16,13 @@
 
 package config
 
-import "testing"
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 // The address Operator Lib carried as Config.ts_conn until this took over. A
 // deployment that upgrades the library and does not touch the flow engine must
@@ -29,9 +35,9 @@ func TestTheTimescaleDefaultIsTheOneOperatorLibCarried(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if cfg.TimescaleConnection != operatorLibDefault {
+	if cfg.TimescaleConnection.Value() != operatorLibDefault {
 		t.Errorf("timescale_connection = %q, want the address Operator Lib defaulted to, %q",
-			cfg.TimescaleConnection, operatorLibDefault)
+			cfg.TimescaleConnection.Value(), operatorLibDefault)
 	}
 }
 
@@ -42,10 +48,10 @@ func TestTheTimescaleConnectionIsOverridableFromTheEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if cfg.TimescaleConnection != "postgresql://ops@timescale.example.org/db" {
+	if cfg.TimescaleConnection.Value() != "postgresql://ops@timescale.example.org/db" {
 		t.Errorf("timescale_connection = %q, want the environment's value; a deployment "+
 			"whose timescale is elsewhere could not be configured otherwise",
-			cfg.TimescaleConnection)
+			cfg.TimescaleConnection.Value())
 	}
 }
 
@@ -78,5 +84,52 @@ func TestInvalidOperatorResourcesFailTheStart(t *testing.T) {
 
 	if _, err := New(""); err == nil {
 		t.Error("New accepted a memory request above the default limit; the deployment would be refused later, per pipeline")
+	}
+}
+
+// main logs the whole config as JSON, so the credentials must not survive the marshalling.
+func TestConfigJsonHidesCredentials(t *testing.T) {
+	secrets := map[string]string{
+		"BROKER_PASSWORD":      "broker-password-from-env",
+		"RANCHER2_ACCESS_KEY":  "rancher-access-key-from-env",
+		"RANCHER2_SECRET_KEY":  "rancher-secret-key-from-env",
+		"TIMESCALE_CONNECTION": "postgresql://ops:timescale-password-from-env@timescale.example.org/db",
+	}
+	for k, v := range secrets {
+		t.Setenv(k, v)
+	}
+	cfg, err := New("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range []string{"broker-password-from-env", "rancher-access-key-from-env", "rancher-secret-key-from-env", "timescale-password-from-env"} {
+		if strings.Contains(string(b), secret) {
+			t.Errorf("config JSON contains %q: %s", secret, b)
+		}
+	}
+}
+
+func TestConfigFileSetsCredentials(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	file := `{"mqtt": {"broker_password": "broker-password-from-file"},
+		"rancher2": {"access_key": "rancher-access-key-from-file", "secret_key": "rancher-secret-key-from-file"},
+		"timescale_connection": "postgresql://ops:timescale-password-from-file@timescale.example.org/db"}`
+	if err := os.WriteFile(path, []byte(file), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := New(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{cfg.Mqtt.BrokerPassword.Value(), cfg.Rancher2.AccessKey.Value(), cfg.Rancher2.SecretKey.Value(), cfg.TimescaleConnection.Value()}
+	want := []string{"broker-password-from-file", "rancher-access-key-from-file", "rancher-secret-key-from-file", "postgresql://ops:timescale-password-from-file@timescale.example.org/db"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("credential %d from file = %q, want %q", i, got[i], want[i])
+		}
 	}
 }

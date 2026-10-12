@@ -69,8 +69,8 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 	case "rancher":
 		driver = rancher2_api.NewRancher2(
 			cfg.Rancher2.Endpoint,
-			cfg.Rancher2.AccessKey,
-			cfg.Rancher2.SecretKey,
+			cfg.Rancher2.AccessKey.Value(),
+			cfg.Rancher2.SecretKey.Value(),
 			cfg.Rancher2.StackId,
 			&cfg.Rancher2,
 			cfg.OperatorResources,
@@ -99,7 +99,7 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 	} else {
 		util.Logger.InfoContext(ctx, "import exports: analytics_serving_api_endpoint is empty, operators read imports from Kafka")
 	}
-	flowEngine := service.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService, cfg.TimescaleConnection, exportLister)
+	flowEngine := service.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService, cfg.TimescaleConnection.Value(), exportLister)
 
 	port := strconv.FormatInt(int64(cfg.ServerPort), 10)
 	util.Logger.InfoContext(ctx, "Starting api server at port "+port)

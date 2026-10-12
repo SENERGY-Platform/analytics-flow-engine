@@ -35,8 +35,8 @@ func TestRancher2_createPersistentVolumeClaim(t *testing.T) {
 	}
 	driver := NewRancher2(
 		cfg.Rancher2.Endpoint,
-		cfg.Rancher2.AccessKey,
-		cfg.Rancher2.SecretKey,
+		cfg.Rancher2.AccessKey.Value(),
+		cfg.Rancher2.SecretKey.Value(),
 		cfg.Rancher2.StackId,
 		&cfg.Rancher2,
 		cfg.OperatorResources,

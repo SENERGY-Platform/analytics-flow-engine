@@ -57,7 +57,7 @@ func ConnectMQTTBroker(ctx context.Context, config config.MqttConfig, pipelineSe
 	retained = flag.Bool("retained", false, "Are the messages sent with the retained flag")
 	clientId := flag.String("clientid", hostname+strconv.Itoa(time.Now().Second()), "A clientid for the connection")
 	username := flag.String("username", config.BrokerUser, "A username to authenticate to the MQTT server")
-	password := flag.String("password", config.BrokerPassword, "Password to match username")
+	password := flag.String("password", config.BrokerPassword.Value(), "Password to match username")
 	flag.Parse()
 
 	connOpts := MQTT.NewClientOptions().

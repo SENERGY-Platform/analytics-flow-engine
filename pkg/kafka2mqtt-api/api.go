@@ -29,7 +29,7 @@ func (api *Kafka2MqttApi) StartOperatorInstance(ctx context.Context, operatorNam
 
 	brokerAddress := api.mqttCfg.BrokerAddress
 	username := api.mqttCfg.BrokerUser
-	password := api.mqttCfg.BrokerPassword
+	password := api.mqttCfg.BrokerPassword.Value()
 	instanceConfig := Instance{
 		Topic:      kafkaTopic,
 		FilterType: "operatorId",

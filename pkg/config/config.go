@@ -18,12 +18,13 @@ package config
 
 import (
 	sb_config_hdl "github.com/SENERGY-Platform/go-service-base/config-hdl"
+	sb_config_types "github.com/SENERGY-Platform/go-service-base/config-hdl/types"
 )
 
 type MqttConfig struct {
-	BrokerAddress  string `json:"broker_address" env_var:"BROKER_ADDRESS"`
-	BrokerUser     string `json:"broker_user" env_var:"BROKER_USER"`
-	BrokerPassword string `json:"broker_password" env_var:"BROKER_PASSWORD"`
+	BrokerAddress  string                 `json:"broker_address" env_var:"BROKER_ADDRESS"`
+	BrokerUser     string                 `json:"broker_user" env_var:"BROKER_USER"`
+	BrokerPassword sb_config_types.Secret `json:"broker_password" env_var:"BROKER_PASSWORD"`
 }
 
 type LoggerConfig struct {
@@ -31,15 +32,15 @@ type LoggerConfig struct {
 }
 
 type Rancher2Config struct {
-	Endpoint       string  `json:"endpoint" env_var:"RANCHER2_ENDPOINT"`
-	AccessKey      string  `json:"access_key" env_var:"RANCHER2_ACCESS_KEY"`
-	SecretKey      string  `json:"secret_key" env_var:"RANCHER2_SECRET_KEY"`
-	StackId        string  `json:"stack_id" env_var:"RANCHER2_STACK_ID"`
-	ProjectId      string  `json:"project_id" env_var:"RANCHER2_PROJECT_ID"`
-	NamespaceId    string  `json:"namespace_id" env_var:"RANCHER2_NAMESPACE_ID"`
-	StorageDriver  *string `json:"storage_driver" env_var:"RANCHER2_STORAGE_DRIVER"`
-	Zookeeper      string  `json:"zookeeper" env_var:"ZOOKEEPER"`
-	KafkaBootstrap string  `json:"kafka_bootstrap" env_var:"KAFKA_BOOTSTRAP"`
+	Endpoint       string                 `json:"endpoint" env_var:"RANCHER2_ENDPOINT"`
+	AccessKey      sb_config_types.Secret `json:"access_key" env_var:"RANCHER2_ACCESS_KEY"`
+	SecretKey      sb_config_types.Secret `json:"secret_key" env_var:"RANCHER2_SECRET_KEY"`
+	StackId        string                 `json:"stack_id" env_var:"RANCHER2_STACK_ID"`
+	ProjectId      string                 `json:"project_id" env_var:"RANCHER2_PROJECT_ID"`
+	NamespaceId    string                 `json:"namespace_id" env_var:"RANCHER2_NAMESPACE_ID"`
+	StorageDriver  *string                `json:"storage_driver" env_var:"RANCHER2_STORAGE_DRIVER"`
+	Zookeeper      string                 `json:"zookeeper" env_var:"ZOOKEEPER"`
+	KafkaBootstrap string                 `json:"kafka_bootstrap" env_var:"KAFKA_BOOTSTRAP"`
 }
 
 type Config struct {
@@ -73,7 +74,7 @@ type Config struct {
 	// is about and this does not solve: it reaches every series, and which series an
 	// operator reads is decided by its input topics. What the move buys is one place
 	// to change when that is addressed.
-	TimescaleConnection string `json:"timescale_connection" env_var:"TIMESCALE_CONNECTION"`
+	TimescaleConnection sb_config_types.Secret `json:"timescale_connection" env_var:"TIMESCALE_CONNECTION"`
 	// OtelEndpoint is the OTLP collector traces are exported to. Empty means the
 	// in-cluster Jaeger the otelx default names, which is what every deployment
 	// uses; the knob exists so a local run can point somewhere else instead of
