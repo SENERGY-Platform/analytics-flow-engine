@@ -64,8 +64,9 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 	}
 
 	driver, err := kubernetes_api.NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, kubernetes_api.TimescaleSecret{
-		Name: cfg.OperatorTimescaleSecretName,
-		Key:  cfg.OperatorTimescaleSecretKey,
+		Name:                 cfg.OperatorTimescaleSecretName,
+		Key:                  cfg.OperatorTimescaleSecretKey,
+		TrustedImagePrefixes: cfg.OperatorTimescaleTrustedImagePrefixes,
 	}, cfg.Debug)
 	if err != nil {
 		util.Logger.ErrorContext(ctx, "Error creating driver", "error", err)

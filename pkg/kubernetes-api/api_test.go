@@ -1,8 +1,10 @@
 package kubernetes_api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"strings"
 	"testing"
 
@@ -192,21 +194,31 @@ func envNamed(envs []apiv1.EnvVar, name string) []apiv1.EnvVar {
 	return found
 }
 
-func timescaleTestDriver() *Kubernetes {
+const trustedTestImage = "ghcr.io/senergy-platform/adder:1"
+
+func timescaleTestDriver(trustedPrefixes ...string) *Kubernetes {
+	if trustedPrefixes == nil {
+		trustedPrefixes = []string{config.DefaultOperatorTimescaleTrustedImagePrefix}
+	}
 	return &Kubernetes{
 		r2cfg:           &config.Rancher2Config{},
-		timescaleSecret: TimescaleSecret{Name: "analytics-timescale", Key: "dsn"},
+		timescaleSecret: TimescaleSecret{Name: "analytics-timescale", Key: "dsn", TrustedImagePrefixes: trustedPrefixes},
 	}
+}
+
+func tsConnFor(t *testing.T, k *Kubernetes, operator pipe.Operator) []apiv1.EnvVar {
+	t.Helper()
+	envs, err := k.operatorEnv(testPipeId, operator, lib.PipelineConfig{}, 8080)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return envNamed(envs, "TS_CONN")
 }
 
 // The DSN reaches a cloud operator by reference only, so reading the Deployment does
 // not reveal it.
 func TestACloudOperatorGetsTsConnFromTheSecret(t *testing.T) {
-	envs, err := timescaleTestDriver().operatorEnv(testPipeId, pipe.Operator{Id: "op-1", DeploymentType: "cloud"}, lib.PipelineConfig{}, 8080)
-	if err != nil {
-		t.Fatal(err)
-	}
-	found := envNamed(envs, "TS_CONN")
+	found := tsConnFor(t, timescaleTestDriver(), pipe.Operator{Id: "op-1", ImageId: trustedTestImage, DeploymentType: "cloud"})
 	if len(found) != 1 {
 		t.Fatalf("TS_CONN entries = %d, want 1", len(found))
 	}
@@ -257,13 +269,108 @@ func TestTheContainerConfigCarriesNoTsConn(t *testing.T) {
 	}
 }
 
-// A fog operator gets no platform DSN, should one ever reach the Kubernetes driver.
+// A fog operator gets no platform DSN, should one ever reach the Kubernetes driver,
+// even with a trusted image.
 func TestAFogOperatorGetsNoTsConn(t *testing.T) {
-	envs, err := timescaleTestDriver().operatorEnv(testPipeId, pipe.Operator{Id: "op-1", DeploymentType: "local"}, lib.PipelineConfig{}, 8080)
-	if err != nil {
+	if found := tsConnFor(t, timescaleTestDriver(), pipe.Operator{Id: "op-1", ImageId: trustedTestImage, DeploymentType: "local"}); len(found) != 0 {
+		t.Errorf("TS_CONN = %+v, want none for a fog operator", found)
+	}
+}
+
+// Anyone can register an operator image, so only images under a trusted prefix read
+// the database. The match is on the reference as written, without normalisation.
+func TestAnUntrustedImageGetsNoTsConn(t *testing.T) {
+	for _, image := range []string{
+		"docker.io/library/adder:1",
+		"ghcr.io/senergy-platform-x/adder:1",
+		"ghcr.io/senergy-platformx/adder:1",
+		"senergy-platform/adder:1",
+		"ghcr.io/senergy-platform",
+		"GHCR.IO/senergy-platform/adder:1",
+		" ghcr.io/senergy-platform/adder:1",
+		"registry.example/ghcr.io/senergy-platform/adder:1",
+		"",
+	} {
+		if found := tsConnFor(t, timescaleTestDriver(), pipe.Operator{Id: "op-1", ImageId: image, DeploymentType: "cloud"}); len(found) != 0 {
+			t.Errorf("image %q got TS_CONN %+v, want none", image, found)
+		}
+	}
+}
+
+func TestAnyTrustedPrefixGrantsTsConn(t *testing.T) {
+	k := timescaleTestDriver("ghcr.io/senergy-platform/", "registry.example:5000/analytics/")
+	for _, image := range []string{trustedTestImage, "registry.example:5000/analytics/forecast@sha256:0123"} {
+		if found := tsConnFor(t, k, pipe.Operator{Id: "op-1", ImageId: image, DeploymentType: "cloud"}); len(found) != 1 {
+			t.Errorf("image %q: TS_CONN entries = %d, want 1", image, len(found))
+		}
+	}
+}
+
+// No prefixes trust no image; an empty prefix, which the config refuses, must not
+// trust every image either.
+func TestNoTrustedPrefixGivesNoTsConn(t *testing.T) {
+	for _, prefixes := range [][]string{{}, {""}} {
+		if found := tsConnFor(t, timescaleTestDriver(prefixes...), pipe.Operator{Id: "op-1", ImageId: trustedTestImage, DeploymentType: "cloud"}); len(found) != 0 {
+			t.Errorf("prefixes %q: TS_CONN = %+v, want none", prefixes, found)
+		}
+	}
+}
+
+// The trust rule holds per container of the Deployment, on the image the container runs,
+// and each start logs the decision so a missing history can be explained.
+func TestCreateOperatorsGivesTsConnOnlyToTheTrustedContainerAndLogsIt(t *testing.T) {
+	var logs bytes.Buffer
+	previous := util.Logger
+	util.Logger = slog.New(slog.NewJSONHandler(&logs, nil))
+	t.Cleanup(func() { util.Logger = previous })
+
+	k, clientset := fakeDriver()
+	k.timescaleSecret.TrustedImagePrefixes = []string{config.DefaultOperatorTimescaleTrustedImagePrefix}
+	trusted := pipe.Operator{Id: "op-trusted", OperatorId: "adder", ImageId: trustedTestImage, DeploymentType: "cloud"}
+	untrusted := pipe.Operator{Id: "op-untrusted", OperatorId: "custom", ImageId: "ghcr.io/senergy-platform-x/custom:1", DeploymentType: "cloud"}
+	if err := k.CreateOperators(context.Background(), fakePipelineId, []pipe.Operator{trusted, untrusted}, lib.PipelineConfig{PipelineId: fakePipelineId}); err != nil {
 		t.Fatal(err)
 	}
-	if found := envNamed(envs, "TS_CONN"); len(found) != 0 {
-		t.Errorf("TS_CONN = %+v, want none for a fog operator", found)
+
+	containers := fakeDeployment(t, clientset).Spec.Template.Spec.Containers
+	if len(containers) != 2 {
+		t.Fatalf("containers = %d, want 2", len(containers))
+	}
+	for _, c := range containers {
+		want := 0
+		if c.Image == trustedTestImage {
+			want = 1
+		}
+		if found := envNamed(c.Env, "TS_CONN"); len(found) != want {
+			t.Errorf("container %s with image %s: TS_CONN entries = %d, want %d", c.Name, c.Image, len(found), want)
+		}
+	}
+
+	access := map[string]bool{}
+	for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
+		var record struct {
+			Msg    string `json:"msg"`
+			Level  string `json:"level"`
+			Id     string `json:"operator_id"`
+			Image  string `json:"image"`
+			Access *bool  `json:"timescale_access"`
+		}
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			t.Fatalf("log line %q: %v", line, err)
+		}
+		if record.Msg != "operator timescale access" {
+			continue
+		}
+		if _, seen := access[record.Id]; seen || record.Level != "INFO" || record.Access == nil {
+			t.Errorf("log record %+v, want one info record per operator with timescale_access", record)
+			continue
+		}
+		access[record.Id] = *record.Access
+		if want := map[string]string{trusted.Id: trusted.ImageId, untrusted.Id: untrusted.ImageId}[record.Id]; record.Image != want {
+			t.Errorf("logged image for %s = %q, want %q", record.Id, record.Image, want)
+		}
+	}
+	if len(access) != 2 || !access[trusted.Id] || access[untrusted.Id] {
+		t.Errorf("logged access = %v, want %s true and %s false", access, trusted.Id, untrusted.Id)
 	}
 }

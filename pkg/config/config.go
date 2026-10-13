@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 
 	sb_config_hdl "github.com/SENERGY-Platform/go-service-base/config-hdl"
 	sb_config_types "github.com/SENERGY-Platform/go-service-base/config-hdl/types"
@@ -70,6 +71,11 @@ type Config struct {
 	// It stays one shared credential reaching every series (SNRGY-4637).
 	OperatorTimescaleSecretName string `json:"operator_timescale_secret_name" env_var:"OPERATOR_TIMESCALE_SECRET_NAME"`
 	OperatorTimescaleSecretKey  string `json:"operator_timescale_secret_key" env_var:"OPERATOR_TIMESCALE_SECRET_KEY"`
+	// OperatorTimescaleTrustedImagePrefixes limits TS_CONN to operators whose image
+	// reference starts with one of these prefixes, compared as written without any
+	// normalisation; every other image gets no DSN. In the environment it is a JSON
+	// array. Empty gives no operator the DSN.
+	OperatorTimescaleTrustedImagePrefixes []string `json:"operator_timescale_trusted_image_prefixes" env_var:"OPERATOR_TIMESCALE_TRUSTED_IMAGE_PREFIXES"`
 	// OtelEndpoint is the OTLP collector traces are exported to. Empty means the
 	// in-cluster Jaeger the otelx default names, which is what every deployment
 	// uses; the knob exists so a local run can point somewhere else instead of
@@ -95,6 +101,8 @@ func New(path string) (*Config, error) {
 			KafkaBootstrap: "kafka.kafka:9092",
 		},
 		OperatorTimescaleSecretKey: DefaultOperatorTimescaleSecretKey,
+		// A fresh slice per call: a config file's array is decoded into this one in place.
+		OperatorTimescaleTrustedImagePrefixes: []string{DefaultOperatorTimescaleTrustedImagePrefix},
 	}
 	err := sb_config_hdl.Load(&cfg, nil, envTypeParser, nil, path)
 	if err == nil {
@@ -103,11 +111,31 @@ func New(path string) (*Config, error) {
 	if err == nil {
 		err = validateOperatorTimescaleSecret(cfg.OperatorTimescaleSecretName, cfg.OperatorTimescaleSecretKey)
 	}
+	if err == nil {
+		err = validateTrustedImagePrefixes(cfg.OperatorTimescaleTrustedImagePrefixes)
+	}
 	return &cfg, err
 }
 
 // DefaultOperatorTimescaleSecretKey is the key of the DSN in the operator timescale Secret.
 const DefaultOperatorTimescaleSecretKey = "TS_CONN"
+
+// DefaultOperatorTimescaleTrustedImagePrefix is the one image prefix whose operators
+// get TS_CONN unless OperatorTimescaleTrustedImagePrefixes says otherwise.
+const DefaultOperatorTimescaleTrustedImagePrefix = "ghcr.io/senergy-platform/"
+
+// validateTrustedImagePrefixes requires every prefix to end in "/", so that it ends on
+// a path boundary: "ghcr.io/senergy-platform" would also trust "ghcr.io/senergy-platform-x/".
+// A leading "/" or whitespace never occurs in an image reference and is refused as a typo.
+func validateTrustedImagePrefixes(prefixes []string) error {
+	for _, prefix := range prefixes {
+		if !strings.HasSuffix(prefix, "/") || strings.HasPrefix(prefix, "/") || strings.ContainsFunc(prefix, unicode.IsSpace) {
+			return fmt.Errorf("operator_timescale_trusted_image_prefixes: %q is not an image prefix; "+
+				"it must end in \"/\", not start with one and contain no whitespace", prefix)
+		}
+	}
+	return nil
+}
 
 // validateOperatorTimescaleSecret checks the reference at startup. The API server
 // accepts a Deployment naming a missing Secret and rejects an invalid name or key

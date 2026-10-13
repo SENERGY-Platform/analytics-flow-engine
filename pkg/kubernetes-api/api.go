@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"maps"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
@@ -51,10 +53,12 @@ type pvcWait struct {
 var defaultPVCWait = pvcWait{timeout: 60 * time.Second, interval: 2 * time.Second}
 
 // TimescaleSecret names the Secret in the pipelines namespace, and the key in it,
-// that cloud operators get their timescale DSN from as TS_CONN.
+// that cloud operators get their timescale DSN from as TS_CONN. Only operators whose
+// image starts with one of TrustedImagePrefixes get it.
 type TimescaleSecret struct {
-	Name string
-	Key  string
+	Name                 string
+	Key                  string
+	TrustedImagePrefixes []string
 }
 
 // TimescaleEnvVar is the env var Operator Lib reads its timescale DSN from.
@@ -121,6 +125,9 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 		if envErr != nil {
 			return envErr
 		}
+		util.Logger.InfoContext(ctx, "operator timescale access", "pipeline_id", pipelineId,
+			"operator_id", operator.Id, "image", operator.ImageId,
+			"timescale_access", slices.ContainsFunc(envs, func(env apiv1.EnvVar) bool { return env.Name == TimescaleEnvVar }))
 		if pipeConfig.Metrics {
 			ports = append(ports, apiv1.ContainerPort{
 				Name:          "metrics-" + strconv.Itoa(i),
@@ -347,7 +354,7 @@ func (k *Kubernetes) operatorEnv(pipelineId string, operator pipe_lib.Operator, 
 	// By reference, so the DSN shows neither in the Deployment nor in the engine.
 	// Not optional: a missing Secret then fails the pod start visibly, naming the
 	// Secret, instead of every history read failing later.
-	if operator.DeploymentType != location.Local {
+	if operator.DeploymentType != location.Local && k.trustedImage(operator.ImageId) {
 		envs = append(envs, apiv1.EnvVar{
 			Name: TimescaleEnvVar,
 			ValueFrom: &apiv1.EnvVarSource{SecretKeyRef: &apiv1.SecretKeySelector{
@@ -373,6 +380,18 @@ func (k *Kubernetes) operatorEnv(pipelineId string, operator pipe_lib.Operator, 
 		envs = append(envs, apiv1.EnvVar{Name: "OUTPUT", Value: operator.OutputTopic})
 	}
 	return envs, nil
+}
+
+// trustedImage reports whether an image may read the timescale DSN. The reference is
+// compared as written, so "senergy-platform/x" is not trusted even where it resolves
+// to a trusted registry: a trusted image has to be written fully qualified.
+func (k *Kubernetes) trustedImage(image string) bool {
+	for _, prefix := range k.timescaleSecret.TrustedImagePrefixes {
+		if prefix != "" && strings.HasPrefix(image, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // operatorRequestConfig is the CONFIG of an operator container, without ts_conn. The

@@ -187,3 +187,89 @@ func TestConfigFileSetsCredentials(t *testing.T) {
 		}
 	}
 }
+
+func TestOnlyTheSenergyPlatformImagesAreTrustedWithTheTimescaleDsnByDefault(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	got := cfg.OperatorTimescaleTrustedImagePrefixes
+	if len(got) != 1 || got[0] != "ghcr.io/senergy-platform/" {
+		t.Errorf("operator_timescale_trusted_image_prefixes = %q, want [ghcr.io/senergy-platform/]", got)
+	}
+}
+
+// The loader reads a list from the environment as a JSON array, as it does OPERATOR_RESOURCES.
+func TestTrustedImagePrefixesAreReadFromTheEnvironment(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+	t.Setenv("OPERATOR_TIMESCALE_TRUSTED_IMAGE_PREFIXES", `["ghcr.io/senergy-platform/","registry.example:5000/analytics/"]`)
+
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	got := cfg.OperatorTimescaleTrustedImagePrefixes
+	if len(got) != 2 || got[0] != "ghcr.io/senergy-platform/" || got[1] != "registry.example:5000/analytics/" {
+		t.Errorf("operator_timescale_trusted_image_prefixes = %q, want the two from the environment", got)
+	}
+}
+
+// An empty list is a valid setting: no operator gets the DSN.
+func TestAnEmptyTrustedImagePrefixListIsAccepted(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+	t.Setenv("OPERATOR_TIMESCALE_TRUSTED_IMAGE_PREFIXES", `[]`)
+
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if len(cfg.OperatorTimescaleTrustedImagePrefixes) != 0 {
+		t.Errorf("operator_timescale_trusted_image_prefixes = %q, want none", cfg.OperatorTimescaleTrustedImagePrefixes)
+	}
+}
+
+// The file's array is decoded into the default in place; a later New must still see the
+// default, not the previous file's entries.
+func TestTrustedImagePrefixesFromAFileDoNotChangeTheDefault(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"operator_timescale_trusted_image_prefixes": ["registry.example/a/"]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := New(path)
+	if err != nil {
+		t.Fatalf("New(file): %v", err)
+	}
+	if got := cfg.OperatorTimescaleTrustedImagePrefixes; len(got) != 1 || got[0] != "registry.example/a/" {
+		t.Fatalf("prefixes from file = %q, want [registry.example/a/]", got)
+	}
+	cfg, err = New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if got := cfg.OperatorTimescaleTrustedImagePrefixes; len(got) != 1 || got[0] != "ghcr.io/senergy-platform/" {
+		t.Errorf("default after a file = %q, want [ghcr.io/senergy-platform/]", got)
+	}
+}
+
+// Without the trailing "/" a prefix would also trust a look-alike organisation such as
+// ghcr.io/senergy-platform-x/.
+func TestAnInvalidTrustedImagePrefixFailsTheStart(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+	for _, prefixes := range []string{
+		`["ghcr.io/senergy-platform"]`,
+		`["ghcr.io/senergy-platform/", ""]`,
+		`["/"]`,
+		`["/senergy-platform/"]`,
+		`[" ghcr.io/senergy-platform/"]`,
+		`["ghcr.io/senergy-platform/\n"]`,
+		`"ghcr.io/senergy-platform/"`,
+	} {
+		t.Setenv("OPERATOR_TIMESCALE_TRUSTED_IMAGE_PREFIXES", prefixes)
+		if _, err := New(""); err == nil {
+			t.Errorf("New accepted operator_timescale_trusted_image_prefixes %s", prefixes)
+		}
+	}
+}
