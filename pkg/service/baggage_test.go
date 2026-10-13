@@ -38,6 +38,10 @@ func init() {
 type recordingDriver struct {
 	configs     []lib.PipelineConfig
 	deleteCalls int
+	// keepVolumeDeleteCalls counts DeleteOperatorsKeepingVolumes, kept apart from
+	// deleteCalls so a test can tell which of the two removed the operators.
+	keepVolumeDeleteCalls int
+	statuses              []lib.PipelineStatus
 }
 
 func (d *recordingDriver) CreateOperators(ctx context.Context, _ string, _ []pipe.Operator, pipelineConfig lib.PipelineConfig) error {
@@ -55,11 +59,18 @@ func (d *recordingDriver) DeleteOperators(ctx context.Context, _ string, _ []pip
 	d.deleteCalls++
 	return nil
 }
+func (d *recordingDriver) DeleteOperatorsKeepingVolumes(ctx context.Context, _ string, _ []pipe.Operator) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	d.keepVolumeDeleteCalls++
+	return nil
+}
 func (d *recordingDriver) GetPipelineStatus(context.Context, string) (lib.PipelineStatus, error) {
 	return lib.PipelineStatus{}, nil
 }
 func (d *recordingDriver) GetPipelinesStatus(context.Context) ([]lib.PipelineStatus, error) {
-	return nil, nil
+	return d.statuses, nil
 }
 
 // recordingPipelines stands in for the registry and keeps what was persisted.
@@ -67,6 +78,7 @@ type recordingPipelines struct {
 	assignedId  uuid.UUID
 	stored      *pipe.Pipeline
 	existing    pipe.Pipeline
+	admin       []pipe.Pipeline
 	deleteCalls int
 }
 
@@ -94,7 +106,7 @@ func (p *recordingPipelines) GetPipelines(context.Context, string, string) ([]pi
 	return nil, nil
 }
 func (p *recordingPipelines) GetPipelinesAdmin(context.Context) ([]pipe.Pipeline, error) {
-	return nil, nil
+	return p.admin, nil
 }
 func (p *recordingPipelines) DeletePipeline(ctx context.Context, _ string, _ string, _ string) error {
 	if err := ctx.Err(); err != nil {

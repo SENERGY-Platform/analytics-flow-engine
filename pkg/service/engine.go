@@ -150,8 +150,9 @@ func (f *FlowEngine) syncPipelines() (err error) {
 			// as the ones the original request wrote. This is the case they are read in.
 			ctx := baggage.WithStored(startupCtx, item.Baggage)
 			util.Logger.WarnContext(ctx, "trying to recreate pipeline", "pipeline", redactPipeline(item))
-			//first delete every resource that might still be present
-			err = f.stopOperators(ctx, item, "")
+			// First delete whatever half of the pipeline is still present, except the
+			// volumes: they hold the operators' state, and CreateOperators reuses them.
+			err = f.stopOperators(ctx, item, "", keepVolumes)
 			if err != nil {
 				util.Logger.ErrorContext(ctx, "cannot stop operators", "error", err)
 				return
@@ -204,7 +205,7 @@ func (f *FlowEngine) StartPipeline(ctx context.Context, pipelineRequest lib.Pipe
 		// the deployment exists — while enabling the cloud-to-fog forwarding, say — and
 		// removing just the registration would leave a deployment in the cluster that
 		// nothing points at. The startup sync only logs those as "extra deployment".
-		if stopErr := f.stopOperators(ctx, *pipeline, token); stopErr != nil {
+		if stopErr := f.stopOperators(ctx, *pipeline, token, deleteVolumes); stopErr != nil {
 			util.Logger.ErrorContext(ctx, "failed to roll back the started operators", "error", stopErr)
 		}
 		if delErr := f.pipelineService.DeletePipeline(ctx, pipeline.Id, userId, token); delErr != nil {
@@ -267,7 +268,7 @@ func (f *FlowEngine) UpdatePipeline(ctx context.Context, pipelineRequest lib.Pip
 		}
 	}
 
-	err = f.stopOperators(ctx, oldPipeline, token)
+	err = f.stopOperators(ctx, oldPipeline, token, deleteVolumes)
 	if err != nil {
 		util.Logger.ErrorContext(ctx, "cannot stop operators", "error", err)
 		return
@@ -371,7 +372,7 @@ func (f *FlowEngine) DeletePipeline(ctx context.Context, id string, userId strin
 	if err != nil {
 		return
 	}
-	err = f.stopOperators(ctx, pipeline, token)
+	err = f.stopOperators(ctx, pipeline, token, deleteVolumes)
 	if err != nil {
 		if !k8apierrors.IsNotFound(err) {
 			return
@@ -495,12 +496,25 @@ func setPipelineModel(pipelineRequest lib.PipelineRequest, parsedPipeline parser
 	return pipeline
 }
 
-func (f *FlowEngine) stopOperators(ctx context.Context, pipeline pipe.Pipeline, token string) error {
+// volumePolicy says whether stopping a pipeline's cloud operators deletes their volumes.
+type volumePolicy bool
+
+const (
+	deleteVolumes volumePolicy = true
+	keepVolumes   volumePolicy = false
+)
+
+func (f *FlowEngine) stopOperators(ctx context.Context, pipeline pipe.Pipeline, token string, volumes volumePolicy) error {
 	localOperators, cloudOperators := seperateOperators(pipeline)
 	util.Logger.DebugContext(ctx, "engine - stop operators for pipeline: "+pipeline.Id, "localOperators", localOperators, "cloudOperators", redactOperators(cloudOperators))
 
 	if len(cloudOperators) > 0 {
-		err := f.driver.DeleteOperators(ctx, pipeline.Id, cloudOperators)
+		var err error
+		if volumes == deleteVolumes {
+			err = f.driver.DeleteOperators(ctx, pipeline.Id, cloudOperators)
+		} else {
+			err = f.driver.DeleteOperatorsKeepingVolumes(ctx, pipeline.Id, cloudOperators)
+		}
 		if err != nil {
 			//ignore error if operator was not found
 			var notFoundErr *lib.NotFoundError

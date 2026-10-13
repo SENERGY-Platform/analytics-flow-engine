@@ -3,11 +3,13 @@ package kubernetes_api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"maps"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/baggage"
@@ -31,12 +33,22 @@ import (
 )
 
 type Kubernetes struct {
-	clientset           *kubernetes.Clientset
-	autoscalerClientset *autoscaler.Clientset
+	clientset           kubernetes.Interface
+	autoscalerClientset autoscaler.Interface
 	r2cfg               *config.Rancher2Config
 	operatorResources   map[string]config.OperatorResource
 	timescaleSecret     TimescaleSecret
+	// pvcWait bounds how long CreateOperators waits for a terminating PVC of the
+	// same name to disappear before it creates the new one.
+	pvcWait pvcWait
 }
+
+type pvcWait struct {
+	timeout  time.Duration
+	interval time.Duration
+}
+
+var defaultPVCWait = pvcWait{timeout: 60 * time.Second, interval: 2 * time.Second}
 
 // TimescaleSecret names the Secret in the pipelines namespace, and the key in it,
 // that cloud operators get their timescale DSN from as TS_CONN.
@@ -90,7 +102,7 @@ func NewKubernetes(r2cfg *config.Rancher2Config, operatorResources map[string]co
 	}
 	util.Logger.Debug("succesfully tested connection", "pods", len(pods.Items))
 
-	return &Kubernetes{clientset: clientset, autoscalerClientset: autoscalerClientSet, r2cfg: r2cfg, operatorResources: operatorResources, timescaleSecret: timescaleSecret}, nil
+	return &Kubernetes{clientset: clientset, autoscalerClientset: autoscalerClientSet, r2cfg: r2cfg, operatorResources: operatorResources, timescaleSecret: timescaleSecret, pvcWait: defaultPVCWait}, nil
 }
 
 func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inputs []pipe_lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
@@ -98,7 +110,6 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 	var volumes []apiv1.Volume
 	metricsBasePort := 8080
 	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
-	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(k.r2cfg.NamespaceId)
 
 	for i, operator := range inputs {
 		var ports []apiv1.ContainerPort
@@ -117,8 +128,9 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 
 		if operator.PersistData {
 			volumeName := getOperatorName(pipelineId, operator)[0]
-			pvc := k.makePVC(volumeName, "50M")
-			_, err = pvcClient.Create(ctx, pvc, metav1.CreateOptions{})
+			if err = k.ensurePVC(ctx, k.makePVC(volumeName, "50M")); err != nil {
+				return err
+			}
 			volumeMounts = append(volumeMounts, apiv1.VolumeMount{
 				Name:      volumeName,
 				MountPath: "/opt/data",
@@ -156,6 +168,7 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: ptr.To[int32](1),
+			Strategy: deploymentStrategy(volumes),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"pipelineId": pipelineId,
@@ -200,6 +213,68 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 	}
 	util.Logger.DebugContext(ctx, fmt.Sprintf("created vpa %s", vpaResult.GetObjectMeta().GetName()))
 	return
+}
+
+// deploymentStrategy is Recreate when the pod mounts a volume: the operator PVCs are
+// ReadWriteOnce, and a rolling update's second pod on another node hangs on Multi-Attach.
+func deploymentStrategy(volumes []apiv1.Volume) appsv1.DeploymentStrategy {
+	if len(volumes) == 0 {
+		return appsv1.DeploymentStrategy{}
+	}
+	return appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType}
+}
+
+// ensurePVC creates pvc, reuses an existing claim of that name, and waits for a
+// terminating one to be gone first, since a claim created over it would vanish with it.
+func (k *Kubernetes) ensurePVC(ctx context.Context, pvc *apiv1.PersistentVolumeClaim) error {
+	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(k.r2cfg.NamespaceId)
+	w := k.pvcWait
+	if w.timeout <= 0 || w.interval <= 0 {
+		w = defaultPVCWait
+	}
+	waitCtx, cancel := context.WithTimeout(ctx, w.timeout)
+	defer cancel()
+	waiting := false
+	for {
+		_, err := pvcClient.Create(waitCtx, pvc, metav1.CreateOptions{})
+		if err == nil {
+			util.Logger.DebugContext(ctx, "created volume "+pvc.Name)
+			return nil
+		}
+		if !k8s_errors.IsAlreadyExists(err) {
+			return pvcError(waitCtx, w, waiting, pvc.Name, err)
+		}
+		existing, err := pvcClient.Get(waitCtx, pvc.Name, metav1.GetOptions{})
+		if err != nil {
+			if k8s_errors.IsNotFound(err) {
+				// Gone between Create and Get: try the create again right away.
+				continue
+			}
+			return pvcError(waitCtx, w, waiting, pvc.Name, err)
+		}
+		if existing.DeletionTimestamp == nil {
+			util.Logger.DebugContext(ctx, "reusing existing volume "+pvc.Name)
+			return nil
+		}
+		if !waiting {
+			util.Logger.InfoContext(ctx, "waiting for the terminating volume to be deleted before creating it again", "volume", pvc.Name, "timeout", w.timeout.String())
+			waiting = true
+		}
+		select {
+		case <-waitCtx.Done():
+			return pvcError(waitCtx, w, waiting, pvc.Name, waitCtx.Err())
+		case <-time.After(w.interval):
+		}
+	}
+}
+
+// pvcError names the timeout when the wait for a terminating claim ran out, rather
+// than the bare context error.
+func pvcError(waitCtx context.Context, w pvcWait, waiting bool, name string, err error) error {
+	if waiting && errors.Is(waitCtx.Err(), context.DeadlineExceeded) {
+		return fmt.Errorf("volume %s is still terminating after %s: %w", name, w.timeout, err)
+	}
+	return fmt.Errorf("volume %s: %w", name, err)
 }
 
 // operatorEnv is the environment of an operator container.
@@ -302,14 +377,26 @@ func (k *Kubernetes) DeleteOperator(context.Context, string, pipe_lib.Operator) 
 	return
 }
 
+// DeleteOperators deletes the deployment of the pipeline, its autoscaler and checkpoints,
+// and the operators' volumes.
 func (k *Kubernetes) DeleteOperators(ctx context.Context, pipelineId string, operators []pipe_lib.Operator) (err error) {
+	return k.deleteOperators(ctx, pipelineId, operators, true)
+}
+
+// DeleteOperatorsKeepingVolumes deletes what DeleteOperators does except the volumes,
+// so a pipeline rebuilt afterwards keeps its operators' stored state.
+func (k *Kubernetes) DeleteOperatorsKeepingVolumes(ctx context.Context, pipelineId string, operators []pipe_lib.Operator) (err error) {
+	return k.deleteOperators(ctx, pipelineId, operators, false)
+}
+
+func (k *Kubernetes) deleteOperators(ctx context.Context, pipelineId string, operators []pipe_lib.Operator, deleteVolumes bool) (err error) {
 	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
 	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(k.r2cfg.NamespaceId)
 	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(k.r2cfg.NamespaceId)
 	verticalAutoscalerCheckpointClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalerCheckpoints(k.r2cfg.NamespaceId)
 
 	for _, operator := range operators {
-		if operator.PersistData {
+		if operator.PersistData && deleteVolumes {
 			volumeName := getOperatorName(pipelineId, operator)[0]
 			util.Logger.DebugContext(ctx, "deleting volume "+volumeName)
 			err = pvcClient.Delete(ctx, volumeName, metav1.DeleteOptions{})

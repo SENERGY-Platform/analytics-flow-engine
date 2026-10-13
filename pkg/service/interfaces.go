@@ -43,6 +43,9 @@ type Driver interface {
 	*/
 	DeleteOperator(ctx context.Context, pipelineId string, input pipe.Operator) error
 	DeleteOperators(ctx context.Context, pipelineId string, inputs []pipe.Operator) error
+	// DeleteOperatorsKeepingVolumes is DeleteOperators without deleting the
+	// operators' volumes, for rebuilding a pipeline whose stored state must survive.
+	DeleteOperatorsKeepingVolumes(ctx context.Context, pipelineId string, inputs []pipe.Operator) error
 	GetPipelineStatus(ctx context.Context, pipelineId string) (lib.PipelineStatus, error)
 	GetPipelinesStatus(ctx context.Context) ([]lib.PipelineStatus, error)
 }
