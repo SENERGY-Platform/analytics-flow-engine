@@ -38,8 +38,8 @@ type Kubernetes struct {
 	r2cfg               *config.Rancher2Config
 	operatorResources   map[string]config.OperatorResource
 	timescaleSecret     TimescaleSecret
-	// pvcWait bounds how long CreateOperators waits for a terminating PVC of the
-	// same name to disappear before it creates the new one.
+	// pvcWait bounds how long one CreateOperators call, across all its operators,
+	// waits for terminating PVCs of the same names to disappear.
 	pvcWait pvcWait
 }
 
@@ -110,6 +110,8 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 	var volumes []apiv1.Volume
 	metricsBasePort := 8080
 	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
+	vw, cancelWait := k.newVolumeWait(ctx)
+	defer cancelWait()
 
 	for i, operator := range inputs {
 		var ports []apiv1.ContainerPort
@@ -128,7 +130,7 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 
 		if operator.PersistData {
 			volumeName := getOperatorName(pipelineId, operator)[0]
-			if err = k.ensurePVC(ctx, k.makePVC(volumeName, "50M")); err != nil {
+			if err = k.ensurePVC(ctx, vw, k.makePVC(volumeName, "50M")); err != nil {
 				return err
 			}
 			volumeMounts = append(volumeMounts, apiv1.VolumeMount{
@@ -224,55 +226,67 @@ func deploymentStrategy(volumes []apiv1.Volume) appsv1.DeploymentStrategy {
 	return appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType}
 }
 
-// ensurePVC creates pvc, reuses an existing claim of that name, and waits for a
-// terminating one to be gone first, since a claim created over it would vanish with it.
-func (k *Kubernetes) ensurePVC(ctx context.Context, pvc *apiv1.PersistentVolumeClaim) error {
-	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(k.r2cfg.NamespaceId)
+// volumeWait is the single wait budget of one CreateOperators call, shared by all its
+// claims so that several terminating claims cannot multiply the wait.
+type volumeWait struct {
+	ctx    context.Context
+	w      pvcWait
+	waited bool
+}
+
+func (k *Kubernetes) newVolumeWait(ctx context.Context) (*volumeWait, context.CancelFunc) {
 	w := k.pvcWait
 	if w.timeout <= 0 || w.interval <= 0 {
 		w = defaultPVCWait
 	}
 	waitCtx, cancel := context.WithTimeout(ctx, w.timeout)
-	defer cancel()
-	waiting := false
+	return &volumeWait{ctx: waitCtx, w: w}, cancel
+}
+
+// ensurePVC creates pvc, reuses an existing claim of that name, and waits for a
+// terminating one to be gone first, since a claim created over it would vanish with it.
+func (k *Kubernetes) ensurePVC(ctx context.Context, vw *volumeWait, pvc *apiv1.PersistentVolumeClaim) error {
+	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(k.r2cfg.NamespaceId)
+	logged := false
 	for {
-		_, err := pvcClient.Create(waitCtx, pvc, metav1.CreateOptions{})
+		_, err := pvcClient.Create(vw.ctx, pvc, metav1.CreateOptions{})
 		if err == nil {
 			util.Logger.DebugContext(ctx, "created volume "+pvc.Name)
 			return nil
 		}
 		if !k8s_errors.IsAlreadyExists(err) {
-			return pvcError(waitCtx, w, waiting, pvc.Name, err)
+			return vw.error(pvc.Name, err)
 		}
-		existing, err := pvcClient.Get(waitCtx, pvc.Name, metav1.GetOptions{})
+		existing, err := pvcClient.Get(vw.ctx, pvc.Name, metav1.GetOptions{})
 		if err != nil {
 			if k8s_errors.IsNotFound(err) {
 				// Gone between Create and Get: try the create again right away.
 				continue
 			}
-			return pvcError(waitCtx, w, waiting, pvc.Name, err)
+			return vw.error(pvc.Name, err)
 		}
 		if existing.DeletionTimestamp == nil {
 			util.Logger.DebugContext(ctx, "reusing existing volume "+pvc.Name)
 			return nil
 		}
-		if !waiting {
-			util.Logger.InfoContext(ctx, "waiting for the terminating volume to be deleted before creating it again", "volume", pvc.Name, "timeout", w.timeout.String())
-			waiting = true
+		vw.waited = true
+		if !logged {
+			util.Logger.InfoContext(ctx, "waiting for the terminating volume to be deleted before creating it again", "volume", pvc.Name, "timeout", vw.w.timeout.String())
+			logged = true
 		}
 		select {
-		case <-waitCtx.Done():
-			return pvcError(waitCtx, w, waiting, pvc.Name, waitCtx.Err())
-		case <-time.After(w.interval):
+		case <-vw.ctx.Done():
+			return vw.error(pvc.Name, vw.ctx.Err())
+		case <-time.After(vw.w.interval):
 		}
 	}
 }
 
-// pvcError names the timeout when the wait for a terminating claim ran out, rather
-// than the bare context error.
-func pvcError(waitCtx context.Context, w pvcWait, waiting bool, name string, err error) error {
-	if waiting && errors.Is(waitCtx.Err(), context.DeadlineExceeded) {
-		return fmt.Errorf("volume %s is still terminating after %s: %w", name, w.timeout, err)
+// error is ErrVolumeStillTerminating once the budget ran out on a terminating claim of
+// this call, and err with the claim name otherwise.
+func (vw *volumeWait) error(name string, err error) error {
+	if vw.waited && errors.Is(vw.ctx.Err(), context.DeadlineExceeded) {
+		return fmt.Errorf("%w: %s after %s", lib.ErrVolumeStillTerminating, name, vw.w.timeout)
 	}
 	return fmt.Errorf("volume %s: %w", name, err)
 }

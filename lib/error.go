@@ -16,6 +16,12 @@
 
 package lib
 
+import "errors"
+
+// ErrVolumeStillTerminating means an operator volume of the same name was still being
+// deleted when the time to wait for it ran out. Retrying at once cannot help.
+var ErrVolumeStillTerminating = errors.New("volume still terminating")
+
 type cError struct {
 	err error
 }

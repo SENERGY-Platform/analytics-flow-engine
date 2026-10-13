@@ -18,6 +18,7 @@ package kubernetes_api
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -194,8 +195,8 @@ func TestCreateOperatorsGivesUpOnAVolumeThatStaysTerminating(t *testing.T) {
 
 	start := time.Now()
 	err := createFakeOperators(k, true)
-	if err == nil || !strings.Contains(err.Error(), "still terminating") {
-		t.Fatalf("err = %v, want a timeout naming the terminating volume", err)
+	if !errors.Is(err, lib.ErrVolumeStillTerminating) || !strings.Contains(err.Error(), fakeVolumeName()) {
+		t.Fatalf("err = %v, want ErrVolumeStillTerminating naming the volume", err)
 	}
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Errorf("gave up after %s, want about the 50ms timeout", elapsed)
@@ -249,5 +250,43 @@ func TestDeleteOperatorsDeletesTheClaim(t *testing.T) {
 	}
 	if _, err := fakePVC(clientset); !k8s_errors.IsNotFound(err) {
 		t.Errorf("claim get = %v, want it deleted", err)
+	}
+}
+
+// The wait is one budget for the whole call: a claim that takes most of it to go must
+// not leave the next stuck claim a full budget of its own, since the engine runs this
+// in a call nobody can cancel.
+func TestCreateOperatorsSharesOneWaitAcrossItsVolumes(t *testing.T) {
+	second := fakeOperator(true)
+	second.Id = "op-87654321"
+	secondClaim := existingPVC(true)
+	secondClaim.Name = getOperatorName(fakePipelineId, second)[0]
+	k, clientset := fakeDriver(existingPVC(true), secondClaim)
+	const budget = 600 * time.Millisecond
+	k.pvcWait = pvcWait{timeout: budget, interval: 5 * time.Millisecond}
+
+	start := time.Now()
+	released := false
+	clientset.PrependReactor("get", "persistentvolumeclaims", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		// The first claim goes after two thirds of the budget; the second never does.
+		if !released && action.(k8stesting.GetAction).GetName() == fakeVolumeName() && time.Since(start) > budget*2/3 {
+			released = true
+			if err := clientset.Tracker().Delete(pvcResource, fakeNamespace, fakeVolumeName()); err != nil {
+				t.Errorf("removing the first claim: %v", err)
+			}
+		}
+		return false, nil, nil
+	})
+
+	err := k.CreateOperators(context.Background(), fakePipelineId, []pipe.Operator{fakeOperator(true), second}, lib.PipelineConfig{PipelineId: fakePipelineId})
+	elapsed := time.Since(start)
+	if !errors.Is(err, lib.ErrVolumeStillTerminating) || !strings.Contains(err.Error(), secondClaim.Name) {
+		t.Fatalf("err = %v, want ErrVolumeStillTerminating for the second claim", err)
+	}
+	if !released {
+		t.Fatal("the first claim was never released, so the test proves nothing")
+	}
+	if elapsed >= budget*4/3 {
+		t.Errorf("waited %s, want one budget of %s for both claims", elapsed, budget)
 	}
 }

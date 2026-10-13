@@ -42,10 +42,18 @@ type recordingDriver struct {
 	// deleteCalls so a test can tell which of the two removed the operators.
 	keepVolumeDeleteCalls int
 	statuses              []lib.PipelineStatus
+	// createErr and keepVolumeDeleteErr fail the call for the pipeline id they name.
+	createErr           map[string]error
+	keepVolumeDeleteErr map[string]error
+	createAttempts      int
 }
 
-func (d *recordingDriver) CreateOperators(ctx context.Context, _ string, _ []pipe.Operator, pipelineConfig lib.PipelineConfig) error {
+func (d *recordingDriver) CreateOperators(ctx context.Context, pipelineId string, _ []pipe.Operator, pipelineConfig lib.PipelineConfig) error {
 	if err := ctx.Err(); err != nil {
+		return err
+	}
+	d.createAttempts++
+	if err := d.createErr[pipelineId]; err != nil {
 		return err
 	}
 	d.configs = append(d.configs, pipelineConfig)
@@ -59,12 +67,12 @@ func (d *recordingDriver) DeleteOperators(ctx context.Context, _ string, _ []pip
 	d.deleteCalls++
 	return nil
 }
-func (d *recordingDriver) DeleteOperatorsKeepingVolumes(ctx context.Context, _ string, _ []pipe.Operator) error {
+func (d *recordingDriver) DeleteOperatorsKeepingVolumes(ctx context.Context, pipelineId string, _ []pipe.Operator) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	d.keepVolumeDeleteCalls++
-	return nil
+	return d.keepVolumeDeleteErr[pipelineId]
 }
 func (d *recordingDriver) GetPipelineStatus(context.Context, string) (lib.PipelineStatus, error) {
 	return lib.PipelineStatus{}, nil

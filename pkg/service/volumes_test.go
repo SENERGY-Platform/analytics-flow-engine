@@ -18,7 +18,11 @@ package service
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
@@ -86,5 +90,72 @@ func TestUpdatePipelineDeletesVolumes(t *testing.T) {
 	}
 	if driver.deleteCalls != 1 || driver.keepVolumeDeleteCalls != 0 {
 		t.Errorf("DeleteOperators %d, DeleteOperatorsKeepingVolumes %d, want 1 and 0", driver.deleteCalls, driver.keepVolumeDeleteCalls)
+	}
+}
+
+// A claim still terminating after the driver's whole wait ends the start at once:
+// the six retries would each wait that long again in a call nobody can cancel.
+func TestStartOperatorsDoesNotRetryAVolumeStillTerminating(t *testing.T) {
+	driver := &recordingDriver{createErr: map[string]error{
+		"3c1f9b42": fmt.Errorf("%w: operator-3c1f9b42-op-12345 after 1m0s", lib.ErrVolumeStillTerminating),
+	}}
+	engine := engineWith(driver, &recordingPipelines{})
+	pipeline := pipe.Pipeline{Id: "3c1f9b42", Operators: []pipe.Operator{persistingCloudOperator()}}
+
+	_, err := engine.startOperators(context.Background(), pipeline, engine.createPipelineConfig(pipeline), "")
+	if !errors.Is(err, lib.ErrVolumeStillTerminating) {
+		t.Fatalf("err = %v, want ErrVolumeStillTerminating", err)
+	}
+	if driver.createAttempts != 1 {
+		t.Errorf("CreateOperators attempts = %d, want 1", driver.createAttempts)
+	}
+}
+
+func TestRetryStopsOnAPermanentError(t *testing.T) {
+	cause := errors.New("cause")
+	calls := 0
+	err := retry(context.Background(), 3, time.Millisecond, func() error {
+		calls++
+		return permanentError{cause}
+	})
+	if calls != 1 || err != cause {
+		t.Errorf("calls = %d, err = %v, want 1 call and the wrapped error itself", calls, err)
+	}
+	calls = 0
+	_ = retry(context.Background(), 3, time.Millisecond, func() error {
+		calls++
+		return cause
+	})
+	if calls != 3 {
+		t.Errorf("calls = %d for an ordinary error, want all 3 attempts", calls)
+	}
+}
+
+// One pipeline whose rebuild fails must not keep the later ones down until the next
+// restart; the failures still come back together so the caller logs the sync as
+// incomplete.
+func TestSyncPipelinesContinuesPastAFailedRebuild(t *testing.T) {
+	stopFailure := errors.New("stop failed")
+	driver := &recordingDriver{
+		keepVolumeDeleteErr: map[string]error{"first": stopFailure},
+		createErr:           map[string]error{"second": fmt.Errorf("%w: claim", lib.ErrVolumeStillTerminating)},
+	}
+	pipelines := &recordingPipelines{admin: []pipe.Pipeline{
+		{Id: "first", Operators: []pipe.Operator{persistingCloudOperator()}},
+		{Id: "second", Operators: []pipe.Operator{persistingCloudOperator()}},
+		{Id: "third", Operators: []pipe.Operator{persistingCloudOperator()}},
+	}}
+
+	err := engineWith(driver, pipelines).syncPipelines()
+	if len(driver.configs) != 1 || driver.configs[0].PipelineId != "third" {
+		t.Errorf("recreated %+v, want the third pipeline despite the two failures before it", driver.configs)
+	}
+	if !errors.Is(err, stopFailure) || !errors.Is(err, lib.ErrVolumeStillTerminating) {
+		t.Fatalf("err = %v, want both failures joined", err)
+	}
+	for _, id := range []string{"first", "second"} {
+		if !strings.Contains(err.Error(), "pipeline "+id) {
+			t.Errorf("err = %q, want it to name pipeline %s", err, id)
+		}
 	}
 }

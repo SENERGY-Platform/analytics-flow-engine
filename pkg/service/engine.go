@@ -142,6 +142,9 @@ func (f *FlowEngine) syncPipelines() (err error) {
 		func(a pipe.Pipeline) string { return a.Id },
 		func(b lib.PipelineStatus) string { return strings.Replace(b.Name, "pipeline-", "", -1) },
 	)
+	// A failed rebuild is logged and the next pipeline still gets its turn; otherwise
+	// one broken pipeline would keep all later ones down until the next restart.
+	var failed []error
 	if len(missing) > 0 {
 		util.Logger.WarnContext(startupCtx, "found missing pipelines")
 		for _, item := range missing {
@@ -152,17 +155,17 @@ func (f *FlowEngine) syncPipelines() (err error) {
 			util.Logger.WarnContext(ctx, "trying to recreate pipeline", "pipeline", redactPipeline(item))
 			// First delete whatever half of the pipeline is still present, except the
 			// volumes: they hold the operators' state, and CreateOperators reuses them.
-			err = f.stopOperators(ctx, item, "", keepVolumes)
-			if err != nil {
-				util.Logger.ErrorContext(ctx, "cannot stop operators", "error", err)
-				return
+			if stopErr := f.stopOperators(ctx, item, "", keepVolumes); stopErr != nil {
+				util.Logger.ErrorContext(ctx, "cannot stop operators", "pipeline", item.Id, "error", stopErr)
+				failed = append(failed, fmt.Errorf("pipeline %s: failed to stop operators: %w", item.Id, stopErr))
+				continue
 			}
 
 			pipeConfig := f.createPipelineConfig(item)
 			pipeConfig.UserId = item.UserId
-			_, err := f.startOperators(ctx, item, pipeConfig, "")
-			if err != nil {
-				return fmt.Errorf("failed to start operators: %w", err)
+			if _, startErr := f.startOperators(ctx, item, pipeConfig, ""); startErr != nil {
+				util.Logger.ErrorContext(ctx, "failed to recreate pipeline", "pipeline", item.Id, "error", startErr)
+				failed = append(failed, fmt.Errorf("pipeline %s: failed to start operators: %w", item.Id, startErr))
 			}
 		}
 	}
@@ -173,7 +176,7 @@ func (f *FlowEngine) syncPipelines() (err error) {
 			util.Logger.WarnContext(startupCtx, "extra deployment", "deployment", item)
 		}
 	}
-	return
+	return errors.Join(failed...)
 }
 
 func (f *FlowEngine) StartPipeline(ctx context.Context, pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline *pipe.Pipeline, err error) {
@@ -552,12 +555,18 @@ func (f *FlowEngine) startOperators(ctx context.Context, pipeline pipe.Pipeline,
 	if len(cloudOperators) > 0 {
 		util.Logger.DebugContext(ctx, "try to start cloud operators")
 		err = retry(ctx, 6, 10*time.Second, func() (err error) {
-			return f.driver.CreateOperators(
+			err = f.driver.CreateOperators(
 				ctx,
 				pipeline.Id,
 				cloudOperators,
 				pipeConfig,
 			)
+			// The driver already waited its full budget for the claim; another attempt
+			// would hold this non-cancellable call for that long again.
+			if errors.Is(err, lib.ErrVolumeStillTerminating) {
+				return permanentError{err}
+			}
+			return err
 		})
 		if err != nil {
 			util.Logger.ErrorContext(ctx, "cannot start cloud operators", "error", err)

@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -34,11 +35,22 @@ func StringInSlice(a string, list []string) bool {
 	return false
 }
 
+// permanentError ends retry at once with the error it wraps: further attempts could
+// only repeat the wait that produced it.
+type permanentError struct{ err error }
+
+func (p permanentError) Error() string { return p.err.Error() }
+func (p permanentError) Unwrap() error { return p.err }
+
 func retry(ctx context.Context, attempts int, sleep time.Duration, f func() error) (err error) {
 	for i := 0; ; i++ {
 		err = f()
 		if err == nil {
 			return
+		}
+		var permanent permanentError
+		if errors.As(err, &permanent) {
+			return permanent.err
 		}
 
 		if i >= (attempts - 1) {
