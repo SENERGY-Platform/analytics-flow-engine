@@ -25,6 +25,11 @@ type PipelinesResponse struct {
 	Total int             `json:"total,omitempty"`
 }
 
+// OperatorConfigTsConn is the Config key Operator Lib falls back to for its timescale
+// DSN when the env var TS_CONN is unset. The platform never sets it and drops it
+// from cloud operators, because the DSN reaches them from a Secret.
+const OperatorConfigTsConn = "ts_conn"
+
 type OperatorRequestConfig struct {
 	Config      map[string]string `json:"config,omitempty"`
 	InputTopics []pipe.InputTopic `json:"inputTopics,omitempty"`

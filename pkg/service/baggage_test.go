@@ -138,11 +138,10 @@ func oneCloudOperatorFlow() parser.Pipeline {
 
 func engineWith(driver *recordingDriver, pipelines *recordingPipelines) *FlowEngine {
 	return &FlowEngine{
-		driver:              driver,
-		parsingService:      staticParser{pipeline: oneCloudOperatorFlow()},
-		permissionService:   allowAll{},
-		pipelineService:     pipelines,
-		timescaleConnection: "postgresql://example/postgres",
+		driver:            driver,
+		parsingService:    staticParser{pipeline: oneCloudOperatorFlow()},
+		permissionService: allowAll{},
+		pipelineService:   pipelines,
 	}
 }
 

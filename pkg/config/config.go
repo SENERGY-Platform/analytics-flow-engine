@@ -17,8 +17,13 @@
 package config
 
 import (
+	"errors"
+	"fmt"
+	"strings"
+
 	sb_config_hdl "github.com/SENERGY-Platform/go-service-base/config-hdl"
 	sb_config_types "github.com/SENERGY-Platform/go-service-base/config-hdl/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 type MqttConfig struct {
@@ -55,17 +60,16 @@ type Config struct {
 	// instead of its short-lived Kafka topic. Empty, the default, switches the
 	// lookup off: operators read imports from Kafka as before.
 	AnalyticsServingApiEndpoint string `json:"analytics_serving_api_endpoint" env_var:"ANALYTICS_SERVING_API_ENDPOINT"`
-	// TimescaleConnection is the DSN a cloud operator reads history through, set on
-	// every one of them as the ts_conn of its operator config.
+	// OperatorTimescaleSecretName names the Secret in the pipelines namespace whose
+	// key OperatorTimescaleSecretKey holds the DSN cloud operators read history
+	// through. It reaches them as the env var TS_CONN by secretKeyRef, so the engine
+	// never holds the DSN and the Deployment does not show it. No default: the
+	// Secret is provisioned with the deployment, and the engine refuses to start
+	// without its name.
 	//
-	// No default: the DSN carries a password, so the deployment sets it from a
-	// secret. Unset, starting a cloud operator is refused (setPlatformOperatorConfig).
-	//
-	// It stays the same shared credential either way, which is the part SNRGY-4637
-	// is about and this does not solve: it reaches every series, and which series an
-	// operator reads is decided by its input topics. What the move buys is one place
-	// to change when that is addressed.
-	TimescaleConnection sb_config_types.Secret `json:"timescale_connection" env_var:"TIMESCALE_CONNECTION"`
+	// It stays one shared credential reaching every series (SNRGY-4637).
+	OperatorTimescaleSecretName string `json:"operator_timescale_secret_name" env_var:"OPERATOR_TIMESCALE_SECRET_NAME"`
+	OperatorTimescaleSecretKey  string `json:"operator_timescale_secret_key" env_var:"OPERATOR_TIMESCALE_SECRET_KEY"`
 	// OtelEndpoint is the OTLP collector traces are exported to. Empty means the
 	// in-cluster Jaeger the otelx default names, which is what every deployment
 	// uses; the knob exists so a local run can point somewhere else instead of
@@ -90,10 +94,34 @@ func New(path string) (*Config, error) {
 			Zookeeper:      "zookeeper.kafka:2181",
 			KafkaBootstrap: "kafka.kafka:9092",
 		},
+		OperatorTimescaleSecretKey: DefaultOperatorTimescaleSecretKey,
 	}
 	err := sb_config_hdl.Load(&cfg, nil, envTypeParser, nil, path)
 	if err == nil {
 		err = ValidateOperatorResources(cfg.OperatorResources)
 	}
+	if err == nil {
+		err = validateOperatorTimescaleSecret(cfg.OperatorTimescaleSecretName, cfg.OperatorTimescaleSecretKey)
+	}
 	return &cfg, err
+}
+
+// DefaultOperatorTimescaleSecretKey is the key of the DSN in the operator timescale Secret.
+const DefaultOperatorTimescaleSecretKey = "TS_CONN"
+
+// validateOperatorTimescaleSecret checks the reference at startup. The API server
+// accepts a Deployment naming a missing Secret and rejects an invalid name or key
+// only per pipeline start, so a bad value would otherwise surface late.
+func validateOperatorTimescaleSecret(name, key string) error {
+	if name == "" {
+		return errors.New("operator_timescale_secret_name (OPERATOR_TIMESCALE_SECRET_NAME) is empty; " +
+			"cloud operators would start without a timescale DSN")
+	}
+	if msgs := validation.IsDNS1123Subdomain(name); len(msgs) > 0 {
+		return fmt.Errorf("operator_timescale_secret_name %q is not a valid secret name: %s", name, strings.Join(msgs, "; "))
+	}
+	if msgs := validation.IsConfigMapKey(key); len(msgs) > 0 {
+		return fmt.Errorf("operator_timescale_secret_key %q is not a valid secret key: %s", key, strings.Join(msgs, "; "))
+	}
+	return nil
 }

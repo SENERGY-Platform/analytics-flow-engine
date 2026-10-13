@@ -2,6 +2,8 @@ package kubernetes_api
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
@@ -21,7 +23,7 @@ func getClient() (client *Kubernetes, err error) {
 		return
 	}
 	util.InitStructLogger("debug")
-	client, err = NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, true)
+	client, err = NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, TimescaleSecret{Name: cfg.OperatorTimescaleSecretName, Key: cfg.OperatorTimescaleSecretKey}, true)
 	if err != nil {
 		return
 	}
@@ -35,7 +37,7 @@ func TestKubernetes_createClient(t *testing.T) {
 		return
 	}
 	util.InitStructLogger("debug")
-	_, err = NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, true)
+	_, err = NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, TimescaleSecret{Name: cfg.OperatorTimescaleSecretName, Key: cfg.OperatorTimescaleSecretKey}, true)
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -177,5 +179,91 @@ func TestNewVPALetsTheUpdaterEvictASinglePod(t *testing.T) {
 	}
 	if min := vpa.Spec.UpdatePolicy.MinReplicas; min == nil || *min != 1 {
 		t.Fatalf("minReplicas = %v, want 1", min)
+	}
+}
+
+func envNamed(envs []apiv1.EnvVar, name string) []apiv1.EnvVar {
+	var found []apiv1.EnvVar
+	for _, env := range envs {
+		if env.Name == name {
+			found = append(found, env)
+		}
+	}
+	return found
+}
+
+func timescaleTestDriver() *Kubernetes {
+	return &Kubernetes{
+		r2cfg:           &config.Rancher2Config{},
+		timescaleSecret: TimescaleSecret{Name: "analytics-timescale", Key: "dsn"},
+	}
+}
+
+// The DSN reaches a cloud operator by reference only, so reading the Deployment does
+// not reveal it.
+func TestACloudOperatorGetsTsConnFromTheSecret(t *testing.T) {
+	envs, err := timescaleTestDriver().operatorEnv(testPipeId, pipe.Operator{Id: "op-1", DeploymentType: "cloud"}, lib.PipelineConfig{}, 8080)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := envNamed(envs, "TS_CONN")
+	if len(found) != 1 {
+		t.Fatalf("TS_CONN entries = %d, want 1", len(found))
+	}
+	env := found[0]
+	if env.Value != "" || env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+		t.Fatalf("TS_CONN = %+v, want a secretKeyRef and no literal value", env)
+	}
+	ref := env.ValueFrom.SecretKeyRef
+	if ref.Name != "analytics-timescale" || ref.Key != "dsn" {
+		t.Errorf("secretKeyRef = %s/%s, want analytics-timescale/dsn", ref.Name, ref.Key)
+	}
+	if ref.Optional == nil || *ref.Optional {
+		t.Errorf("secretKeyRef optional = %v, want false so a missing Secret fails the pod start", ref.Optional)
+	}
+}
+
+// A pipeline recreated from the registry carries the config stored while the DSN was
+// still put into it; CONFIG must not pass it on.
+func TestTheContainerConfigCarriesNoTsConn(t *testing.T) {
+	operator := pipe.Operator{
+		Id:             "op-1",
+		DeploymentType: "cloud",
+		Config:         map[string]string{"ts_conn": "stored-dsn", "window": "5"},
+	}
+	envs, err := timescaleTestDriver().operatorEnv(testPipeId, operator, lib.PipelineConfig{}, 8080)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, env := range envs {
+		if strings.Contains(env.Value, "stored-dsn") {
+			t.Errorf("env %s carries the stored DSN: %s", env.Name, env.Value)
+		}
+	}
+	found := envNamed(envs, "CONFIG")
+	if len(found) != 1 {
+		t.Fatalf("CONFIG entries = %d, want 1", len(found))
+	}
+	var got lib.OperatorRequestConfig
+	if err := json.Unmarshal([]byte(found[0].Value), &got); err != nil {
+		t.Fatalf("CONFIG is not JSON: %v", err)
+	}
+	if _, present := got.Config["ts_conn"]; present || got.Config["window"] != "5" {
+		t.Errorf("CONFIG config = %v, want window kept and ts_conn dropped", got.Config)
+	}
+	// The engine goes on to store the operator, so the driver must not change it.
+	if operator.Config["ts_conn"] != "stored-dsn" {
+		t.Error("building CONFIG changed the operator's own config")
+	}
+}
+
+// A fog operator gets no platform DSN, should one ever reach the Kubernetes driver.
+func TestAFogOperatorGetsNoTsConn(t *testing.T) {
+	envs, err := timescaleTestDriver().operatorEnv(testPipeId, pipe.Operator{Id: "op-1", DeploymentType: "local"}, lib.PipelineConfig{}, 8080)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found := envNamed(envs, "TS_CONN"); len(found) != 0 {
+		t.Errorf("TS_CONN = %+v, want none for a fog operator", found)
 	}
 }

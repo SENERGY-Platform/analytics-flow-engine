@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"strconv"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/baggage"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
+	location "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
 	pipe_lib "github.com/SENERGY-Platform/analytics-pipeline/lib"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v1"
@@ -33,9 +35,20 @@ type Kubernetes struct {
 	autoscalerClientset *autoscaler.Clientset
 	r2cfg               *config.Rancher2Config
 	operatorResources   map[string]config.OperatorResource
+	timescaleSecret     TimescaleSecret
 }
 
-func NewKubernetes(r2cfg *config.Rancher2Config, operatorResources map[string]config.OperatorResource, debug bool) (kube *Kubernetes, err error) {
+// TimescaleSecret names the Secret in the pipelines namespace, and the key in it,
+// that cloud operators get their timescale DSN from as TS_CONN.
+type TimescaleSecret struct {
+	Name string
+	Key  string
+}
+
+// TimescaleEnvVar is the env var Operator Lib reads its timescale DSN from.
+const TimescaleEnvVar = "TS_CONN"
+
+func NewKubernetes(r2cfg *config.Rancher2Config, operatorResources map[string]config.OperatorResource, timescaleSecret TimescaleSecret, debug bool) (kube *Kubernetes, err error) {
 	var restConfig *rest.Config
 
 	if debug {
@@ -77,7 +90,7 @@ func NewKubernetes(r2cfg *config.Rancher2Config, operatorResources map[string]co
 	}
 	util.Logger.Debug("succesfully tested connection", "pods", len(pods.Items))
 
-	return &Kubernetes{clientset: clientset, autoscalerClientset: autoscalerClientSet, r2cfg: r2cfg, operatorResources: operatorResources}, nil
+	return &Kubernetes{clientset: clientset, autoscalerClientset: autoscalerClientSet, r2cfg: r2cfg, operatorResources: operatorResources, timescaleSecret: timescaleSecret}, nil
 }
 
 func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inputs []pipe_lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
@@ -90,72 +103,16 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 	for i, operator := range inputs {
 		var ports []apiv1.ContainerPort
 		var volumeMounts []apiv1.VolumeMount
-		operatorRequestConfig, _ := json.Marshal(lib.OperatorRequestConfig{Config: operator.Config, InputTopics: operator.InputTopics})
-		envs := []apiv1.EnvVar{
-			{
-				Name:  "ZK_QUORUM",
-				Value: k.r2cfg.Zookeeper,
-			},
-			{
-				Name:  "CONFIG_BOOTSTRAP_SERVERS",
-				Value: k.r2cfg.KafkaBootstrap,
-			},
-			{
-				Name:  "CONFIG_APPLICATION_ID",
-				Value: "analytics-" + operator.ApplicationId.String(),
-			},
-			{
-				Name:  "PIPELINE_ID",
-				Value: pipelineId,
-			},
-			{
-				Name:  "OPERATOR_ID",
-				Value: operator.Id,
-			},
-			{
-				Name:  "WINDOW_TIME",
-				Value: strconv.Itoa(pipeConfig.WindowTime),
-			},
-			{
-				Name:  "JOIN_STRATEGY",
-				Value: pipeConfig.MergeStrategy,
-			},
-			{
-				Name:  "CONFIG",
-				Value: string(operatorRequestConfig),
-			},
-			{
-				Name:  "DEVICE_ID_PATH",
-				Value: "device_id",
-			},
-			{
-				Name:  "CONSUMER_AUTO_OFFSET_RESET_CONFIG",
-				Value: pipeConfig.ConsumerOffset,
-			},
-			{
-				Name:  "USER_ID",
-				Value: pipeConfig.UserId,
-			},
+		metricsPort := metricsBasePort + i
+		envs, envErr := k.operatorEnv(pipelineId, operator, pipeConfig, metricsPort)
+		if envErr != nil {
+			return envErr
 		}
-
-		// The operator libraries read this and put the entries into every log record
-		// they write. The pod labels below cover the same ground for the log
-		// aggregation, which sees the container from the outside; this covers the
-		// operator process, which is the only place that knows what it is doing.
-		if header := baggage.Header(pipeConfig.Baggage); header != "" {
-			envs = append(envs, apiv1.EnvVar{Name: baggage.EnvVar, Value: header})
-		}
-
 		if pipeConfig.Metrics {
-			metricsPort := metricsBasePort + i
-			envs = append(envs, apiv1.EnvVar{Name: "METRICS", Value: "true"}, apiv1.EnvVar{Name: "METRICS_PORT", Value: strconv.Itoa(metricsPort)})
 			ports = append(ports, apiv1.ContainerPort{
 				Name:          "metrics-" + strconv.Itoa(i),
 				ContainerPort: int32(metricsPort),
 			})
-		}
-		if operator.OutputTopic != "" {
-			envs = append(envs, apiv1.EnvVar{Name: "OUTPUT", Value: operator.OutputTopic})
 		}
 
 		if operator.PersistData {
@@ -243,6 +200,102 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 	}
 	util.Logger.DebugContext(ctx, fmt.Sprintf("created vpa %s", vpaResult.GetObjectMeta().GetName()))
 	return
+}
+
+// operatorEnv is the environment of an operator container.
+func (k *Kubernetes) operatorEnv(pipelineId string, operator pipe_lib.Operator, pipeConfig lib.PipelineConfig, metricsPort int) ([]apiv1.EnvVar, error) {
+	requestConfig, err := operatorRequestConfig(operator)
+	if err != nil {
+		return nil, fmt.Errorf("config of operator %s: %w", operator.Id, err)
+	}
+	envs := []apiv1.EnvVar{
+		{
+			Name:  "ZK_QUORUM",
+			Value: k.r2cfg.Zookeeper,
+		},
+		{
+			Name:  "CONFIG_BOOTSTRAP_SERVERS",
+			Value: k.r2cfg.KafkaBootstrap,
+		},
+		{
+			Name:  "CONFIG_APPLICATION_ID",
+			Value: "analytics-" + operator.ApplicationId.String(),
+		},
+		{
+			Name:  "PIPELINE_ID",
+			Value: pipelineId,
+		},
+		{
+			Name:  "OPERATOR_ID",
+			Value: operator.Id,
+		},
+		{
+			Name:  "WINDOW_TIME",
+			Value: strconv.Itoa(pipeConfig.WindowTime),
+		},
+		{
+			Name:  "JOIN_STRATEGY",
+			Value: pipeConfig.MergeStrategy,
+		},
+		{
+			Name:  "CONFIG",
+			Value: string(requestConfig),
+		},
+		{
+			Name:  "DEVICE_ID_PATH",
+			Value: "device_id",
+		},
+		{
+			Name:  "CONSUMER_AUTO_OFFSET_RESET_CONFIG",
+			Value: pipeConfig.ConsumerOffset,
+		},
+		{
+			Name:  "USER_ID",
+			Value: pipeConfig.UserId,
+		},
+	}
+
+	// By reference, so the DSN shows neither in the Deployment nor in the engine.
+	// Not optional: a missing Secret then fails the pod start visibly, naming the
+	// Secret, instead of every history read failing later.
+	if operator.DeploymentType != location.Local {
+		envs = append(envs, apiv1.EnvVar{
+			Name: TimescaleEnvVar,
+			ValueFrom: &apiv1.EnvVarSource{SecretKeyRef: &apiv1.SecretKeySelector{
+				LocalObjectReference: apiv1.LocalObjectReference{Name: k.timescaleSecret.Name},
+				Key:                  k.timescaleSecret.Key,
+				Optional:             ptr.To(false),
+			}},
+		})
+	}
+
+	// The operator libraries read this and put the entries into every log record
+	// they write. The pod labels in CreateOperators cover the same ground for the log
+	// aggregation, which sees the container from the outside; this covers the
+	// operator process, which is the only place that knows what it is doing.
+	if header := baggage.Header(pipeConfig.Baggage); header != "" {
+		envs = append(envs, apiv1.EnvVar{Name: baggage.EnvVar, Value: header})
+	}
+
+	if pipeConfig.Metrics {
+		envs = append(envs, apiv1.EnvVar{Name: "METRICS", Value: "true"}, apiv1.EnvVar{Name: "METRICS_PORT", Value: strconv.Itoa(metricsPort)})
+	}
+	if operator.OutputTopic != "" {
+		envs = append(envs, apiv1.EnvVar{Name: "OUTPUT", Value: operator.OutputTopic})
+	}
+	return envs, nil
+}
+
+// operatorRequestConfig is the CONFIG of an operator container, without ts_conn. The
+// engine drops that key too, but a pipeline recreated from the registry (startup
+// sync, rollback of an update) carries the config stored before the DSN moved.
+func operatorRequestConfig(operator pipe_lib.Operator) ([]byte, error) {
+	cfg := operator.Config
+	if _, ok := cfg[lib.OperatorConfigTsConn]; ok {
+		cfg = maps.Clone(cfg)
+		delete(cfg, lib.OperatorConfigTsConn)
+	}
+	return json.Marshal(lib.OperatorRequestConfig{Config: cfg, InputTopics: operator.InputTopics})
 }
 
 func (k *Kubernetes) DeleteOperator(context.Context, string, pipe_lib.Operator) (err error) {

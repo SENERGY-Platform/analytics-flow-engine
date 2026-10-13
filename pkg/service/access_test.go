@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib/access"
@@ -131,72 +130,47 @@ func TestAnExternalOperatorInputIsCheckedAgainstItsPipeline(t *testing.T) {
 	}
 }
 
-func TestACloudOperatorGetsTheConfiguredDSN(t *testing.T) {
-	f := &FlowEngine{timescaleConnection: "postgresql://ops@timescale/db"}
+// The platform no longer puts a DSN into the operator config: cloud operators get it
+// as TS_CONN from a Secret, which CONFIG would otherwise expose.
+func TestACloudOperatorIsGivenNoDSNInItsConfig(t *testing.T) {
+	f := &FlowEngine{}
 	operators := []pipe.Operator{{Id: "op-1", DeploymentType: "cloud"}}
 
-	if err := f.setPlatformOperatorConfig(operators); err != nil {
-		t.Fatalf("setPlatformOperatorConfig: %v", err)
-	}
-	if got := operators[0].Config[OperatorConfigTsConn]; got != "postgresql://ops@timescale/db" {
-		t.Errorf("ts_conn = %q, want the configured DSN", got)
+	f.setPlatformOperatorConfig(operators)
+
+	if _, present := operators[0].Config[OperatorConfigTsConn]; present {
+		t.Errorf("ts_conn = %q, want none in the config", operators[0].Config[OperatorConfigTsConn])
 	}
 }
 
 // The flow's own node config is the user's. A ts_conn out of it would point an
-// operator at a database the platform never chose, so the platform value wins.
-func TestTheFlowsOwnTsConnIsOverwritten(t *testing.T) {
-	f := &FlowEngine{timescaleConnection: "postgresql://ops@timescale/db"}
+// operator at a database the platform never chose, so it is dropped.
+func TestTheFlowsOwnTsConnIsDroppedFromACloudOperator(t *testing.T) {
+	f := &FlowEngine{}
 	operators := []pipe.Operator{{
 		Id:             "op-1",
 		DeploymentType: "cloud",
-		Config:         map[string]string{"ts_conn": "postgresql://attacker@elsewhere/db", "window": "5"},
+		Config:         map[string]string{"ts_conn": "user-supplied-dsn", "window": "5"},
 	}}
 
-	if err := f.setPlatformOperatorConfig(operators); err != nil {
-		t.Fatalf("setPlatformOperatorConfig: %v", err)
-	}
-	if got := operators[0].Config[OperatorConfigTsConn]; got != "postgresql://ops@timescale/db" {
-		t.Errorf("ts_conn = %q, want the platform's", got)
+	f.setPlatformOperatorConfig(operators)
+
+	if got, present := operators[0].Config[OperatorConfigTsConn]; present {
+		t.Errorf("ts_conn = %q, want the user's value dropped", got)
 	}
 	if got := operators[0].Config["window"]; got != "5" {
 		t.Errorf("window = %q, want the flow's own values left alone", got)
 	}
 }
 
-// A fog operator runs on hardware the platform does not own. Shipping a platform
-// database credential there is worse than the problem this whole change fixes.
+// A fog operator runs on hardware the platform does not own and gets no platform DSN.
 func TestAFogOperatorGetsNoDSN(t *testing.T) {
-	f := &FlowEngine{timescaleConnection: "postgresql://ops@timescale/db"}
+	f := &FlowEngine{}
 	operators := []pipe.Operator{{Id: "op-1", DeploymentType: "local"}}
 
-	if err := f.setPlatformOperatorConfig(operators); err != nil {
-		t.Fatalf("setPlatformOperatorConfig: %v", err)
-	}
+	f.setPlatformOperatorConfig(operators)
+
 	if _, present := operators[0].Config[OperatorConfigTsConn]; present {
-		t.Error("a fog operator was given the platform DSN")
-	}
-}
-
-func TestACloudPipelineWithoutAConfiguredDSNIsRefused(t *testing.T) {
-	f := &FlowEngine{timescaleConnection: ""}
-	operators := []pipe.Operator{{Id: "op-1", DeploymentType: "cloud"}}
-
-	err := f.setPlatformOperatorConfig(operators)
-	if err == nil {
-		t.Fatal("deployment allowed with no timescale_connection configured")
-	}
-	if !strings.Contains(err.Error(), "timescale_connection") {
-		t.Errorf("error = %q, want it to name the setting", err)
-	}
-}
-
-// A fog-only pipeline needs no DSN, so it must not be blocked by one being unset.
-func TestAFogOnlyPipelineNeedsNoDSN(t *testing.T) {
-	f := &FlowEngine{timescaleConnection: ""}
-	operators := []pipe.Operator{{Id: "op-1", DeploymentType: "local"}}
-
-	if err := f.setPlatformOperatorConfig(operators); err != nil {
-		t.Errorf("setPlatformOperatorConfig: %v, want a fog-only pipeline to deploy", err)
+		t.Error("a fog operator was given a DSN")
 	}
 }

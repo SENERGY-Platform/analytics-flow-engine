@@ -47,10 +47,6 @@ type FlowEngine struct {
 	kafak2mqttService    Kafka2MqttApiService
 	deviceManagerService DeviceManagerService
 	pipelineService      PipelineApiService
-	// timescaleConnection is handed to every cloud operator as ts_conn. Held here
-	// rather than in the drivers because both of them build the same operator
-	// config, and a fog operator must not receive it at all.
-	timescaleConnection string
 	// exportLister looks up the exports of imports. Nil when no analytics-serving
 	// endpoint is configured; operators then read imports from Kafka.
 	exportLister exports.Lister
@@ -63,7 +59,6 @@ func NewFlowEngine(
 	kafak2mqttService Kafka2MqttApiService,
 	deviceManagerService DeviceManagerService,
 	pipelineService PipelineApiService,
-	timescaleConnection string,
 	exportLister exports.Lister) *FlowEngine {
 	f := &FlowEngine{
 		driver:               driver,
@@ -72,7 +67,6 @@ func NewFlowEngine(
 		kafak2mqttService:    kafak2mqttService,
 		deviceManagerService: deviceManagerService,
 		pipelineService:      pipelineService,
-		timescaleConnection:  timescaleConnection,
 		exportLister:         exportLister,
 	}
 	err := f.syncPipelines()
@@ -324,9 +318,7 @@ func (f *FlowEngine) setupPipeline(ctx context.Context, pipelineRequest lib.Pipe
 		return nil, lib.NewForbiddenError(fmt.Errorf("checkAccess failed: %w", err))
 	}
 
-	if err = f.setPlatformOperatorConfig(pipeline.Operators); err != nil {
-		return nil, err
-	}
+	f.setPlatformOperatorConfig(pipeline.Operators)
 
 	if err = f.setImportExports(ctx, pipeline.Operators, token); err != nil {
 		return nil, err
@@ -335,37 +327,20 @@ func (f *FlowEngine) setupPipeline(ctx context.Context, pipelineRequest lib.Pipe
 	return pipeline, nil
 }
 
-// setPlatformOperatorConfig writes the config values the platform owns into
-// every cloud operator, overwriting whatever the flow carried.
+// setPlatformOperatorConfig removes from every cloud operator the config keys only
+// the platform may set. A cloud operator gets its DSN as TS_CONN from a Secret (see
+// the Kubernetes driver), and a ts_conn out of the user's node config would point it
+// at a database this deployment never chose.
 //
-// After the caller's own config rather than before it: the flow's node config is
-// the user's, and a ts_conn out of it would point an operator at a database this
-// deployment never chose.
-//
-// Fog operators are skipped deliberately. They run on hardware the platform does
-// not own, and the DSN is a platform credential; an operator there that wants
-// history fails naming ts_conn, which is the truthful outcome since it could not
-// reach the database anyway.
-func (f *FlowEngine) setPlatformOperatorConfig(operators []pipe.Operator) error {
+// Fog operators are left alone: they run on hardware the platform does not own and
+// get no platform DSN either way.
+func (f *FlowEngine) setPlatformOperatorConfig(operators []pipe.Operator) {
 	for i := range operators {
 		if operators[i].DeploymentType == deploymentLocationLib.Local {
 			continue
 		}
-		// Only reachable when a deployment blanks the setting deliberately: it has a
-		// default. Refused anyway, because an operator started without a ts_conn does
-		// not fail until it reads history, by which time the failure is a traceback in
-		// a container log rather than a refused deployment.
-		if f.timescaleConnection == "" {
-			return lib.NewInternalError(errors.New(
-				"engine - timescale_connection is set to an empty value, so a cloud operator " +
-					"would start without a ts_conn and fail when it reads history"))
-		}
-		if operators[i].Config == nil {
-			operators[i].Config = map[string]string{}
-		}
-		operators[i].Config[OperatorConfigTsConn] = f.timescaleConnection
+		delete(operators[i].Config, OperatorConfigTsConn)
 	}
-	return nil
 }
 
 // checkTopicAccess authorizes what the operators are about to read.

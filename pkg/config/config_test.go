@@ -24,33 +24,99 @@ import (
 	"testing"
 )
 
-// The DSN carries a password, so it must come from the deployment and never from
-// a value compiled into a public repository.
-func TestTheTimescaleConnectionHasNoDefault(t *testing.T) {
-	cfg, err := New("")
-	if err != nil {
-		t.Fatalf("New: %v", err)
+// withOperatorTimescaleSecret sets the one setting New refuses to start without, so
+// a test about something else is not failed by it.
+func withOperatorTimescaleSecret(t *testing.T) {
+	t.Helper()
+	t.Setenv("OPERATOR_TIMESCALE_SECRET_NAME", "operator-timescale")
+}
+
+// Without the Secret's name every cloud operator would start without a DSN, so the
+// engine fails closed at startup instead of per pipeline.
+func TestTheEngineRefusesToStartWithoutAnOperatorTimescaleSecretName(t *testing.T) {
+	t.Setenv("OPERATOR_TIMESCALE_SECRET_NAME", "")
+
+	_, err := New("")
+	if err == nil {
+		t.Fatal("New accepted an empty operator_timescale_secret_name")
 	}
-	if cfg.TimescaleConnection.Value() != "" {
-		t.Error("timescale_connection has a compiled-in default, want it empty")
+	if !strings.Contains(err.Error(), "OPERATOR_TIMESCALE_SECRET_NAME") {
+		t.Errorf("error = %q, want it to name the setting", err)
 	}
 }
 
-func TestTheTimescaleConnectionIsOverridableFromTheEnvironment(t *testing.T) {
-	t.Setenv("TIMESCALE_CONNECTION", "postgresql://ops@timescale.example.org/db")
+func TestOperatorTimescaleSecretKeyDefaultsToTsConn(t *testing.T) {
+	withOperatorTimescaleSecret(t)
 
 	cfg, err := New("")
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if cfg.TimescaleConnection.Value() != "postgresql://ops@timescale.example.org/db" {
-		t.Errorf("timescale_connection = %q, want the environment's value; a deployment "+
-			"whose timescale is elsewhere could not be configured otherwise",
-			cfg.TimescaleConnection.Value())
+	if cfg.OperatorTimescaleSecretKey != "TS_CONN" {
+		t.Errorf("operator_timescale_secret_key = %q, want TS_CONN", cfg.OperatorTimescaleSecretKey)
+	}
+}
+
+func TestOperatorTimescaleSecretIsReadFromTheEnvironment(t *testing.T) {
+	t.Setenv("OPERATOR_TIMESCALE_SECRET_NAME", "analytics-timescale")
+	t.Setenv("OPERATOR_TIMESCALE_SECRET_KEY", "dsn")
+
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if cfg.OperatorTimescaleSecretName != "analytics-timescale" || cfg.OperatorTimescaleSecretKey != "dsn" {
+		t.Errorf("secret = %q/%q, want analytics-timescale/dsn",
+			cfg.OperatorTimescaleSecretName, cfg.OperatorTimescaleSecretKey)
+	}
+}
+
+// The API server would reject these per pipeline start; the engine rejects them once,
+// at startup.
+func TestAnInvalidOperatorTimescaleSecretFailsTheStart(t *testing.T) {
+	for _, c := range []struct{ name, key string }{
+		{"Timescale_DSN", "TS_CONN"},
+		{" operator-timescale", "TS_CONN"},
+		{"operator-timescale", "TS CONN"},
+		{"operator-timescale", ".."},
+		{"operator-timescale", ""},
+	} {
+		path := filepath.Join(t.TempDir(), "config.json")
+		file, _ := json.Marshal(map[string]string{
+			"operator_timescale_secret_name": c.name,
+			"operator_timescale_secret_key":  c.key,
+		})
+		if err := os.WriteFile(path, file, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := New(path); err == nil {
+			t.Errorf("New accepted secret %q key %q", c.name, c.key)
+		}
+	}
+}
+
+// The DSN itself is no longer the engine's to hold: a leftover TIMESCALE_CONNECTION
+// in a deployment must not be read, and so cannot reach the logged config.
+func TestTheEngineNoLongerReadsTheTimescaleConnection(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+	t.Setenv("TIMESCALE_CONNECTION", "leftover-dsn-from-env")
+
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	b, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "leftover-dsn-from-env") {
+		t.Errorf("config read TIMESCALE_CONNECTION: %s", b)
 	}
 }
 
 func TestOperatorResourcesAreEmptyByDefault(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+
 	cfg, err := New("")
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -61,6 +127,7 @@ func TestOperatorResourcesAreEmptyByDefault(t *testing.T) {
 }
 
 func TestOperatorResourcesAreReadFromTheEnvironment(t *testing.T) {
+	withOperatorTimescaleSecret(t)
 	t.Setenv("OPERATOR_RESOURCES", `{"ghcr.io/senergy-platform/consumption-forecast-operator":{"memory_limit":"2Gi","memory_request":"1Gi"}}`)
 
 	cfg, err := New("")
@@ -74,6 +141,7 @@ func TestOperatorResourcesAreReadFromTheEnvironment(t *testing.T) {
 }
 
 func TestInvalidOperatorResourcesFailTheStart(t *testing.T) {
+	withOperatorTimescaleSecret(t)
 	// A request alone above the default limit of 512Mi.
 	t.Setenv("OPERATOR_RESOURCES", `{"ghcr.io/senergy-platform/consumption-forecast-operator":{"memory_request":"1Gi"}}`)
 
@@ -84,13 +152,9 @@ func TestInvalidOperatorResourcesFailTheStart(t *testing.T) {
 
 // main logs the whole config as JSON, so the credentials must not survive the marshalling.
 func TestConfigJsonHidesCredentials(t *testing.T) {
-	secrets := map[string]string{
-		"BROKER_PASSWORD":      "broker-password-from-env",
-		"TIMESCALE_CONNECTION": "postgresql://ops:timescale-password-from-env@timescale.example.org/db",
-	}
-	for k, v := range secrets {
-		t.Setenv(k, v)
-	}
+	withOperatorTimescaleSecret(t)
+	t.Setenv("BROKER_PASSWORD", "broker-password-from-env")
+
 	cfg, err := New("")
 	if err != nil {
 		t.Fatal(err)
@@ -99,17 +163,15 @@ func TestConfigJsonHidesCredentials(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, secret := range []string{"broker-password-from-env", "timescale-password-from-env"} {
-		if strings.Contains(string(b), secret) {
-			t.Errorf("config JSON contains %q: %s", secret, b)
-		}
+	if strings.Contains(string(b), "broker-password-from-env") {
+		t.Errorf("config JSON contains the broker password: %s", b)
 	}
 }
 
 func TestConfigFileSetsCredentials(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	file := `{"mqtt": {"broker_password": "broker-password-from-file"},
-		"timescale_connection": "postgresql://ops:timescale-password-from-file@timescale.example.org/db"}`
+		"operator_timescale_secret_name": "secret-from-file", "operator_timescale_secret_key": "key-from-file"}`
 	if err := os.WriteFile(path, []byte(file), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -117,11 +179,11 @@ func TestConfigFileSetsCredentials(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := []string{cfg.Mqtt.BrokerPassword.Value(), cfg.TimescaleConnection.Value()}
-	want := []string{"broker-password-from-file", "postgresql://ops:timescale-password-from-file@timescale.example.org/db"}
+	got := []string{cfg.Mqtt.BrokerPassword.Value(), cfg.OperatorTimescaleSecretName, cfg.OperatorTimescaleSecretKey}
+	want := []string{"broker-password-from-file", "secret-from-file", "key-from-file"}
 	for i := range want {
 		if got[i] != want[i] {
-			t.Errorf("credential %d from file = %q, want %q", i, got[i], want[i])
+			t.Errorf("setting %d from file = %q, want %q", i, got[i], want[i])
 		}
 	}
 }

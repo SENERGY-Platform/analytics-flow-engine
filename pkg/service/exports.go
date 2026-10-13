@@ -31,16 +31,16 @@ import (
 // setImportExports names, in every cloud operator, the export the history of each
 // of its import inputs is read from. See package exports for the rule.
 //
-// Like ts_conn, the value is the platform's: it names a table the operator reads
-// over a shared database credential, so a user's node config must not be able to
-// carry it. A key already in the flow's config is therefore replaced when an export
+// Like the timescale DSN, the value is the platform's: it names a table the operator
+// reads over a shared database credential, so a user's node config must not be able
+// to carry it. A key already in the flow's config is therefore replaced when an export
 // resolves and removed when none does, and removed as well when no analytics-serving
 // endpoint is configured.
 //
-// Fog operators get no export, as in setPlatformOperatorConfig: they have no ts_conn
-// to read the table through. A user-supplied key is still removed there, because
+// Fog operators get no export: as in setPlatformOperatorConfig, they get no timescale
+// DSN to read the table through. A user-supplied key is still removed there, because
 // Operator Lib does read it: an import input with an entry and no reader configured
-// fails naming ts_conn instead of falling back to Kafka.
+// fails for want of a DSN instead of falling back to Kafka.
 //
 // Errors refuse the deployment, never fall back to Kafka. An ambiguous import is the
 // requester's to resolve (an input error); a failing listing or permission service

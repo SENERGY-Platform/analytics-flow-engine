@@ -63,7 +63,10 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 		return nil, fmt.Errorf("failed to set up OpenTelemetry: %w", err)
 	}
 
-	driver, err := kubernetes_api.NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, cfg.Debug)
+	driver, err := kubernetes_api.NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, kubernetes_api.TimescaleSecret{
+		Name: cfg.OperatorTimescaleSecretName,
+		Key:  cfg.OperatorTimescaleSecretKey,
+	}, cfg.Debug)
 	if err != nil {
 		util.Logger.ErrorContext(ctx, "Error creating driver", "error", err)
 		return
@@ -84,7 +87,7 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 	} else {
 		util.Logger.InfoContext(ctx, "import exports: analytics_serving_api_endpoint is empty, operators read imports from Kafka")
 	}
-	flowEngine := service.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService, cfg.TimescaleConnection.Value(), exportLister)
+	flowEngine := service.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService, exportLister)
 
 	port := strconv.FormatInt(int64(cfg.ServerPort), 10)
 	util.Logger.InfoContext(ctx, "Starting api server at port "+port)
