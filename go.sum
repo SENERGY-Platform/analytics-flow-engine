@@ -14,8 +14,8 @@ github.com/SENERGY-Platform/analytics-pipeline v0.3.0 h1:JYyKi/fgx9+ArkuivoQlw0N
 github.com/SENERGY-Platform/analytics-pipeline v0.3.0/go.mod h1:PtC4tJOfXiR4Jv6WuWRW/4DFUjHxQ0mV8Ed+eBk9lwk=
 github.com/SENERGY-Platform/developer-notifications v0.0.5 h1:x66XZgLxiwzWTaUXE9xcWI2zlW9reS6Moizc93nuQSs=
 github.com/SENERGY-Platform/developer-notifications v0.0.5/go.mod h1:4zJM5bicd+k3cijxUz81U63dyRqtBWQpHAkcXb2KWSw=
-github.com/SENERGY-Platform/gin-middleware v0.14.1 h1:o2le7do9++e377ixtnFXbobAJP5CSMQXW7d1dUSAwFU=
-github.com/SENERGY-Platform/gin-middleware v0.14.1/go.mod h1:+9dhC08w9tpnjnFC8gYO0+0Po5TKfeUGt+5a1jUVfqI=
+github.com/SENERGY-Platform/gin-middleware v0.14.2 h1:SqCuJIZRmewAI2zxZp4KJV8i7swlDF01PX/1qtFK4Mw=
+github.com/SENERGY-Platform/gin-middleware v0.14.2/go.mod h1:FI8SZIBuCjq6xXm+So/sXZIThRVB0+o0R2uyDFTNy4o=
 github.com/SENERGY-Platform/go-env-loader v0.5.3 h1:sNM/psxYBs3DeDCw8P8gWM2hvySijwy9t2DdSGdhF1c=
 github.com/SENERGY-Platform/go-env-loader v0.5.3/go.mod h1:vdEOp4x1VIzmCR+5u/4/GmO8bUOkYsP6NQaLy/46AVE=
 github.com/SENERGY-Platform/go-service-base/config-hdl v1.2.0 h1:OST21YZ0/Or10Ey2woQbaN5OVJHr+2Ix84pCygx5S3o=
