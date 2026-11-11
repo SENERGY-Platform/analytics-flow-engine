@@ -121,6 +121,9 @@ func (p *PipelineApi) DeletePipeline(ctx context.Context, id string, userId stri
 	if err != nil {
 		return fmt.Errorf("pipeline API - could not delete pipeline from pipeline registry: %w", err)
 	}
+	if response.StatusCode == http.StatusNotFound {
+		return lib.NewNotFoundError(fmt.Errorf("could not find pipeline %s", id))
+	}
 	if response.StatusCode != http.StatusOK {
 		return errors.New("pipeline API - could not delete pipeline from pipeline registry: " +
 			strconv.Itoa(response.StatusCode) + " " + response.Text())

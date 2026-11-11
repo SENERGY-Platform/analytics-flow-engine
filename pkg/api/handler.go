@@ -163,7 +163,7 @@ func deletePipeline(flowEngine service.FlowEngine) (string, string, gin.HandlerF
 		id := c.Param("id")
 		err := flowEngine.DeletePipeline(c.Request.Context(), id, c.GetString(UserIdKey), c.GetHeader("Authorization"))
 		if err != nil {
-			util.Logger.ErrorContext(c.Request.Context(), "could not delete pipeline", "error", err, "method", "DELETE", "path", PipelineIdPath)
+			util.Logger.Log(c.Request.Context(), errorLevel(err), "could not delete pipeline", "error", err, "method", "DELETE", "path", PipelineIdPath)
 			_ = c.Error(handleError(err))
 			return
 		}
