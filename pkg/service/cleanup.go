@@ -29,6 +29,7 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	kubernetes_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kubernetes-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
+	operatorLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/operator"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 )
 
@@ -103,6 +104,13 @@ var internalTopic = regexp.MustCompile(`^analytics-([0-9a-f]{8}-[0-9a-f]{4}-[0-9
 
 const (
 	defaultTopicInterval = time.Second
+	// orphansWithoutShareCheck is how many orphaned pipeline ids are reported without
+	// comparing them to maxOrphanShare, so a small cleanup always works.
+	orphansWithoutShareCheck = 5
+	// defaultListTimeout bounds the listing of the cluster, the registry and the topics.
+	// The callers' contexts are not cancelled by the client, and a delete holds the
+	// pipeline lock while it lists.
+	defaultListTimeout = time.Minute
 	// maxJobErrors bounds the errors a job keeps for its status; the log has all.
 	maxJobErrors = 100
 )
@@ -114,10 +122,17 @@ type Cleanup struct {
 	registry PipelineApiService
 	locks    *pipelineLocks
 	minAge   time.Duration
-	now      func() time.Time
+	// maxOrphanShare is the largest share of the cluster's pipeline ids that may be
+	// orphaned before the registry is taken for incomplete.
+	maxOrphanShare float64
+	now            func() time.Time
 	// topicInterval is the pause between two deletes of a topic job.
 	topicInterval time.Duration
-	job           topicJob
+	// topicRecheckInterval is the longest a topic job deletes on one check of which
+	// topics are in use.
+	topicRecheckInterval time.Duration
+	listTimeout          time.Duration
+	job                  topicJob
 }
 
 type topicJob struct {
@@ -134,15 +149,19 @@ type topicJob struct {
 
 // NewCleanup shares the engine's registry client and per-pipeline locks, so a delete
 // here waits for an update or delete of the same pipeline.
-func NewCleanup(engine *FlowEngine, cluster ClusterInventory, topics TopicAdmin, minAge time.Duration) *Cleanup {
+func NewCleanup(engine *FlowEngine, cluster ClusterInventory, topics TopicAdmin, minAge time.Duration, maxOrphanShare float64) *Cleanup {
 	return &Cleanup{
-		cluster:       cluster,
-		topics:        topics,
-		registry:      engine.pipelineService,
-		locks:         engine.locks,
-		minAge:        minAge,
-		now:           time.Now,
-		topicInterval: defaultTopicInterval,
+		cluster:        cluster,
+		topics:         topics,
+		registry:       engine.pipelineService,
+		locks:          engine.locks,
+		minAge:         minAge,
+		maxOrphanShare: maxOrphanShare,
+		now:            time.Now,
+		topicInterval:  defaultTopicInterval,
+		listTimeout:    defaultListTimeout,
+		// One check per topic would cost a registry and a cluster listing every second.
+		topicRecheckInterval: 30 * time.Second,
 	}
 }
 
@@ -216,11 +235,13 @@ func (c *Cleanup) deleteOrphan(ctx context.Context, orphan OrphanPipeline) error
 // orphanPipelines lists the cluster before the registry: a pipeline registered in
 // between is then at worst missing from the cluster listing, never taken for an orphan.
 func (c *Cleanup) orphanPipelines(ctx context.Context) ([]OrphanPipeline, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.listTimeout)
+	defer cancel()
 	inv, err := c.cluster.Inventory(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list the pipelines namespace: %w", err)
 	}
-	registered, err := c.registeredPipelines(ctx, len(inv.Deployments))
+	registered, err := c.registeredPipelines(ctx, inv)
 	if err != nil {
 		return nil, err
 	}
@@ -231,6 +252,12 @@ func (c *Cleanup) orphanPipelines(ctx context.Context) ([]OrphanPipeline, error)
 
 	byId := groupByPipeline(inv)
 	_, orphaned := diffPipelineIds(registeredIds, slices.Sorted(maps.Keys(byId)))
+	// Counted before the age filter: a registry missing entries also misses young ones.
+	if n := len(orphaned); n > orphansWithoutShareCheck && float64(n)/float64(len(byId)) > c.maxOrphanShare {
+		return nil, &RegistryUnavailableError{Reason: fmt.Sprintf(
+			"%d of the %d pipelines in the cluster have no registry entry, more than the share of %v that cleanup_max_orphan_share allows; "+
+				"the registry is taken to be incomplete, nothing is reported", n, len(byId), c.maxOrphanShare)}
+	}
 	now := c.now()
 	orphans := []OrphanPipeline{}
 	for _, id := range orphaned {
@@ -245,16 +272,20 @@ func (c *Cleanup) orphanPipelines(ctx context.Context) ([]OrphanPipeline, error)
 	return orphans, nil
 }
 
-// registeredPipelines reads the registry. An empty answer while the cluster runs
-// deployments is taken for a broken registry, not for every pipeline being orphaned.
-func (c *Cleanup) registeredPipelines(ctx context.Context, deployments int) ([]pipe.Pipeline, error) {
+// registeredPipelines reads the registry. An empty answer while the cluster holds any
+// deployment or pipeline object is taken for a broken registry, not for every pipeline
+// being orphaned.
+func (c *Cleanup) registeredPipelines(ctx context.Context, inv kubernetes_api.Inventory) ([]pipe.Pipeline, error) {
 	pipelines, err := c.registry.GetPipelinesAdmin(ctx)
 	if err != nil {
 		return nil, &RegistryUnavailableError{Reason: "the pipeline registry could not be read, nothing is reported", cause: err}
 	}
-	if len(pipelines) == 0 && deployments > 0 {
-		return nil, &RegistryUnavailableError{Reason: fmt.Sprintf(
-			"the pipeline registry returned no pipelines while the cluster runs %d deployments, nothing is reported", deployments)}
+	if len(pipelines) == 0 {
+		if ids := len(groupByPipeline(inv)); ids > 0 || len(inv.Deployments) > 0 {
+			return nil, &RegistryUnavailableError{Reason: fmt.Sprintf(
+				"the pipeline registry returned no pipelines while the cluster holds %d deployments and objects of %d pipelines, nothing is reported",
+				len(inv.Deployments), ids)}
+		}
 	}
 	return pipelines, nil
 }
@@ -338,42 +369,82 @@ func (c *Cleanup) DeleteOrphanTopic(ctx context.Context, topic string) error {
 // orphanTopics lists the topics before the cluster and the registry, so a topic that
 // appears in between is not in the listing to be judged.
 func (c *Cleanup) orphanTopics(ctx context.Context) ([]string, error) {
+	orphans, _, err := c.orphanTopicsAndUse(ctx)
+	return orphans, err
+}
+
+func (c *Cleanup) orphanTopicsAndUse(ctx context.Context) ([]string, topicUse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.listTimeout)
+	defer cancel()
 	topics, err := c.topics.ListTopics(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list topics: %w", err)
+		return nil, topicUse{}, fmt.Errorf("list topics: %w", err)
 	}
-	inv, err := c.cluster.Inventory(ctx)
+	use, err := c.topicsInUse(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list the pipelines namespace: %w", err)
-	}
-	registered, err := c.registeredPipelines(ctx, len(inv.Deployments))
-	if err != nil {
-		return nil, err
-	}
-	inUse := map[string]bool{}
-	for _, p := range registered {
-		for _, op := range p.Operators {
-			inUse[op.ApplicationId.String()] = true
-		}
-	}
-	for _, d := range inv.Deployments {
-		for _, id := range d.ApplicationIds {
-			inUse[id] = true
-		}
+		return nil, topicUse{}, err
 	}
 	orphans := []string{}
 	for _, topic := range topics {
-		if m := internalTopic.FindStringSubmatch(topic); m != nil && !inUse[m[1]] {
+		if use.orphaned(topic) {
 			orphans = append(orphans, topic)
 		}
 	}
 	slices.Sort(orphans)
-	return orphans, nil
+	return orphans, use, nil
+}
+
+// topicsInUse lists the cluster before the registry, as orphanPipelines does.
+func (c *Cleanup) topicsInUse(ctx context.Context) (topicUse, error) {
+	inv, err := c.cluster.Inventory(ctx)
+	if err != nil {
+		return topicUse{}, fmt.Errorf("list the pipelines namespace: %w", err)
+	}
+	registered, err := c.registeredPipelines(ctx, inv)
+	if err != nil {
+		return topicUse{}, err
+	}
+	return newTopicUse(registered, inv), nil
+}
+
+// topicUse is what keeps a topic from being orphaned: the application ids of the
+// registered pipelines and of the deployments, and the registered operators' output
+// topics, whose names are user-chosen and may look like internal topics.
+type topicUse struct {
+	applicationIds map[string]bool
+	outputTopics   map[string]bool
+}
+
+func newTopicUse(registered []pipe.Pipeline, inv kubernetes_api.Inventory) topicUse {
+	use := topicUse{applicationIds: map[string]bool{}, outputTopics: map[string]bool{}}
+	for _, p := range registered {
+		for _, op := range p.Operators {
+			use.applicationIds[op.ApplicationId.String()] = true
+			use.outputTopics[operatorLib.GenerateCloudOperatorTopic(op.Name)] = true
+			if op.OutputTopic != "" {
+				use.outputTopics[op.OutputTopic] = true
+			}
+		}
+	}
+	for _, d := range inv.Deployments {
+		for _, id := range d.ApplicationIds {
+			use.applicationIds[id] = true
+		}
+	}
+	return use
+}
+
+func (u topicUse) orphaned(topic string) bool {
+	if u.outputTopics[topic] {
+		return false
+	}
+	m := internalTopic.FindStringSubmatch(topic)
+	return m != nil && !u.applicationIds[m[1]]
 }
 
 // StartTopicJob checks for orphaned topics and deletes them in the background, one per
-// topicInterval. The list is not checked again per topic: an application id that
-// neither the registry nor a deployment holds is never handed out again.
+// topicInterval. Which topics are in use is checked again every topicRecheckInterval,
+// since an update reuses application ids and a new pipeline may take a listed one.
 func (c *Cleanup) StartTopicJob(ctx context.Context) error {
 	j := &c.job
 	j.mu.Lock()
@@ -388,20 +459,23 @@ func (c *Cleanup) StartTopicJob(ctx context.Context) error {
 
 	// The job outlives the request; it keeps the request's trace but not its cancellation.
 	ctx = deploymentContext(ctx)
-	topics, err := c.orphanTopics(ctx)
+	topics, use, err := c.orphanTopicsAndUse(ctx)
 	if err != nil {
 		c.finishTopicJob(done)
 		return err
 	}
+	checked := time.Now()
 	j.mu.Lock()
 	j.total, j.remaining = len(topics), len(topics)
 	j.mu.Unlock()
 	util.Logger.InfoContext(ctx, "started deleting orphaned topics", "total", len(topics))
-	go c.runTopicJob(ctx, topics, stop, done)
+	go c.runTopicJob(ctx, topics, use, checked, stop, done)
 	return nil
 }
 
-func (c *Cleanup) runTopicJob(ctx context.Context, topics []string, stop, done chan struct{}) {
+// runTopicJob deletes topics as long as the last check of use is younger than
+// topicRecheckInterval; checked is a time.Now value, so the age is measured monotonically.
+func (c *Cleanup) runTopicJob(ctx context.Context, topics []string, use topicUse, checked time.Time, stop, done chan struct{}) {
 	defer c.finishTopicJob(done)
 	for i, topic := range topics {
 		if i > 0 {
@@ -410,31 +484,79 @@ func (c *Cleanup) runTopicJob(ctx context.Context, topics []string, stop, done c
 			case <-time.After(c.topicInterval):
 			}
 		}
-		// Checked on its own, so a stop wins over a pause that has also elapsed.
+		if time.Since(checked) >= c.topicRecheckInterval {
+			fresh, err := c.recheckTopicUse(ctx)
+			if err != nil {
+				util.Logger.ErrorContext(ctx, "stopped deleting orphaned topics, could not check again which are in use",
+					"remaining", len(topics)-i, "error", err)
+				c.job.record("stopped, could not check again which topics are in use: " + publicReason(err))
+				return
+			}
+			use, checked = fresh, time.Now()
+		}
+		// Checked on its own, so a stop wins over a pause or a check that has also ended.
 		select {
 		case <-stop:
 			util.Logger.InfoContext(ctx, "stopped deleting orphaned topics", "remaining", len(topics)-i)
 			return
 		default:
 		}
+		if !use.orphaned(topic) {
+			util.Logger.InfoContext(ctx, "skipped orphaned topic, it is in use now", "topic", topic)
+			c.job.handled("skipped, now in use: " + topic)
+			continue
+		}
 		err := c.topics.DeleteTopic(ctx, topic)
 		if err != nil {
 			util.Logger.ErrorContext(ctx, "could not delete orphaned topic", "topic", topic, "error", err)
-		} else {
-			util.Logger.InfoContext(ctx, "deleted orphaned topic", "topic", topic)
+			c.job.handled(err.Error())
+			continue
 		}
-		c.job.mu.Lock()
-		c.job.remaining--
-		if err != nil {
-			if len(c.job.errors) < maxJobErrors {
-				c.job.errors = append(c.job.errors, err.Error())
-			} else {
-				c.job.droppedErrors++
-			}
-		}
-		c.job.mu.Unlock()
+		util.Logger.InfoContext(ctx, "deleted orphaned topic", "topic", topic)
+		c.job.handled("")
 	}
 	util.Logger.InfoContext(ctx, "finished deleting orphaned topics", "total", len(topics))
+}
+
+func (c *Cleanup) recheckTopicUse(ctx context.Context) (topicUse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.listTimeout)
+	defer cancel()
+	return c.topicsInUse(ctx)
+}
+
+// publicReason is the text of err fit for the job status: a registry error's reason
+// without its cause, which stays in the log.
+func publicReason(err error) string {
+	var unavailable *RegistryUnavailableError
+	if errors.As(err, &unavailable) {
+		return unavailable.Reason
+	}
+	return err.Error()
+}
+
+// handled counts one topic as done and keeps msg, if any, for the status.
+func (j *topicJob) handled(msg string) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.remaining--
+	j.recordLocked(msg)
+}
+
+func (j *topicJob) record(msg string) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.recordLocked(msg)
+}
+
+// recordLocked keeps up to maxJobErrors messages and counts the rest; the log has all.
+func (j *topicJob) recordLocked(msg string) {
+	switch {
+	case msg == "":
+	case len(j.errors) < maxJobErrors:
+		j.errors = append(j.errors, msg)
+	default:
+		j.droppedErrors++
+	}
 }
 
 func (c *Cleanup) finishTopicJob(done chan struct{}) {

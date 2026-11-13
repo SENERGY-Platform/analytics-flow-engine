@@ -112,6 +112,8 @@ type adminRegistry struct {
 	log       *callLog
 	pipelines []pipe.Pipeline
 	err       error
+	// hang makes the call wait until ctx ends.
+	hang bool
 }
 
 func (r adminRegistry) GetPipelinesAdmin(ctx context.Context) ([]pipe.Pipeline, error) {
@@ -119,6 +121,10 @@ func (r adminRegistry) GetPipelinesAdmin(ctx context.Context) ([]pipe.Pipeline, 
 		return nil, err
 	}
 	r.log.add("registry")
+	if r.hang {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 	return r.pipelines, r.err
 }
 
@@ -219,7 +225,7 @@ func newCleanupFixture(inv kubernetes_api.Inventory, registered ...string) *clea
 	}
 	engine := engineWith(&recordingDriver{}, &recordingPipelines{})
 	engine.pipelineService = fx.registry
-	fx.cleanup = NewCleanup(engine, fx.cluster, fx.topics, 15*time.Minute)
+	fx.cleanup = NewCleanup(engine, fx.cluster, fx.topics, 15*time.Minute, 0.5)
 	fx.cleanup.now = func() time.Time { return cleanupNow }
 	fx.cleanup.topicInterval = time.Millisecond
 	return fx
@@ -331,11 +337,134 @@ func TestAnEmptyRegistryBesideDeploymentsReportsNoOrphan(t *testing.T) {
 		t.Errorf("deleted %v, want nothing", d)
 	}
 
-	// Without any deployment an empty registry is plausible.
-	volumesOnly := kubernetes_api.Inventory{PVCs: []kubernetes_api.Resource{res("operator-"+volumeOnlyId+"-abcdefgh", time.Hour)}}
-	orphans, err := newCleanupFixture(volumesOnly).cleanup.OrphanPipelines(context.Background())
-	if err != nil || len(orphans) != 1 {
-		t.Errorf("orphans %v, err %v; want the volume", orphans, err)
+}
+
+// A single object of any kind is enough to make an empty registry implausible, for the
+// pipeline and the topic listing alike; only an empty cluster goes with an empty registry.
+func TestAnEmptyRegistryBesideAnyPipelineObjectReportsNothing(t *testing.T) {
+	for name, inv := range map[string]kubernetes_api.Inventory{
+		"foreign deployment": {Deployments: []kubernetes_api.Deployment{dep("nginx", time.Hour)}},
+		"vpa":                {VPAs: []kubernetes_api.Resource{res("pipeline-"+orphanId+"-vpa", time.Hour)}},
+		"checkpoint":         {Checkpoints: []kubernetes_api.Resource{res("pipeline-"+orphanId+"-vpa-op--x", time.Hour)}},
+		"pvc":                {PVCs: []kubernetes_api.Resource{res("operator-"+volumeOnlyId+"-abcdefgh", time.Hour)}},
+	} {
+		fx := newCleanupFixture(inv)
+		fx.topics.topics = []string{"analytics-" + unusedAppId + "-x-changelog"}
+		if orphans, err := fx.cleanup.OrphanPipelines(context.Background()); !errors.As(err, new(*RegistryUnavailableError)) {
+			t.Errorf("%s: pipelines %v, err %v; want RegistryUnavailableError", name, orphans, err)
+		}
+		if topics, err := fx.cleanup.OrphanTopics(context.Background()); !errors.As(err, new(*RegistryUnavailableError)) {
+			t.Errorf("%s: topics %v, err %v; want RegistryUnavailableError", name, topics, err)
+		}
+	}
+
+	fx := newCleanupFixture(kubernetes_api.Inventory{PVCs: []kubernetes_api.Resource{res("data-something-else", time.Hour)}})
+	fx.topics.topics = []string{"analytics-" + unusedAppId + "-x-changelog"}
+	if orphans, err := fx.cleanup.OrphanPipelines(context.Background()); err != nil || len(orphans) != 0 {
+		t.Errorf("empty cluster: pipelines %v, err %v; want none and no error", orphans, err)
+	}
+	if topics, err := fx.cleanup.OrphanTopics(context.Background()); err != nil || len(topics) != 1 {
+		t.Errorf("empty cluster: topics %v, err %v; want the one topic", topics, err)
+	}
+}
+
+// orphanInventory holds total pipelines, each with a deployment, of which the first
+// orphaned are not registered; young of those are younger than the minimum age.
+func orphanInventory(total, orphaned, young int) (kubernetes_api.Inventory, []string) {
+	var inv kubernetes_api.Inventory
+	var registered []string
+	for i := range total {
+		id := fmt.Sprintf("%08d-0000-4000-8000-000000000000", i)
+		age := time.Hour
+		if i < young {
+			age = time.Minute
+		}
+		inv.Deployments = append(inv.Deployments, dep("pipeline-"+id, age))
+		if i >= orphaned {
+			registered = append(registered, id)
+		}
+	}
+	return inv, registered
+}
+
+// Many orphans at once point at a registry that misses entries rather than at that many
+// leftovers; a few are always reported.
+func TestTooLargeAShareOfOrphansReportsNothing(t *testing.T) {
+	for _, tc := range []struct {
+		name                   string
+		total, orphaned, young int
+		refused                bool
+	}{
+		{"six of eight", 8, 6, 0, true},
+		{"young ones count too", 8, 6, 3, true},
+		{"six of eleven", 11, 6, 0, true},
+		{"six of twelve, exactly the share", 12, 6, 0, false},
+		{"five of six, a small cleanup", 6, 5, 0, false},
+	} {
+		inv, registered := orphanInventory(tc.total, tc.orphaned, tc.young)
+		fx := newCleanupFixture(inv, registered...)
+		orphans, err := fx.cleanup.OrphanPipelines(context.Background())
+		var unavailable *RegistryUnavailableError
+		if refused := errors.As(err, &unavailable); refused != tc.refused {
+			t.Errorf("%s: orphans %d, err %v; want refused %v", tc.name, len(orphans), err, tc.refused)
+			continue
+		}
+		if tc.refused {
+			if want := fmt.Sprintf("%d of the %d pipelines", tc.orphaned, tc.total); !strings.Contains(unavailable.Reason, want) {
+				t.Errorf("%s: reason %q does not say %q", tc.name, unavailable.Reason, want)
+			}
+			if err := fx.cleanup.DeleteOrphanPipeline(context.Background(), inv.Deployments[tc.orphaned-1].Name[len("pipeline-"):]); !errors.As(err, new(*RegistryUnavailableError)) {
+				t.Errorf("%s: delete one: err = %v, want RegistryUnavailableError", tc.name, err)
+			}
+			if d := fx.cluster.deletedObjects(); len(d) != 0 {
+				t.Errorf("%s: deleted %v, want nothing", tc.name, d)
+			}
+		} else if len(orphans) != tc.orphaned-tc.young {
+			t.Errorf("%s: orphans %d, want %d", tc.name, len(orphans), tc.orphaned-tc.young)
+		}
+	}
+}
+
+// within fails the test if f does not return in time.
+func within(t *testing.T, f func()) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		f()
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("did not return")
+	}
+}
+
+// A hanging registry must not hold the pipeline lock or leave a job running for good.
+func TestAHangingRegistryEndsTheCallInTime(t *testing.T) {
+	fx := newCleanupFixture(standardInventory(), registeredId)
+	fx.registry.hang = true
+	fx.cleanup.listTimeout = 20 * time.Millisecond
+	within(t, func() {
+		if err := fx.cleanup.DeleteOrphanPipeline(context.Background(), orphanId); !errors.As(err, new(*RegistryUnavailableError)) {
+			t.Errorf("delete one: err = %v, want RegistryUnavailableError", err)
+		}
+	})
+	within(t, func() { fx.cleanup.locks.lock(orphanId)() })
+
+	fx = topicFixture()
+	fx.registry.hang = true
+	fx.cleanup.listTimeout = 20 * time.Millisecond
+	within(t, func() {
+		if err := fx.cleanup.StartTopicJob(context.Background()); !errors.As(err, new(*RegistryUnavailableError)) {
+			t.Errorf("job start: err = %v, want RegistryUnavailableError", err)
+		}
+	})
+	if fx.cleanup.TopicJob().Running {
+		t.Error("the job runs after its listing timed out")
+	}
+	if d := fx.cluster.deletedObjects(); len(d) != 0 {
+		t.Errorf("deleted %v, want nothing", d)
 	}
 }
 
@@ -503,6 +632,34 @@ func TestOrphanTopicsFollowTheRegistryRules(t *testing.T) {
 	}
 }
 
+// Operator names are user-chosen, so an output topic "analytics-<name>" can look like an
+// internal topic of an unused application id.
+func TestARegisteredOutputTopicIsNeverOrphaned(t *testing.T) {
+	const lookalikeId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+	byName := "analytics-" + lookalikeId + "-KSTREAM-x-changelog"
+	byOutputTopic := "analytics-" + lookalikeId + "-y-repartition"
+	fx := topicFixture()
+	fx.registry.pipelines = append(fx.registry.pipelines, pipe.Pipeline{Id: orphanId, Operators: []pipe.Operator{
+		{Name: lookalikeId + "-KSTREAM-x-changelog", ApplicationId: uuid.MustParse(registryAppId)},
+		{Name: "renamed", OutputTopic: byOutputTopic, ApplicationId: uuid.MustParse(registryAppId)},
+	}})
+	fx.topics.topics = append(fx.topics.topics, byName, byOutputTopic, "analytics-"+lookalikeId+"-other-changelog")
+
+	topics, err := fx.cleanup.OrphanTopics(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(topics, byName) || slices.Contains(topics, byOutputTopic) {
+		t.Errorf("orphaned topics %v contain an operator output topic", topics)
+	}
+	if !slices.Contains(topics, "analytics-"+lookalikeId+"-other-changelog") {
+		t.Errorf("orphaned topics %v miss the internal topic of the unused id", topics)
+	}
+	if err := fx.cleanup.DeleteOrphanTopic(context.Background(), byName); !errors.As(err, new(*lib.NotFoundError)) {
+		t.Errorf("delete %s: err = %v, want NotFoundError", byName, err)
+	}
+}
+
 func TestDeleteOrphanTopicChecksAgain(t *testing.T) {
 	fx := topicFixture()
 	inUse := "analytics-" + registryAppId + "-KSTREAM-TOTABLE-STATE-STORE-0000000002-changelog"
@@ -619,6 +776,58 @@ func TestConcurrentStopsOfATopicJob(t *testing.T) {
 	}
 	if fx.cleanup.TopicJob().Running {
 		t.Error("the job still runs")
+	}
+}
+
+// startGatedTopicJob starts a job that checks before every topic and returns while
+// the first delete waits; release lets the job go on.
+func startGatedTopicJob(t *testing.T) (fx *cleanupFixture, release func()) {
+	t.Helper()
+	fx = topicFixture()
+	fx.cleanup.topicRecheckInterval = 0
+	fx.topics.entered, fx.topics.gate = make(chan struct{}, len(fx.topics.topics)), make(chan struct{})
+	if err := fx.cleanup.StartTopicJob(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	<-fx.topics.entered
+	return fx, func() { close(fx.topics.gate) }
+}
+
+// An application id taken while the job runs, by an update reusing it or a new
+// pipeline, protects its topics from the rest of the job.
+func TestATopicJobSkipsTopicsThatCameIntoUse(t *testing.T) {
+	fx, release := startGatedTopicJob(t)
+	fx.registry.pipelines = append(slices.Clone(fx.registry.pipelines),
+		pipe.Pipeline{Id: orphanId, Operators: []pipe.Operator{{ApplicationId: uuid.MustParse(unusedAppId)}}})
+	release()
+
+	job := waitForJob(t, fx.cleanup)
+	if d := fx.topics.deletedTopics(); len(d) != 1 {
+		t.Errorf("deleted %v, want only the one before the id came into use", d)
+	}
+	want := []string{
+		"skipped, now in use: analytics-" + unusedAppId + "-KSTREAM-REPARTITION-0000000005-repartition",
+		"skipped, now in use: analytics-" + unusedAppId + "-KSTREAM-TOTABLE-STATE-STORE-0000000002-changelog",
+	}
+	if job.Total != 3 || job.Remaining != 0 || !slices.Equal(job.Errors, want) {
+		t.Errorf("job = %+v, want 3 of 3 handled with errors %v", job, want)
+	}
+}
+
+// Deleting on an outdated check is what the re-check is there to prevent, so a failed
+// one ends the job.
+func TestATopicJobStopsWhenItCannotCheckAgain(t *testing.T) {
+	fx, release := startGatedTopicJob(t)
+	fx.registry.err = errors.New("registry down")
+	release()
+
+	job := waitForJob(t, fx.cleanup)
+	if d := fx.topics.deletedTopics(); len(d) != 1 {
+		t.Errorf("deleted %v, want only the one before the check failed", d)
+	}
+	if job.Remaining != 2 || len(job.Errors) != 1 || !strings.HasPrefix(job.Errors[0], "stopped, could not check again") ||
+		strings.Contains(job.Errors[0], "registry down") {
+		t.Errorf("job = %+v, want stopped with 2 remaining and the reason without the internal error", job)
 	}
 }
 

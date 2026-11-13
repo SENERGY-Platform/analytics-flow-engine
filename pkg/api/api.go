@@ -152,7 +152,7 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 	for _, route := range setRoutes {
 		util.Logger.DebugContext(ctx, "http route", attributes.MethodKey, route[0], attributes.PathKey, route[1])
 	}
-	cleanup := service.NewCleanup(flowEngine, driver, kafka_api.New(cfg.Kubernetes.KafkaBootstrap), time.Duration(cfg.CleanupMinAge))
+	cleanup := service.NewCleanup(flowEngine, driver, kafka_api.New(cfg.Kubernetes.KafkaBootstrap), time.Duration(cfg.CleanupMinAge), cfg.CleanupMaxOrphanShare)
 	setRoutes, err = setCleanupRoutes(prefix, cleanup)
 	if err != nil {
 		return nil, err

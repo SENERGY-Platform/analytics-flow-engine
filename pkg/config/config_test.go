@@ -324,3 +324,37 @@ func TestANegativeCleanupMinAgeFailsTheStart(t *testing.T) {
 		t.Fatal("New accepted a negative cleanup_min_age")
 	}
 }
+
+func TestCleanupMaxOrphanShareDefaultsToHalf(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if cfg.CleanupMaxOrphanShare != 0.5 {
+		t.Errorf("cleanup_max_orphan_share = %v, want 0.5", cfg.CleanupMaxOrphanShare)
+	}
+}
+
+func TestCleanupMaxOrphanShareIsReadFromTheEnvironment(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+	for value, want := range map[string]float64{"1": 1, "0.25": 0.25, "1e-3": 0.001} {
+		t.Setenv("CLEANUP_MAX_ORPHAN_SHARE", value)
+		cfg, err := New("")
+		if err != nil || cfg.CleanupMaxOrphanShare != want {
+			t.Errorf("%s: share %v, err %v; want %v", value, cfg.CleanupMaxOrphanShare, err, want)
+		}
+	}
+}
+
+// Zero would refuse every larger cleanup, above one never refuses, NaN compares false to
+// everything.
+func TestAnInvalidCleanupMaxOrphanShareFailsTheStart(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+	for _, value := range []string{"0", "-0.5", "1.0000001", "NaN", "+Inf"} {
+		t.Setenv("CLEANUP_MAX_ORPHAN_SHARE", value)
+		if _, err := New(""); err == nil {
+			t.Errorf("New accepted cleanup_max_orphan_share %s", value)
+		}
+	}
+}

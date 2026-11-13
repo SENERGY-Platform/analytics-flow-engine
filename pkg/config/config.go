@@ -92,10 +92,17 @@ type Config struct {
 	// must be before the admin cleanup reports it, so that a pipeline still being set
 	// up is never taken for an orphan.
 	CleanupMinAge sb_config_types.Duration `json:"cleanup_min_age" env_var:"CLEANUP_MIN_AGE"`
+	// CleanupMaxOrphanShare is the largest share of the pipeline ids in the cluster that
+	// may lack a registry entry before the cleanup takes the registry for incomplete and
+	// refuses; it is only applied when more than five pipeline ids are orphaned.
+	CleanupMaxOrphanShare float64 `json:"cleanup_max_orphan_share" env_var:"CLEANUP_MAX_ORPHAN_SHARE"`
 }
 
 // DefaultCleanupMinAge is the default of CleanupMinAge.
 const DefaultCleanupMinAge = 15 * time.Minute
+
+// DefaultCleanupMaxOrphanShare is the default of CleanupMaxOrphanShare.
+const DefaultCleanupMaxOrphanShare = 0.5
 
 func New(path string) (*Config, error) {
 	cfg := Config{
@@ -112,6 +119,7 @@ func New(path string) (*Config, error) {
 		},
 		OperatorTimescaleSecretKey: DefaultOperatorTimescaleSecretKey,
 		CleanupMinAge:              sb_config_types.Duration(DefaultCleanupMinAge),
+		CleanupMaxOrphanShare:      DefaultCleanupMaxOrphanShare,
 		// A fresh slice per call: a config file's array is decoded into this one in place.
 		OperatorTimescaleTrustedImagePrefixes: []string{DefaultOperatorTimescaleTrustedImagePrefix},
 	}
@@ -127,6 +135,10 @@ func New(path string) (*Config, error) {
 	}
 	if err == nil && cfg.CleanupMinAge < 0 {
 		err = fmt.Errorf("cleanup_min_age (CLEANUP_MIN_AGE) is negative: %s", time.Duration(cfg.CleanupMinAge))
+	}
+	// Written as a negation, so NaN, which the environment parser accepts, is refused too.
+	if err == nil && !(cfg.CleanupMaxOrphanShare > 0 && cfg.CleanupMaxOrphanShare <= 1) {
+		err = fmt.Errorf("cleanup_max_orphan_share (CLEANUP_MAX_ORPHAN_SHARE) is %v, want 0 < x <= 1", cfg.CleanupMaxOrphanShare)
 	}
 	return &cfg, err
 }
