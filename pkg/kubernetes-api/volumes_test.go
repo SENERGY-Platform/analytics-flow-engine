@@ -290,3 +290,28 @@ func TestCreateOperatorsSharesOneWaitAcrossItsVolumes(t *testing.T) {
 		t.Errorf("waited %s, want one budget of %s for both claims", elapsed, budget)
 	}
 }
+
+// An update stops the old operators first; a pipeline whose VPA is already gone must
+// still be stoppable, or the update fails after its deployment was deleted.
+func TestDeletingAPipelineWithoutVPASucceeds(t *testing.T) {
+	k, clientset := fakeDriver(&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
+		Name:      "pipeline-" + fakePipelineId,
+		Namespace: fakeNamespace,
+	}})
+	if err := k.DeleteOperators(context.Background(), fakePipelineId, []pipe.Operator{fakeOperator(true)}); err != nil {
+		t.Fatalf("delete with the VPA and the checkpoint missing: %v", err)
+	}
+	if _, err := clientset.AppsV1().Deployments(fakeNamespace).Get(context.Background(), "pipeline-"+fakePipelineId, metav1.GetOptions{}); !k8s_errors.IsNotFound(err) {
+		t.Errorf("deployment still there: %v", err)
+	}
+}
+
+func TestAFailedVolumeDeleteIsReported(t *testing.T) {
+	k, clientset := fakeDriver(existingPVC(false))
+	clientset.PrependReactor("delete", "persistentvolumeclaims", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("storage backend unavailable")
+	})
+	if err := k.DeleteOperators(context.Background(), fakePipelineId, []pipe.Operator{fakeOperator(true)}); err == nil || !strings.Contains(err.Error(), "storage backend unavailable") {
+		t.Fatalf("want the volume delete error, got %v", err)
+	}
+}

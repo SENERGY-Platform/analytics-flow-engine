@@ -422,7 +422,7 @@ func (k *Kubernetes) DeleteOperatorsKeepingVolumes(ctx context.Context, pipeline
 	return k.deleteOperators(ctx, pipelineId, operators, false)
 }
 
-func (k *Kubernetes) deleteOperators(ctx context.Context, pipelineId string, operators []pipe_lib.Operator, deleteVolumes bool) (err error) {
+func (k *Kubernetes) deleteOperators(ctx context.Context, pipelineId string, operators []pipe_lib.Operator, deleteVolumes bool) error {
 	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
 	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(k.r2cfg.NamespaceId)
 	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(k.r2cfg.NamespaceId)
@@ -431,52 +431,41 @@ func (k *Kubernetes) deleteOperators(ctx context.Context, pipelineId string, ope
 	for _, operator := range operators {
 		if operator.PersistData && deleteVolumes {
 			volumeName := getOperatorName(pipelineId, operator)[0]
-			util.Logger.DebugContext(ctx, "deleting volume "+volumeName)
-			err = pvcClient.Delete(ctx, volumeName, metav1.DeleteOptions{})
-			util.Logger.DebugContext(ctx, fmt.Sprintf("deleted volume %s", volumeName))
+			if err := deleteIgnoringNotFound(ctx, "volume", volumeName, pvcClient.Delete(ctx, volumeName, metav1.DeleteOptions{})); err != nil {
+				return err
+			}
 		}
 		autoscalerCheckpointId := getOperatorName(pipelineId, operator)[1] + "-vpa-" + operator.OperatorId + "--" + operator.Id
-		util.Logger.DebugContext(ctx, "try to delete autoscaler checkpoint: "+autoscalerCheckpointId)
-		err = verticalAutoscalerCheckpointClient.Delete(ctx, autoscalerCheckpointId, metav1.DeleteOptions{})
-		if err != nil {
-			if k8s_errors.IsNotFound(err) {
-				util.Logger.DebugContext(ctx, "autoscaler checkpoint not found: "+autoscalerCheckpointId)
-			} else {
-				return
-			}
-		} else {
-			util.Logger.DebugContext(ctx, "deleted autoscaler checkpoint: "+autoscalerCheckpointId)
+		if err := deleteIgnoringNotFound(ctx, "autoscaler checkpoint", autoscalerCheckpointId, verticalAutoscalerCheckpointClient.Delete(ctx, autoscalerCheckpointId, metav1.DeleteOptions{})); err != nil {
+			return err
 		}
 	}
 
-	util.Logger.DebugContext(ctx, "deleting deployment "+pipelineId)
+	deploymentName := getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1]
 	deletePolicy := metav1.DeletePropagationForeground
-
-	err = deploymentsClient.Delete(ctx, getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1], metav1.DeleteOptions{
+	if err := deleteIgnoringNotFound(ctx, "deployment", deploymentName, deploymentsClient.Delete(ctx, deploymentName, metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
-	})
-	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			util.Logger.DebugContext(ctx, "deployment not found: "+getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1])
-		} else {
-			return
-		}
-	} else {
-		util.Logger.DebugContext(ctx, fmt.Sprintf("deleted deployment %s", pipelineId))
+	})); err != nil {
+		return err
 	}
 
-	util.Logger.DebugContext(ctx, "deleting autoscaler "+pipelineId)
-	err = verticalAutoscalerClient.Delete(ctx, getOperatorName(pipelineId, pipe_lib.Operator{Id: DummyOperatorId})[1]+"-vpa", metav1.DeleteOptions{})
-	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			util.Logger.DebugContext(ctx, "autoscaler not found: "+pipelineId)
-		} else {
-			return
-		}
-	} else {
-		util.Logger.DebugContext(ctx, fmt.Sprintf("deleted autoscaler %s", pipelineId))
+	vpaName := deploymentName + "-vpa"
+	return deleteIgnoringNotFound(ctx, "autoscaler", vpaName, verticalAutoscalerClient.Delete(ctx, vpaName, metav1.DeleteOptions{}))
+}
+
+// deleteIgnoringNotFound treats an object that is already gone as deleted, so that a
+// pipeline missing one of its parts can still be stopped and rebuilt.
+func deleteIgnoringNotFound(ctx context.Context, kind string, name string, err error) error {
+	switch {
+	case err == nil:
+		util.Logger.DebugContext(ctx, "deleted "+kind, "name", name)
+		return nil
+	case k8s_errors.IsNotFound(err):
+		util.Logger.DebugContext(ctx, kind+" not found", "name", name)
+		return nil
+	default:
+		return err
 	}
-	return
 }
 
 func (k *Kubernetes) GetPipelineStatus(ctx context.Context, pipelineId string) (pipeStatus lib.PipelineStatus, err error) {

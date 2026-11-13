@@ -162,6 +162,7 @@ func engineWith(driver *recordingDriver, pipelines *recordingPipelines) *FlowEng
 		parsingService:    staticParser{pipeline: oneCloudOperatorFlow()},
 		permissionService: allowAll{},
 		pipelineService:   pipelines,
+		locks:             newPipelineLocks(),
 	}
 }
 

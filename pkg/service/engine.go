@@ -50,6 +50,8 @@ type FlowEngine struct {
 	// exportLister looks up the exports of imports. Nil when no analytics-serving
 	// endpoint is configured; operators then read imports from Kafka.
 	exportLister exports.Lister
+	// locks is shared by every copy of the engine; the router hands each handler one.
+	locks *pipelineLocks
 }
 
 func NewFlowEngine(
@@ -68,6 +70,7 @@ func NewFlowEngine(
 		deviceManagerService: deviceManagerService,
 		pipelineService:      pipelineService,
 		exportLister:         exportLister,
+		locks:                newPipelineLocks(),
 	}
 	err := f.syncPipelines()
 	if err != nil {
@@ -243,6 +246,7 @@ func withPipelineIdInBaggage(ctx context.Context, pipelineId string) context.Con
 func (f *FlowEngine) UpdatePipeline(ctx context.Context, pipelineRequest lib.PipelineRequest, userId string, token string) (pipeline *pipe.Pipeline, err error) {
 	ctx = withPipelineIdInBaggage(deploymentContext(ctx), pipelineRequest.Id)
 	util.Logger.DebugContext(ctx, "engine - update pipeline: "+pipelineRequest.Id)
+	defer f.locks.lock(pipelineRequest.Id)()
 	oldPipeline, err := f.pipelineService.GetPipeline(ctx, pipelineRequest.Id, userId, token)
 	if err != nil {
 		return
@@ -371,6 +375,7 @@ func (f *FlowEngine) checkTopicAccess(ctx context.Context, operators []pipe.Oper
 func (f *FlowEngine) DeletePipeline(ctx context.Context, id string, userId string, token string) (err error) {
 	ctx = withPipelineIdInBaggage(deploymentContext(ctx), id)
 	util.Logger.DebugContext(ctx, "engine - delete pipeline: "+id)
+	defer f.locks.lock(id)()
 	pipeline, err := f.pipelineService.GetPipeline(ctx, id, userId, token)
 	if err != nil {
 		return
