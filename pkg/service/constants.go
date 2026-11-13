@@ -16,7 +16,7 @@
 
 package service
 
-import "github.com/SENERGY-Platform/analytics-flow-engine/lib"
+import "github.com/SENERGY-Platform/analytics-flow-engine/pkg/deployment"
 
 // The permission resource names and the deployed filter-type spellings both live
 // in lib/access now, because the Operator Development Environment applies the
@@ -24,4 +24,4 @@ import "github.com/SENERGY-Platform/analytics-flow-engine/lib"
 
 // OperatorConfigTsConn is the key Operator Lib reads a timescale DSN from, in
 // operator_lib/util/model.py. A wire contract, not an internal name.
-const OperatorConfigTsConn = lib.OperatorConfigTsConn
+const OperatorConfigTsConn = deployment.OperatorConfigTsConn

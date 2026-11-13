@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/deployment"
 	"maps"
 	"slices"
 	"strconv"
@@ -34,7 +35,7 @@ import (
 type Kubernetes struct {
 	clientset           kubernetes.Interface
 	autoscalerClientset autoscaler.Interface
-	r2cfg               *config.Rancher2Config
+	kubeCfg             *config.KubernetesConfig
 	operatorResources   map[string]config.OperatorResource
 	timescaleSecret     TimescaleSecret
 	// pvcWait bounds how long one CreateOperators call, across all its operators,
@@ -96,18 +97,18 @@ func clientsFor(restConfig *rest.Config) (kubernetes.Interface, autoscaler.Inter
 }
 
 // New is the driver on the given clients. It makes no call to the cluster.
-func New(clientset kubernetes.Interface, autoscalerClientset autoscaler.Interface, r2cfg *config.Rancher2Config, operatorResources map[string]config.OperatorResource, timescaleSecret TimescaleSecret) *Kubernetes {
-	return &Kubernetes{clientset: clientset, autoscalerClientset: autoscalerClientset, r2cfg: r2cfg, operatorResources: operatorResources, timescaleSecret: timescaleSecret, pvcWait: defaultPVCWait}
+func New(clientset kubernetes.Interface, autoscalerClientset autoscaler.Interface, kubeCfg *config.KubernetesConfig, operatorResources map[string]config.OperatorResource, timescaleSecret TimescaleSecret) *Kubernetes {
+	return &Kubernetes{clientset: clientset, autoscalerClientset: autoscalerClientset, kubeCfg: kubeCfg, operatorResources: operatorResources, timescaleSecret: timescaleSecret, pvcWait: defaultPVCWait}
 }
 
 // NewKubernetes builds the clients, the driver on them, and checks that the pipelines
 // namespace can be read.
-func NewKubernetes(ctx context.Context, kubeconfig string, r2cfg *config.Rancher2Config, operatorResources map[string]config.OperatorResource, timescaleSecret TimescaleSecret) (*Kubernetes, error) {
+func NewKubernetes(ctx context.Context, kubeconfig string, kubeCfg *config.KubernetesConfig, operatorResources map[string]config.OperatorResource, timescaleSecret TimescaleSecret) (*Kubernetes, error) {
 	clientset, autoscalerClientset, err := NewClients(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
-	k := New(clientset, autoscalerClientset, r2cfg, operatorResources, timescaleSecret)
+	k := New(clientset, autoscalerClientset, kubeCfg, operatorResources, timescaleSecret)
 	if err = k.CheckConnection(ctx); err != nil {
 		return nil, err
 	}
@@ -116,7 +117,7 @@ func NewKubernetes(ctx context.Context, kubeconfig string, r2cfg *config.Rancher
 
 // CheckConnection lists the pods of the pipelines namespace.
 func (k *Kubernetes) CheckConnection(ctx context.Context) error {
-	pods, err := k.clientset.CoreV1().Pods(k.r2cfg.NamespaceId).List(ctx, metav1.ListOptions{})
+	pods, err := k.clientset.CoreV1().Pods(k.kubeCfg.NamespaceId).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -124,7 +125,7 @@ func (k *Kubernetes) CheckConnection(ctx context.Context) error {
 	return nil
 }
 
-func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inputs []pipe_lib.Operator, pipeConfig lib.PipelineConfig) (err error) {
+func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inputs []pipe_lib.Operator, pipeConfig deployment.PipelineConfig) (err error) {
 	var containers []apiv1.Container
 	var volumes []apiv1.Volume
 	metricsBasePort := 8080
@@ -246,7 +247,7 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 	vpa := newVPA(pipelineId)
 
 	util.Logger.DebugContext(ctx, "creating autoscaler")
-	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(k.r2cfg.NamespaceId)
+	verticalAutoscalerClient := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(k.kubeCfg.NamespaceId)
 	vpaResult, err := verticalAutoscalerClient.Create(ctx, vpa, metav1.CreateOptions{})
 	if err != nil {
 		return
@@ -279,7 +280,7 @@ var ErrDeploymentStillTerminating = errors.New("deployment still terminating")
 // pods are. It takes its wait from the budget the volumes use, since both wait for the
 // same pods.
 func (k *Kubernetes) createDeployment(ctx context.Context, vw *volumeWait, deployment *appsv1.Deployment) error {
-	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
+	deploymentsClient := k.clientset.AppsV1().Deployments(k.kubeCfg.NamespaceId)
 	logged := false
 	for {
 		_, err := deploymentsClient.Create(ctx, deployment, metav1.CreateOptions{})
@@ -341,7 +342,7 @@ func (k *Kubernetes) newVolumeWait(ctx context.Context) (*volumeWait, context.Ca
 // terminating one to be gone first, since a claim created over it would vanish with it.
 // created is false for a reused claim.
 func (k *Kubernetes) ensurePVC(ctx context.Context, vw *volumeWait, pvc *apiv1.PersistentVolumeClaim) (created bool, err error) {
-	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(k.r2cfg.NamespaceId)
+	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(k.kubeCfg.NamespaceId)
 	logged := false
 	for {
 		_, err = pvcClient.Create(vw.ctx, pvc, metav1.CreateOptions{})
@@ -381,13 +382,13 @@ func (k *Kubernetes) ensurePVC(ctx context.Context, vw *volumeWait, pvc *apiv1.P
 // this call, and err with the claim name otherwise.
 func (vw *volumeWait) error(name string, err error) error {
 	if vw.waited && errors.Is(vw.ctx.Err(), context.DeadlineExceeded) {
-		return fmt.Errorf("%w: %s after %s", lib.ErrVolumeStillTerminating, name, vw.w.timeout)
+		return fmt.Errorf("%w: %s after %s", deployment.ErrVolumeStillTerminating, name, vw.w.timeout)
 	}
 	return fmt.Errorf("volume %s: %w", name, err)
 }
 
 // operatorEnv is the environment of an operator container.
-func (k *Kubernetes) operatorEnv(pipelineId string, operator pipe_lib.Operator, pipeConfig lib.PipelineConfig, metricsPort int) ([]apiv1.EnvVar, error) {
+func (k *Kubernetes) operatorEnv(pipelineId string, operator pipe_lib.Operator, pipeConfig deployment.PipelineConfig, metricsPort int) ([]apiv1.EnvVar, error) {
 	requestConfig, err := operatorRequestConfig(operator)
 	if err != nil {
 		return nil, fmt.Errorf("config of operator %s: %w", operator.Id, err)
@@ -395,11 +396,11 @@ func (k *Kubernetes) operatorEnv(pipelineId string, operator pipe_lib.Operator, 
 	envs := []apiv1.EnvVar{
 		{
 			Name:  "ZK_QUORUM",
-			Value: k.r2cfg.Zookeeper,
+			Value: k.kubeCfg.Zookeeper,
 		},
 		{
 			Name:  "CONFIG_BOOTSTRAP_SERVERS",
-			Value: k.r2cfg.KafkaBootstrap,
+			Value: k.kubeCfg.KafkaBootstrap,
 		},
 		{
 			Name:  ApplicationIdEnvVar,
@@ -487,11 +488,11 @@ func (k *Kubernetes) trustedImage(image string) bool {
 // sync, rollback of an update) carries the config stored before the DSN moved.
 func operatorRequestConfig(operator pipe_lib.Operator) ([]byte, error) {
 	cfg := operator.Config
-	if _, ok := cfg[lib.OperatorConfigTsConn]; ok {
+	if _, ok := cfg[deployment.OperatorConfigTsConn]; ok {
 		cfg = maps.Clone(cfg)
-		delete(cfg, lib.OperatorConfigTsConn)
+		delete(cfg, deployment.OperatorConfigTsConn)
 	}
-	return json.Marshal(lib.OperatorRequestConfig{Config: cfg, InputTopics: operator.InputTopics})
+	return json.Marshal(deployment.OperatorRequestConfig{Config: cfg, InputTopics: operator.InputTopics})
 }
 
 // DeleteOperators deletes the deployment of the pipeline, its autoscaler and checkpoints,
@@ -534,7 +535,7 @@ func (k *Kubernetes) DeleteDeployment(ctx context.Context, name string) error {
 		return errEmptyName
 	}
 	policy := metav1.DeletePropagationForeground
-	err := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId).Delete(ctx, name, metav1.DeleteOptions{PropagationPolicy: &policy})
+	err := k.clientset.AppsV1().Deployments(k.kubeCfg.NamespaceId).Delete(ctx, name, metav1.DeleteOptions{PropagationPolicy: &policy})
 	return deleted(ctx, "deployment", name, err)
 }
 
@@ -544,7 +545,7 @@ func (k *Kubernetes) DeleteVPA(ctx context.Context, name string) error {
 	if name == "" {
 		return errEmptyName
 	}
-	err := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(k.r2cfg.NamespaceId).Delete(ctx, name, metav1.DeleteOptions{})
+	err := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalers(k.kubeCfg.NamespaceId).Delete(ctx, name, metav1.DeleteOptions{})
 	return deleted(ctx, "autoscaler", name, err)
 }
 
@@ -554,7 +555,7 @@ func (k *Kubernetes) DeleteVPACheckpoint(ctx context.Context, name string) error
 	if name == "" {
 		return errEmptyName
 	}
-	err := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalerCheckpoints(k.r2cfg.NamespaceId).Delete(ctx, name, metav1.DeleteOptions{})
+	err := k.autoscalerClientset.AutoscalingV1().VerticalPodAutoscalerCheckpoints(k.kubeCfg.NamespaceId).Delete(ctx, name, metav1.DeleteOptions{})
 	return deleted(ctx, "autoscaler checkpoint", name, err)
 }
 
@@ -564,7 +565,7 @@ func (k *Kubernetes) DeletePVC(ctx context.Context, name string) error {
 	if name == "" {
 		return errEmptyName
 	}
-	err := k.clientset.CoreV1().PersistentVolumeClaims(k.r2cfg.NamespaceId).Delete(ctx, name, metav1.DeleteOptions{})
+	err := k.clientset.CoreV1().PersistentVolumeClaims(k.kubeCfg.NamespaceId).Delete(ctx, name, metav1.DeleteOptions{})
 	return deleted(ctx, "volume", name, err)
 }
 
@@ -588,7 +589,7 @@ func deleted(ctx context.Context, kind, name string, err error) error {
 // GetPipelineStatus is the status of the pipeline's deployment, and a lib.NotFoundError
 // when the pipeline has none.
 func (k *Kubernetes) GetPipelineStatus(ctx context.Context, pipelineId string) (lib.PipelineStatus, error) {
-	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
+	deploymentsClient := k.clientset.AppsV1().Deployments(k.kubeCfg.NamespaceId)
 	pipe, err := deploymentsClient.Get(ctx, DeploymentName(pipelineId), metav1.GetOptions{})
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
@@ -604,7 +605,7 @@ func (k *Kubernetes) GetPipelineStatus(ctx context.Context, pipelineId string) (
 }
 
 func (k *Kubernetes) GetPipelinesStatus(ctx context.Context) (pipeStatus []lib.PipelineStatus, err error) {
-	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
+	deploymentsClient := k.clientset.AppsV1().Deployments(k.kubeCfg.NamespaceId)
 	pipes, err := deploymentsClient.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return
@@ -626,7 +627,7 @@ func (k *Kubernetes) makePVC(name string, size string) *apiv1.PersistentVolumeCl
 	pvc := apiv1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: k.r2cfg.NamespaceId,
+			Namespace: k.kubeCfg.NamespaceId,
 		},
 		Spec: apiv1.PersistentVolumeClaimSpec{
 			AccessModes: []apiv1.PersistentVolumeAccessMode{apiv1.ReadWriteOnce},
@@ -636,8 +637,8 @@ func (k *Kubernetes) makePVC(name string, size string) *apiv1.PersistentVolumeCl
 				},
 			},
 			StorageClassName: func() *string {
-				if k.r2cfg.StorageDriver != nil && *k.r2cfg.StorageDriver != "" {
-					return k.r2cfg.StorageDriver
+				if k.kubeCfg.StorageDriver != nil && *k.kubeCfg.StorageDriver != "" {
+					return k.kubeCfg.StorageDriver
 				}
 				return nil
 			}(),

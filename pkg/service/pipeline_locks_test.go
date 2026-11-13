@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/deployment"
 	"sync"
 	"testing"
 	"time"
@@ -35,7 +36,7 @@ type overlapDriver struct {
 	maxSeen int
 }
 
-func (d *overlapDriver) CreateOperators(context.Context, string, []pipe.Operator, lib.PipelineConfig) error {
+func (d *overlapDriver) CreateOperators(context.Context, string, []pipe.Operator, deployment.PipelineConfig) error {
 	time.Sleep(20 * time.Millisecond)
 	d.mu.Lock()
 	d.active--

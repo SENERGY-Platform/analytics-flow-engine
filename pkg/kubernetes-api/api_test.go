@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/deployment"
 	"log/slog"
 	"strings"
 	"testing"
 
-	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
@@ -25,7 +25,7 @@ func getClient() (client *Kubernetes, err error) {
 		return
 	}
 	util.InitStructLogger("debug")
-	client, err = NewKubernetes(context.Background(), config.DefaultKubeconfigPath(), &cfg.Rancher2, cfg.OperatorResources, TimescaleSecret{Name: cfg.OperatorTimescaleSecretName, Key: cfg.OperatorTimescaleSecretKey})
+	client, err = NewKubernetes(context.Background(), config.DefaultKubeconfigPath(), &cfg.Kubernetes, cfg.OperatorResources, TimescaleSecret{Name: cfg.OperatorTimescaleSecretName, Key: cfg.OperatorTimescaleSecretKey})
 	if err != nil {
 		return
 	}
@@ -39,7 +39,7 @@ func TestKubernetes_createClient(t *testing.T) {
 		return
 	}
 	util.InitStructLogger("debug")
-	_, err = NewKubernetes(context.Background(), config.DefaultKubeconfigPath(), &cfg.Rancher2, cfg.OperatorResources, TimescaleSecret{Name: cfg.OperatorTimescaleSecretName, Key: cfg.OperatorTimescaleSecretKey})
+	_, err = NewKubernetes(context.Background(), config.DefaultKubeconfigPath(), &cfg.Kubernetes, cfg.OperatorResources, TimescaleSecret{Name: cfg.OperatorTimescaleSecretName, Key: cfg.OperatorTimescaleSecretKey})
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -72,7 +72,7 @@ func TestKubernetes_CreateOperators(t *testing.T) {
 			DownstreamConfig: pipe.DownstreamConfig{},
 		},
 	}
-	err = driver.CreateOperators(context.Background(), pipelineId, ops, lib.PipelineConfig{
+	err = driver.CreateOperators(context.Background(), pipelineId, ops, deployment.PipelineConfig{
 		WindowTime:     30,
 		MergeStrategy:  "inner",
 		Metrics:        false,
@@ -201,14 +201,14 @@ func timescaleTestDriver(trustedPrefixes ...string) *Kubernetes {
 		trustedPrefixes = []string{config.DefaultOperatorTimescaleTrustedImagePrefix}
 	}
 	return &Kubernetes{
-		r2cfg:           &config.Rancher2Config{},
+		kubeCfg:         &config.KubernetesConfig{},
 		timescaleSecret: TimescaleSecret{Name: "analytics-timescale", Key: "dsn", TrustedImagePrefixes: trustedPrefixes},
 	}
 }
 
 func tsConnFor(t *testing.T, k *Kubernetes, operator pipe.Operator) []apiv1.EnvVar {
 	t.Helper()
-	envs, err := k.operatorEnv(testPipeId, operator, lib.PipelineConfig{}, 8080)
+	envs, err := k.operatorEnv(testPipeId, operator, deployment.PipelineConfig{}, 8080)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func TestTheContainerConfigCarriesNoTsConn(t *testing.T) {
 		DeploymentType: "cloud",
 		Config:         map[string]string{"ts_conn": "stored-dsn", "window": "5"},
 	}
-	envs, err := timescaleTestDriver().operatorEnv(testPipeId, operator, lib.PipelineConfig{}, 8080)
+	envs, err := timescaleTestDriver().operatorEnv(testPipeId, operator, deployment.PipelineConfig{}, 8080)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestTheContainerConfigCarriesNoTsConn(t *testing.T) {
 	if len(found) != 1 {
 		t.Fatalf("CONFIG entries = %d, want 1", len(found))
 	}
-	var got lib.OperatorRequestConfig
+	var got deployment.OperatorRequestConfig
 	if err := json.Unmarshal([]byte(found[0].Value), &got); err != nil {
 		t.Fatalf("CONFIG is not JSON: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestCreateOperatorsGivesTsConnOnlyToTheTrustedContainerAndLogsIt(t *testing
 	k.timescaleSecret.TrustedImagePrefixes = []string{config.DefaultOperatorTimescaleTrustedImagePrefix}
 	trusted := pipe.Operator{Id: "op-trusted", OperatorId: "adder", ImageId: trustedTestImage, DeploymentType: "cloud"}
 	untrusted := pipe.Operator{Id: "op-untrusted", OperatorId: "custom", ImageId: "ghcr.io/senergy-platform-x/custom:1", DeploymentType: "cloud"}
-	if err := k.CreateOperators(context.Background(), fakePipelineId, []pipe.Operator{trusted, untrusted}, lib.PipelineConfig{PipelineId: fakePipelineId}); err != nil {
+	if err := k.CreateOperators(context.Background(), fakePipelineId, []pipe.Operator{trusted, untrusted}, deployment.PipelineConfig{PipelineId: fakePipelineId}); err != nil {
 		t.Fatal(err)
 	}
 

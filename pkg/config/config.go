@@ -38,7 +38,9 @@ type LoggerConfig struct {
 	Level string `json:"level" env_var:"LOGGER_LEVEL"`
 }
 
-type Rancher2Config struct {
+// KubernetesConfig keeps the JSON keys and env names of the Rancher-era config, which
+// the deployments still set.
+type KubernetesConfig struct {
 	NamespaceId    string  `json:"namespace_id" env_var:"RANCHER2_NAMESPACE_ID"`
 	StorageDriver  *string `json:"storage_driver" env_var:"RANCHER2_STORAGE_DRIVER"`
 	Zookeeper      string  `json:"zookeeper" env_var:"ZOOKEEPER"`
@@ -46,17 +48,17 @@ type Rancher2Config struct {
 }
 
 type Config struct {
-	Mqtt                     MqttConfig     `json:"mqtt" env_var:"MQTT_CONFIG"`
-	Logger                   LoggerConfig   `json:"logger" env_var:"LOGGER_CONFIG"`
-	URLPrefix                string         `json:"url_prefix" env_var:"URL_PREFIX"`
-	ServerPort               int            `json:"server_port" env_var:"SERVER_PORT"`
-	Rancher2                 Rancher2Config `json:"rancher2" env_var:"RANCHER2_CONFIG"`
-	Debug                    bool           `json:"debug" env_var:"DEBUG"`
-	ParserApiEndpoint        string         `json:"parser_api_endpoint" env_var:"PARSER_API_ENDPOINT"`
-	PermissionApiEndpoint    string         `json:"permission_api_endpoint" env_var:"PERMISSION_API_ENDPOINT"`
-	Kafka2MqttApiEndpoint    string         `json:"kafka2mqtt_api_endpoint" env_var:"KAFKA2MQTT_API_ENDPOINT"`
-	DeviceManagerApiEndpoint string         `json:"device_manager_api_endpoint" env_var:"DEVICE_MANAGER_API_ENDPOINT"`
-	PipelineApiEndpoint      string         `json:"pipeline_api_endpoint" env_var:"PIPELINE_API_ENDPOINT"`
+	Mqtt                     MqttConfig       `json:"mqtt" env_var:"MQTT_CONFIG"`
+	Logger                   LoggerConfig     `json:"logger" env_var:"LOGGER_CONFIG"`
+	URLPrefix                string           `json:"url_prefix" env_var:"URL_PREFIX"`
+	ServerPort               int              `json:"server_port" env_var:"SERVER_PORT"`
+	Kubernetes               KubernetesConfig `json:"rancher2" env_var:"RANCHER2_CONFIG"`
+	Debug                    bool             `json:"debug" env_var:"DEBUG"`
+	ParserApiEndpoint        string           `json:"parser_api_endpoint" env_var:"PARSER_API_ENDPOINT"`
+	PermissionApiEndpoint    string           `json:"permission_api_endpoint" env_var:"PERMISSION_API_ENDPOINT"`
+	Kafka2MqttApiEndpoint    string           `json:"kafka2mqtt_api_endpoint" env_var:"KAFKA2MQTT_API_ENDPOINT"`
+	DeviceManagerApiEndpoint string           `json:"device_manager_api_endpoint" env_var:"DEVICE_MANAGER_API_ENDPOINT"`
+	PipelineApiEndpoint      string           `json:"pipeline_api_endpoint" env_var:"PIPELINE_API_ENDPOINT"`
 	// AnalyticsServingApiEndpoint is where the exports of an import are looked up
 	// at deployment, so an operator can read the import's history from timescale
 	// instead of its short-lived Kafka topic. Empty, the default, switches the
@@ -104,7 +106,7 @@ func New(path string) (*Config, error) {
 		},
 		ServerPort: 8000,
 		Debug:      false,
-		Rancher2: Rancher2Config{
+		Kubernetes: KubernetesConfig{
 			Zookeeper:      "zookeeper.kafka:2181",
 			KafkaBootstrap: "kafka.kafka:9092",
 		},

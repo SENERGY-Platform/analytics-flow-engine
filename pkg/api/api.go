@@ -55,9 +55,9 @@ import (
 // @license.name Apache-2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 // @BasePath /
-func CreateServer(ctx context.Context, cfg *config.Config, pipelineService service.PipelineApiService) (r *gin.Engine, err error) {
-	// Before anything else, and in particular before NewFlowEngine: its constructor
-	// runs the startup sync, which makes outgoing calls. Until this has run, the
+func CreateServer(ctx context.Context, cfg *config.Config, pipelineService service.PipelineApiService, mqtt service.Publisher) (r *gin.Engine, err error) {
+	// Before anything else, and in particular before the engine's startup sync, which
+	// makes outgoing calls. Until this has run, the
 	// global propagator is the no-op one and those calls would carry neither a
 	// traceparent nor a baggage header.
 	otelHandler, err := otelx.GinOpenTelemetry(ctx, ServiceName, cfg.OtelEndpoint)
@@ -71,7 +71,7 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 	if cfg.Debug {
 		kubeconfig = config.KubeconfigPath
 	}
-	driver, err := kubernetes_api.NewKubernetes(ctx, kubeconfig, &cfg.Rancher2, cfg.OperatorResources, kubernetes_api.TimescaleSecret{
+	driver, err := kubernetes_api.NewKubernetes(ctx, kubeconfig, &cfg.Kubernetes, cfg.OperatorResources, kubernetes_api.TimescaleSecret{
 		Name:                 cfg.OperatorTimescaleSecretName,
 		Key:                  cfg.OperatorTimescaleSecretKey,
 		TrustedImagePrefixes: cfg.OperatorTimescaleTrustedImagePrefixes,
@@ -96,7 +96,8 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 	} else {
 		util.Logger.InfoContext(ctx, "import exports: analytics_serving_api_endpoint is empty, operators read imports from Kafka")
 	}
-	flowEngine := service.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService, exportLister)
+	flowEngine := service.NewFlowEngine(driver, parser, permission, kafka2mqtt, deviceManager, pipelineService, exportLister, mqtt)
+	flowEngine.Sync()
 
 	port := strconv.FormatInt(int64(cfg.ServerPort), 10)
 	util.Logger.InfoContext(ctx, "Starting api server at port "+port)
@@ -151,7 +152,7 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 	for _, route := range setRoutes {
 		util.Logger.DebugContext(ctx, "http route", attributes.MethodKey, route[0], attributes.PathKey, route[1])
 	}
-	cleanup := service.NewCleanup(flowEngine, driver, kafka_api.New(cfg.Rancher2.KafkaBootstrap), time.Duration(cfg.CleanupMinAge))
+	cleanup := service.NewCleanup(flowEngine, driver, kafka_api.New(cfg.Kubernetes.KafkaBootstrap), time.Duration(cfg.CleanupMinAge))
 	setRoutes, err = setCleanupRoutes(prefix, cleanup)
 	if err != nil {
 		return nil, err

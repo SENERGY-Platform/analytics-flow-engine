@@ -25,16 +25,6 @@ type PipelinesResponse struct {
 	Total int             `json:"total,omitempty"`
 }
 
-// OperatorConfigTsConn is the Config key Operator Lib falls back to for its timescale
-// DSN when the env var TS_CONN is unset. The platform never sets it and drops it
-// from cloud operators, because the DSN reaches them from a Secret.
-const OperatorConfigTsConn = "ts_conn"
-
-type OperatorRequestConfig struct {
-	Config      map[string]string `json:"config,omitempty"`
-	InputTopics []pipe.InputTopic `json:"inputTopics,omitempty"`
-}
-
 type PipelineRequest struct {
 	Id                 string         `json:"id,omitempty"`
 	FlowId             string         `json:"flowId,omitempty"`
@@ -74,20 +64,6 @@ type NodeInput struct {
 type NodeValue struct {
 	Name string `json:"name,omitempty"`
 	Path string `json:"path,omitempty"`
-}
-
-type PipelineConfig struct {
-	WindowTime     int
-	MergeStrategy  string
-	Metrics        bool
-	ConsumerOffset string
-	FlowId         string
-	PipelineId     string
-	UserId         string
-	// Baggage is the caller's OpenTelemetry context, carried here because both
-	// drivers build the same operator deployment out of this struct and both have
-	// to label it and hand it to the containers the same way.
-	Baggage map[string]string
 }
 
 type PipelineStatus struct {

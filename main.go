@@ -68,14 +68,14 @@ func main() {
 
 	pipelineService := pipeline_api.NewPipelineApi(cfg.PipelineApiEndpoint)
 
-	err = service.ConnectMQTTBroker(ctx, cfg.Mqtt, pipelineService)
+	mqttClient, err := service.ConnectMQTTBroker(ctx, cfg.Mqtt, pipelineService)
 	if err != nil {
 		util.Logger.ErrorContext(ctx, "error connecting to mqtt broker", "error", err)
 		ec = 1
 		return
 	}
 
-	httpHandler, err := api.CreateServer(ctx, cfg, pipelineService)
+	httpHandler, err := api.CreateServer(ctx, cfg, pipelineService, mqttClient)
 	if err != nil {
 		util.Logger.ErrorContext(ctx, "error creating http engine", "error", err)
 		ec = 1
@@ -126,7 +126,7 @@ func main() {
 		}
 
 		util.Logger.InfoContext(ctx, "closing mqtt connection")
-		service.CloseMQTTConnection()
+		mqttClient.Close()
 		util.Logger.InfoContext(ctx, "mqtt connection closed")
 	}()
 

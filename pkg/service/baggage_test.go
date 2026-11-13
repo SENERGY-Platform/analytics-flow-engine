@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/deployment"
 	"testing"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
@@ -37,7 +38,7 @@ func init() {
 // recordingDriver keeps the PipelineConfig it was handed, which is where the
 // baggage has to arrive for the driver to be able to label anything.
 type recordingDriver struct {
-	configs     []lib.PipelineConfig
+	configs     []deployment.PipelineConfig
 	deleteCalls int
 	// keepVolumeDeleteCalls counts DeleteOperatorsKeepingVolumes, kept apart from
 	// deleteCalls so a test can tell which of the two removed the operators.
@@ -51,7 +52,7 @@ type recordingDriver struct {
 	created [][]pipe.Operator
 }
 
-func (d *recordingDriver) CreateOperators(ctx context.Context, pipelineId string, operators []pipe.Operator, pipelineConfig lib.PipelineConfig) error {
+func (d *recordingDriver) CreateOperators(ctx context.Context, pipelineId string, operators []pipe.Operator, pipelineConfig deployment.PipelineConfig) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}

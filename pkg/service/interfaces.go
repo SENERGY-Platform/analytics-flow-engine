@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/deployment"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 	"github.com/SENERGY-Platform/models/go/models"
 	permV2 "github.com/SENERGY-Platform/permissions-v2/pkg/client"
@@ -37,7 +38,7 @@ import (
 // The context the Driver gets is deliberately not cancellable: see the comment on
 // FlowEngine.deploymentContext.
 type Driver interface {
-	CreateOperators(ctx context.Context, pipelineId string, input []pipe.Operator, pipelineConfig lib.PipelineConfig) error
+	CreateOperators(ctx context.Context, pipelineId string, input []pipe.Operator, pipelineConfig deployment.PipelineConfig) error
 	DeleteOperators(ctx context.Context, pipelineId string, inputs []pipe.Operator) error
 	// DeleteOperatorsKeepingVolumes is DeleteOperators without deleting the
 	// operators' volumes, for rebuilding a pipeline whose stored state must survive.
@@ -45,6 +46,11 @@ type Driver interface {
 	// GetPipelineStatus returns a lib.NotFoundError when the pipeline has no deployment.
 	GetPipelineStatus(ctx context.Context, pipelineId string) (lib.PipelineStatus, error)
 	GetPipelinesStatus(ctx context.Context) ([]lib.PipelineStatus, error)
+}
+
+// Publisher sends a message to the broker the fog agents listen on.
+type Publisher interface {
+	Publish(topic string, message string) error
 }
 
 type ParsingApiService interface {

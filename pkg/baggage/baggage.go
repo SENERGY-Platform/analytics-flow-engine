@@ -247,7 +247,7 @@ func Labels(entries map[string]string) (labels map[string]string, skipped []stri
 }
 
 // AddLabels merges the baggage labels into an existing label set and logs which
-// entries were left out. Kept here so both drivers apply the same rule and log it
+// entries were left out. Kept here so every caller applies the same rule and log it
 // the same way.
 //
 // The existing labels win on collision. LabelPrefix makes that unreachable today,

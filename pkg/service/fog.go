@@ -20,9 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/deployment"
 	"strings"
 
-	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 
@@ -34,10 +34,11 @@ import (
 
 type FogClient struct {
 	pipelineService PipelineApiService
+	mqtt            Publisher
 }
 
-func NewFogClient(pipelineService PipelineApiService) *FogClient {
-	return &FogClient{pipelineService}
+func NewFogClient(pipelineService PipelineApiService, mqtt Publisher) *FogClient {
+	return &FogClient{pipelineService: pipelineService, mqtt: mqtt}
 }
 
 func (f *FogClient) processMessage(message MQTT.Message) {
@@ -85,7 +86,7 @@ func (f *FogClient) sendActiveOperators(ctx context.Context, userID string, toke
 		return
 	}
 	topic := operatorLib.GetOperatorControlSyncResponseTopic(userID)
-	err = publishMessage(topic, string(syncMsgStr))
+	err = f.mqtt.Publish(topic, string(syncMsgStr))
 	if err != nil {
 		util.Logger.ErrorContext(ctx, "cannot publish operator sync message", "error", err)
 	}
@@ -120,7 +121,7 @@ func (f *FogClient) sendTopicsWithEnabledForward(ctx context.Context, userID str
 		return
 	}
 	topic := upstreamLib.GetUpstreamControlSyncResponseTopic(userID)
-	err = publishMessage(topic, string(syncMsgStr))
+	err = f.mqtt.Publish(topic, string(syncMsgStr))
 	if err != nil {
 		util.Logger.ErrorContext(ctx, "cannot publish upstream sync message", "error", err)
 	}
@@ -158,7 +159,7 @@ func GenerateFogOperatorStartCommand(operator pipe.Operator, pipelineID string, 
 	}
 }
 
-func startFogOperator(ctx context.Context, operator pipe.Operator, pipelineConfig lib.PipelineConfig, userID string) error {
+func (f *FlowEngine) startFogOperator(ctx context.Context, operator pipe.Operator, pipelineConfig deployment.PipelineConfig, userID string) error {
 	inputTopics := convertInputTopics(operator.InputTopics)
 
 	command := GenerateFogOperatorStartCommand(operator, pipelineConfig.PipelineId, inputTopics)
@@ -168,7 +169,7 @@ func startFogOperator(ctx context.Context, operator pipe.Operator, pipelineConfi
 	}
 	controlTopic := operatorLib.GetStartOperatorCloudTopic(userID)
 	util.Logger.DebugContext(ctx, "publish start command for operator", "operator", operator, "topic", controlTopic)
-	err = publishMessage(controlTopic, string(out))
+	err = f.mqtt.Publish(controlTopic, string(out))
 	if err != nil {
 		util.Logger.ErrorContext(ctx, "cannot publish start command for operator", "error", err, "operator", operator)
 		return err
@@ -176,7 +177,7 @@ func startFogOperator(ctx context.Context, operator pipe.Operator, pipelineConfi
 	return nil
 }
 
-func stopFogOperator(ctx context.Context, pipelineId string, operator pipe.Operator, userID string) error {
+func (f *FlowEngine) stopFogOperator(ctx context.Context, pipelineId string, operator pipe.Operator, userID string) error {
 	command := &operatorLib.StopOperatorControlCommand{
 		OperatorIDs: operatorLib.OperatorIDs{
 			OperatorId:     operator.Id,
@@ -192,7 +193,7 @@ func stopFogOperator(ctx context.Context, pipelineId string, operator pipe.Opera
 
 	controlTopic := operatorLib.GetStopOperatorCloudTopic(userID)
 	util.Logger.DebugContext(ctx, "publish stop command for operator", "operator", operator, "topic", controlTopic)
-	err = publishMessage(controlTopic, string(out))
+	err = f.mqtt.Publish(controlTopic, string(out))
 	if err != nil {
 		util.Logger.ErrorContext(ctx, "cannot publish stop command for operator", "error", err, "operator", operator)
 		return err

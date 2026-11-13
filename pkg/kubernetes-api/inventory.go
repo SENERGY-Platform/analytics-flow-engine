@@ -57,7 +57,7 @@ type Inventory struct {
 // Inventory lists the deployments, autoscalers, autoscaler checkpoints and volumes of
 // the pipelines namespace.
 func (k *Kubernetes) Inventory(ctx context.Context) (Inventory, error) {
-	ns := k.r2cfg.NamespaceId
+	ns := k.kubeCfg.NamespaceId
 	var inv Inventory
 
 	deployments, err := k.clientset.AppsV1().Deployments(ns).List(ctx, metav1.ListOptions{})

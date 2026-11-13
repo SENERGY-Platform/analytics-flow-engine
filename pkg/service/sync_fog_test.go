@@ -26,7 +26,7 @@ import (
 // replaced the forwarding left the stored ids pointing at removed instances.
 func TestSyncPipelinesRebuildsOnlyTheCloudDeployment(t *testing.T) {
 	const id = "6b0f3c2e-8d51-4f7a-9c3b-1e2d4a5b6c7d"
-	mqtt := useRecordingMQTT(t)
+	mqtt := &recordingMQTT{}
 	forwarding := &scriptedKafka2Mqtt{}
 	driver := &recordingDriver{}
 	cloud := forwardingOperator("op-cloud-1", "stored-instance")
@@ -34,6 +34,7 @@ func TestSyncPipelinesRebuildsOnlyTheCloudDeployment(t *testing.T) {
 	pipelines := &recordingPipelines{admin: []pipe.Pipeline{{Id: id, UserId: "owner", Operators: []pipe.Operator{cloud, fog}}}}
 	engine := engineWith(driver, pipelines)
 	engine.kafak2mqttService = forwarding
+	engine.mqtt = mqtt
 
 	if err := engine.syncPipelines(); err != nil {
 		t.Fatal(err)
@@ -58,14 +59,16 @@ func TestSyncPipelinesRebuildsOnlyTheCloudDeployment(t *testing.T) {
 // A pipeline that runs on fog only has no deployment; counted as missing, every restart
 // stopped and restarted its fog operators.
 func TestSyncPipelinesLeavesAFogOnlyPipelineAlone(t *testing.T) {
-	mqtt := useRecordingMQTT(t)
+	mqtt := &recordingMQTT{}
 	driver := &recordingDriver{}
 	pipelines := &recordingPipelines{admin: []pipe.Pipeline{{
 		Id:        "6b0f3c2e-8d51-4f7a-9c3b-1e2d4a5b6c7d",
 		Operators: []pipe.Operator{{Id: "op-1", DeploymentType: "local"}},
 	}}}
 
-	if err := engineWith(driver, pipelines).syncPipelines(); err != nil {
+	engine := engineWith(driver, pipelines)
+	engine.mqtt = mqtt
+	if err := engine.syncPipelines(); err != nil {
 		t.Fatal(err)
 	}
 	if driver.keepVolumeDeleteCalls != 0 || len(driver.configs) != 0 || len(mqtt.topics) != 0 {

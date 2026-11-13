@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"crypto/tls"
-	"flag"
 	"fmt"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
@@ -32,20 +31,26 @@ import (
 	"time"
 )
 
-var client MQTT.Client
-var qos *int
-var retained *bool
-var fogClient *FogClient
+const (
+	mqttQos      = 2
+	mqttRetained = false
+)
+
+// MqttClient is the connection to the broker, on which the engine commands the fog
+// agents and which answers their sync requests.
+type MqttClient struct {
+	client MQTT.Client
+	fog    *FogClient
+}
 
 // ConnectMQTTBroker takes the process context so the broker callbacks, which paho
 // invokes without one of their own, still have something to log against.
-func ConnectMQTTBroker(ctx context.Context, config config.MqttConfig, pipelineService PipelineApiService) error {
+func ConnectMQTTBroker(ctx context.Context, config config.MqttConfig, pipelineService PipelineApiService) (*MqttClient, error) {
 	//MQTT.DEBUG = log.New(os.Stdout, "", 0)
 	//MQTT.ERROR = log.New(os.Stdout, "", 0)
 
 	hostname, _ := os.Hostname()
-
-	server := flag.String("server", config.BrokerAddress, "The full url of the MQTT server to connect to ex: tcp://127.0.0.1:1883")
+	m := &MqttClient{}
 
 	topics := map[string]byte{
 		upstreamLib.GetUpstreamControlSyncTriggerSubTopic(): byte(0),
@@ -53,16 +58,11 @@ func ConnectMQTTBroker(ctx context.Context, config config.MqttConfig, pipelineSe
 	}
 	util.Logger.InfoContext(ctx, "subscribing to topics: "+fmt.Sprintf("%v", topics))
 
-	qos = flag.Int("qos", 2, "The QoS to subscribe to messages at")
-	retained = flag.Bool("retained", false, "Are the messages sent with the retained flag")
-	clientId := flag.String("clientid", hostname+strconv.Itoa(time.Now().Second()), "A clientid for the connection")
-	username := flag.String("username", config.BrokerUser, "A username to authenticate to the MQTT server")
-	password := flag.String("password", config.BrokerPassword.Value(), "Password to match username")
-	flag.Parse()
+	clientId := hostname + strconv.Itoa(time.Now().Second())
 
 	connOpts := MQTT.NewClientOptions().
-		AddBroker(*server).
-		SetClientID(*clientId).
+		AddBroker(config.BrokerAddress).
+		SetClientID(clientId).
 		SetCleanSession(true).
 		SetConnectionLostHandler(func(c MQTT.Client, err error) {
 			util.Logger.ErrorContext(ctx, "mqtt connection lost: ", "error", err)
@@ -76,10 +76,10 @@ func ConnectMQTTBroker(ctx context.Context, config config.MqttConfig, pipelineSe
 		}).
 		SetAutoReconnect(true)
 
-	if *username != "" {
-		connOpts.SetUsername(*username)
-		if *password != "" {
-			connOpts.SetPassword(*password)
+	if config.BrokerUser != "" {
+		connOpts.SetUsername(config.BrokerUser)
+		if password := config.BrokerPassword.Value(); password != "" {
+			connOpts.SetPassword(password)
 		}
 	}
 
@@ -87,7 +87,7 @@ func ConnectMQTTBroker(ctx context.Context, config config.MqttConfig, pipelineSe
 	connOpts.SetTLSConfig(tlsConfig)
 
 	connOpts.OnConnect = func(c MQTT.Client) {
-		if token := c.SubscribeMultiple(topics, onMessageReceived); token.Wait() && token.Error() != nil {
+		if token := c.SubscribeMultiple(topics, m.onMessageReceived); token.Wait() && token.Error() != nil {
 			panic(token.Error())
 		}
 		util.Logger.InfoContext(ctx, "Subscribed to topics: "+fmt.Sprintf("%v", topics))
@@ -95,31 +95,31 @@ func ConnectMQTTBroker(ctx context.Context, config config.MqttConfig, pipelineSe
 
 	// Set before connecting: OnConnect subscribes, and a message can arrive before
 	// Connect returns.
-	fogClient = NewFogClient(pipelineService)
-	client = MQTT.NewClient(connOpts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		return fmt.Errorf("Cant connect to broker %s: %s\n", hostname, token.Error())
+	m.fog = NewFogClient(pipelineService, m)
+	m.client = MQTT.NewClient(connOpts)
+	if token := m.client.Connect(); token.Wait() && token.Error() != nil {
+		return nil, fmt.Errorf("Cant connect to broker %s: %s\n", hostname, token.Error())
 	}
-	util.Logger.InfoContext(ctx, "Connected to broker "+*server)
-	return nil
+	util.Logger.InfoContext(ctx, "Connected to broker "+config.BrokerAddress)
+	return m, nil
 }
 
-func publishMessage(topic string, message string) error {
-	token := client.Publish(topic, byte(*qos), *retained, message)
+func (m *MqttClient) Publish(topic string, message string) error {
+	token := m.client.Publish(topic, byte(mqttQos), mqttRetained, message)
 	if token.Wait() && token.Error() != nil {
 		return token.Error()
 	}
 	return nil
 }
 
-func onMessageReceived(_ MQTT.Client, message MQTT.Message) {
+func (m *MqttClient) onMessageReceived(_ MQTT.Client, message MQTT.Message) {
 	// paho hands over no context, and an MQTT message carries no trace context to
 	// extract one from; processMessage explains why it starts a background one.
 	util.Logger.Debug("Received message on topic: "+message.Topic(), "message", message.Payload())
-	go fogClient.processMessage(message)
+	go m.fog.processMessage(message)
 }
 
-func CloseMQTTConnection() {
-	client.Disconnect(250)
+func (m *MqttClient) Close() {
+	m.client.Disconnect(250)
 	time.Sleep(1 * time.Second)
 }

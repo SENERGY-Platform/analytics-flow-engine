@@ -19,11 +19,11 @@ package kubernetes_api
 import (
 	"context"
 	"errors"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/deployment"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
@@ -53,7 +53,7 @@ func fakeDriver(objects ...runtime.Object) (*Kubernetes, *fake.Clientset) {
 	return &Kubernetes{
 		clientset:           clientset,
 		autoscalerClientset: vpafake.NewSimpleClientset(),
-		r2cfg:               &config.Rancher2Config{NamespaceId: fakeNamespace},
+		kubeCfg:             &config.KubernetesConfig{NamespaceId: fakeNamespace},
 		timescaleSecret:     TimescaleSecret{Name: "analytics-timescale", Key: "dsn"},
 		pvcWait:             pvcWait{timeout: 2 * time.Second, interval: time.Millisecond},
 	}, clientset
@@ -91,7 +91,7 @@ func existingPVC(terminating bool) *apiv1.PersistentVolumeClaim {
 }
 
 func createFakeOperators(k *Kubernetes, persist bool) error {
-	return k.CreateOperators(context.Background(), fakePipelineId, []pipe.Operator{fakeOperator(persist)}, lib.PipelineConfig{PipelineId: fakePipelineId})
+	return k.CreateOperators(context.Background(), fakePipelineId, []pipe.Operator{fakeOperator(persist)}, deployment.PipelineConfig{PipelineId: fakePipelineId})
 }
 
 func fakeDeployment(t *testing.T, clientset *fake.Clientset) *appsv1.Deployment {
@@ -203,7 +203,7 @@ func TestCreateOperatorsGivesUpOnAVolumeThatStaysTerminating(t *testing.T) {
 
 	start := time.Now()
 	err := createFakeOperators(k, true)
-	if !errors.Is(err, lib.ErrVolumeStillTerminating) || !strings.Contains(err.Error(), fakeVolumeName()) {
+	if !errors.Is(err, deployment.ErrVolumeStillTerminating) || !strings.Contains(err.Error(), fakeVolumeName()) {
 		t.Fatalf("err = %v, want ErrVolumeStillTerminating naming the volume", err)
 	}
 	if elapsed := time.Since(start); elapsed > time.Second {
@@ -286,9 +286,9 @@ func TestCreateOperatorsSharesOneWaitAcrossItsVolumes(t *testing.T) {
 		return false, nil, nil
 	})
 
-	err := k.CreateOperators(context.Background(), fakePipelineId, []pipe.Operator{fakeOperator(true), second}, lib.PipelineConfig{PipelineId: fakePipelineId})
+	err := k.CreateOperators(context.Background(), fakePipelineId, []pipe.Operator{fakeOperator(true), second}, deployment.PipelineConfig{PipelineId: fakePipelineId})
 	elapsed := time.Since(start)
-	if !errors.Is(err, lib.ErrVolumeStillTerminating) || !strings.Contains(err.Error(), secondClaim.Name) {
+	if !errors.Is(err, deployment.ErrVolumeStillTerminating) || !strings.Contains(err.Error(), secondClaim.Name) {
 		t.Fatalf("err = %v, want ErrVolumeStillTerminating for the second claim", err)
 	}
 	if !released {

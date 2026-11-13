@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/deployment"
 	"strings"
 	"testing"
 	"time"
@@ -98,13 +99,13 @@ func TestUpdatePipelineDeletesVolumes(t *testing.T) {
 // the six retries would each wait that long again in a call nobody can cancel.
 func TestStartOperatorsDoesNotRetryAVolumeStillTerminating(t *testing.T) {
 	driver := &recordingDriver{createErr: map[string]error{
-		"3c1f9b42": fmt.Errorf("%w: operator-3c1f9b42-op-12345 after 1m0s", lib.ErrVolumeStillTerminating),
+		"3c1f9b42": fmt.Errorf("%w: operator-3c1f9b42-op-12345 after 1m0s", deployment.ErrVolumeStillTerminating),
 	}}
 	engine := engineWith(driver, &recordingPipelines{})
 	pipeline := pipe.Pipeline{Id: "3c1f9b42", Operators: []pipe.Operator{persistingCloudOperator()}}
 
 	_, err := engine.startOperators(context.Background(), pipeline, engine.createPipelineConfig(pipeline), "")
-	if !errors.Is(err, lib.ErrVolumeStillTerminating) {
+	if !errors.Is(err, deployment.ErrVolumeStillTerminating) {
 		t.Fatalf("err = %v, want ErrVolumeStillTerminating", err)
 	}
 	if driver.createAttempts != 1 {
@@ -139,7 +140,7 @@ func TestSyncPipelinesContinuesPastAFailedRebuild(t *testing.T) {
 	stopFailure := errors.New("stop failed")
 	driver := &recordingDriver{
 		keepVolumeDeleteErr: map[string]error{"first": stopFailure},
-		createErr:           map[string]error{"second": fmt.Errorf("%w: claim", lib.ErrVolumeStillTerminating)},
+		createErr:           map[string]error{"second": fmt.Errorf("%w: claim", deployment.ErrVolumeStillTerminating)},
 	}
 	pipelines := &recordingPipelines{admin: []pipe.Pipeline{
 		{Id: "first", Operators: []pipe.Operator{persistingCloudOperator()}},
@@ -151,12 +152,38 @@ func TestSyncPipelinesContinuesPastAFailedRebuild(t *testing.T) {
 	if len(driver.configs) != 1 || driver.configs[0].PipelineId != "third" {
 		t.Errorf("recreated %+v, want the third pipeline despite the two failures before it", driver.configs)
 	}
-	if !errors.Is(err, stopFailure) || !errors.Is(err, lib.ErrVolumeStillTerminating) {
+	if !errors.Is(err, stopFailure) || !errors.Is(err, deployment.ErrVolumeStillTerminating) {
 		t.Fatalf("err = %v, want both failures joined", err)
 	}
 	for _, id := range []string{"first", "second"} {
 		if !strings.Contains(err.Error(), "pipeline "+id) {
 			t.Errorf("err = %q, want it to name pipeline %s", err, id)
 		}
+	}
+}
+
+// The startup sync can run while requests arrive; its rebuild of a pipeline waits for
+// a request that holds the pipeline's lock.
+func TestSyncPipelinesWaitsForThePipelineLock(t *testing.T) {
+	const id = "6b0f3c2e-8d51-4f7a-9c3b-1e2d4a5b6c7d"
+	driver := &recordingDriver{}
+	pipelines := &recordingPipelines{admin: []pipe.Pipeline{{Id: id, Operators: []pipe.Operator{persistingCloudOperator()}}}}
+	engine := engineWith(driver, pipelines)
+
+	unlock := engine.locks.lock(id)
+	done := make(chan error)
+	go func() { done <- engine.syncPipelines() }()
+
+	select {
+	case <-done:
+		t.Fatal("the sync rebuilt the pipeline while a request held its lock")
+	case <-time.After(100 * time.Millisecond):
+	}
+	unlock()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if len(driver.configs) != 1 {
+		t.Errorf("expected the pipeline to be rebuilt after the lock was released, got %d creates", len(driver.configs))
 	}
 }
