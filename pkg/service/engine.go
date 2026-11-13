@@ -209,6 +209,9 @@ func (f *FlowEngine) StartPipeline(ctx context.Context, pipelineRequest lib.Pipe
 		return
 	}
 	pipeline.Id = id.String()
+	// The registry takes the owner from the request, not from this field, but
+	// startOperators and stopOperators address the fog and kafka2mqtt by it.
+	pipeline.UserId = userId
 
 	// The pipeline id only exists now, so it joins the baggage here rather than in
 	// the middleware. From this point on every log line of this request names the
@@ -296,6 +299,7 @@ func (f *FlowEngine) UpdatePipeline(ctx context.Context, pipelineRequest lib.Pip
 	}
 
 	pipeline.Id = oldPipeline.Id
+	pipeline.UserId = userId
 	pipeline.Operators = addPipelineIDToFogTopic(pipeline.Operators, pipeline.Id)
 	pipeConfig := f.createPipelineConfig(*pipeline)
 	pipeConfig.UserId = userId
