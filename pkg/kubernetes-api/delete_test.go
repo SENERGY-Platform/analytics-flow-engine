@@ -165,3 +165,15 @@ func TestClientsForRefusesAnInvalidConfig(t *testing.T) {
 		t.Fatalf("clients %v %v, err %v; want an error and no clients", clientset, autoscalerClientset, err)
 	}
 }
+
+// An operator id too short for a volume name has no volume, since CreateOperators
+// refuses it; the delete must still go through, or the pipeline cannot be deleted.
+func TestDeleteOperatorsWithAShortOperatorIdSucceeds(t *testing.T) {
+	k, _ := fakeDriver(fakeDeploymentObject())
+	short := fakeOperator(true)
+	short.Id = "op-1"
+	if err := k.DeleteOperators(context.Background(), fakePipelineId, []pipe.Operator{short}); err != nil {
+		t.Fatalf("err = %v, want none", err)
+	}
+	deploymentGone(t, k)
+}

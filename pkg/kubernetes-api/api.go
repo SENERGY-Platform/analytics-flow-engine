@@ -128,9 +128,18 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 	var containers []apiv1.Container
 	var volumes []apiv1.Volume
 	metricsBasePort := 8080
-	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
 	vw, cancelWait := k.newVolumeWait(ctx)
 	defer cancelWait()
+
+	// A failed call removes what it created, so that a retry does not run into
+	// AlreadyExists; volumes it reused stay, they hold the operators' state.
+	var createdDeployment string
+	var createdVolumes []string
+	defer func() {
+		if err != nil {
+			k.removeCreated(ctx, createdDeployment, createdVolumes)
+		}
+	}()
 
 	for i, operator := range inputs {
 		var ports []apiv1.ContainerPort
@@ -155,8 +164,12 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 			if nameErr != nil {
 				return nameErr
 			}
-			if err = k.ensurePVC(ctx, vw, k.makePVC(volumeName, "50M")); err != nil {
-				return err
+			created, pvcErr := k.ensurePVC(ctx, vw, k.makePVC(volumeName, "50M"))
+			if pvcErr != nil {
+				return pvcErr
+			}
+			if created {
+				createdVolumes = append(createdVolumes, volumeName)
 			}
 			volumeMounts = append(volumeMounts, apiv1.VolumeMount{
 				Name:      volumeName,
@@ -223,11 +236,11 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 
 	// Create Deployment
 	util.Logger.DebugContext(ctx, "creating deployment")
-	result, err := deploymentsClient.Create(ctx, deployment, metav1.CreateOptions{})
-	if err != nil {
+	if err = k.createDeployment(ctx, vw, deployment); err != nil {
 		return
 	}
-	util.Logger.DebugContext(ctx, fmt.Sprintf("created deployment %s", result.GetObjectMeta().GetName()))
+	createdDeployment = deployment.Name
+	util.Logger.DebugContext(ctx, fmt.Sprintf("created deployment %s", deployment.Name))
 
 	// Create Vertical Pod Autoscaler
 	vpa := newVPA(pipelineId)
@@ -240,6 +253,62 @@ func (k *Kubernetes) CreateOperators(ctx context.Context, pipelineId string, inp
 	}
 	util.Logger.DebugContext(ctx, fmt.Sprintf("created vpa %s", vpaResult.GetObjectMeta().GetName()))
 	return
+}
+
+// removeCreated deletes what a failed CreateOperators call created. Its own failure is
+// logged only, the caller gets the error that made the call fail.
+func (k *Kubernetes) removeCreated(ctx context.Context, deployment string, volumes []string) {
+	var errs []error
+	if deployment != "" {
+		errs = append(errs, k.DeleteDeployment(ctx, deployment))
+	}
+	for _, name := range volumes {
+		errs = append(errs, k.DeletePVC(ctx, name))
+	}
+	if err := errors.Join(errs...); err != nil {
+		util.Logger.ErrorContext(ctx, "could not remove what a failed create left behind", "error", err)
+	}
+}
+
+// ErrDeploymentStillTerminating means the previous deployment of the same name was still
+// being deleted when the time to wait for it ran out.
+var ErrDeploymentStillTerminating = errors.New("deployment still terminating")
+
+// createDeployment waits for a terminating deployment of the same name to be gone
+// before creating it: the previous one is deleted in the foreground and stays until its
+// pods are. It takes its wait from the budget the volumes use, since both wait for the
+// same pods.
+func (k *Kubernetes) createDeployment(ctx context.Context, vw *volumeWait, deployment *appsv1.Deployment) error {
+	deploymentsClient := k.clientset.AppsV1().Deployments(k.r2cfg.NamespaceId)
+	logged := false
+	for {
+		_, err := deploymentsClient.Create(ctx, deployment, metav1.CreateOptions{})
+		if !k8s_errors.IsAlreadyExists(err) {
+			return err
+		}
+		existing, getErr := deploymentsClient.Get(ctx, deployment.Name, metav1.GetOptions{})
+		if getErr != nil {
+			if k8s_errors.IsNotFound(getErr) {
+				continue
+			}
+			return getErr
+		}
+		if existing.DeletionTimestamp == nil {
+			return err
+		}
+		if !logged {
+			util.Logger.InfoContext(ctx, "waiting for the terminating deployment to be deleted before creating it again", "deployment", deployment.Name, "timeout", vw.w.timeout.String())
+			logged = true
+		}
+		select {
+		case <-vw.ctx.Done():
+			if errors.Is(vw.ctx.Err(), context.DeadlineExceeded) {
+				return fmt.Errorf("%w: %s after %s", ErrDeploymentStillTerminating, deployment.Name, vw.w.timeout)
+			}
+			return fmt.Errorf("deployment %s: %w", deployment.Name, vw.ctx.Err())
+		case <-time.After(vw.w.interval):
+		}
+	}
 }
 
 // deploymentStrategy is Recreate when the pod mounts a volume: the operator PVCs are
@@ -270,17 +339,18 @@ func (k *Kubernetes) newVolumeWait(ctx context.Context) (*volumeWait, context.Ca
 
 // ensurePVC creates pvc, reuses an existing claim of that name, and waits for a
 // terminating one to be gone first, since a claim created over it would vanish with it.
-func (k *Kubernetes) ensurePVC(ctx context.Context, vw *volumeWait, pvc *apiv1.PersistentVolumeClaim) error {
+// created is false for a reused claim.
+func (k *Kubernetes) ensurePVC(ctx context.Context, vw *volumeWait, pvc *apiv1.PersistentVolumeClaim) (created bool, err error) {
 	pvcClient := k.clientset.CoreV1().PersistentVolumeClaims(k.r2cfg.NamespaceId)
 	logged := false
 	for {
-		_, err := pvcClient.Create(vw.ctx, pvc, metav1.CreateOptions{})
+		_, err = pvcClient.Create(vw.ctx, pvc, metav1.CreateOptions{})
 		if err == nil {
 			util.Logger.DebugContext(ctx, "created volume "+pvc.Name)
-			return nil
+			return true, nil
 		}
 		if !k8s_errors.IsAlreadyExists(err) {
-			return vw.error(pvc.Name, err)
+			return false, vw.error(pvc.Name, err)
 		}
 		existing, err := pvcClient.Get(vw.ctx, pvc.Name, metav1.GetOptions{})
 		if err != nil {
@@ -288,11 +358,11 @@ func (k *Kubernetes) ensurePVC(ctx context.Context, vw *volumeWait, pvc *apiv1.P
 				// Gone between Create and Get: try the create again right away.
 				continue
 			}
-			return vw.error(pvc.Name, err)
+			return false, vw.error(pvc.Name, err)
 		}
 		if existing.DeletionTimestamp == nil {
 			util.Logger.DebugContext(ctx, "reusing existing volume "+pvc.Name)
-			return nil
+			return false, nil
 		}
 		vw.waited = true
 		if !logged {
@@ -301,7 +371,7 @@ func (k *Kubernetes) ensurePVC(ctx context.Context, vw *volumeWait, pvc *apiv1.P
 		}
 		select {
 		case <-vw.ctx.Done():
-			return vw.error(pvc.Name, vw.ctx.Err())
+			return false, vw.error(pvc.Name, vw.ctx.Err())
 		case <-time.After(vw.w.interval):
 		}
 	}
@@ -443,7 +513,9 @@ func (k *Kubernetes) deleteOperators(ctx context.Context, pipelineId string, ope
 	for _, operator := range operators {
 		if operator.PersistData && deleteVolumes {
 			if name, err := PVCName(pipelineId, operator); err != nil {
-				errs = append(errs, err)
+				// CreateOperators refuses such an operator, so it has no volume; failing
+				// here would make the pipeline undeletable.
+				util.Logger.WarnContext(ctx, "operator has no volume to delete", "pipeline_id", pipelineId, "error", err)
 			} else {
 				errs = append(errs, k.DeletePVC(ctx, name))
 			}
