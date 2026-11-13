@@ -100,7 +100,8 @@ func (p *PipelineApi) GetPipelines(ctx context.Context, userId string, authoriza
 
 // GetPipelinesAdmin reads every pipeline, for the startup sync. It runs outside any
 // request, hence the admin headers rather than a caller's token; ctx carries no
-// baggage there and is only what makes the call cancellable.
+// baggage there and is only what makes the call cancellable. An answer with fewer or
+// more pipelines than its total is an error: the callers treat the list as complete.
 func (p *PipelineApi) GetPipelinesAdmin(ctx context.Context) (pipelines []pipe.Pipeline, err error) {
 	response, err := httpreq.Do(ctx, httpreq.Request{
 		Method: http.MethodGet,
@@ -113,7 +114,14 @@ func (p *PipelineApi) GetPipelinesAdmin(ctx context.Context) (pipelines []pipe.P
 	if err != nil {
 		return nil, fmt.Errorf("pipeline API - could not get admin pipelines from pipeline registry: %w", err)
 	}
-	return decodePipelines(response, "admin pipelines")
+	result, err := decodePipelinesResponse(response, "admin pipelines")
+	if err != nil {
+		return nil, err
+	}
+	if result.Total != len(result.Data) {
+		return nil, fmt.Errorf("pipeline API - pipeline registry returned %d of %d admin pipelines", len(result.Data), result.Total)
+	}
+	return result.Data, nil
 }
 
 func (p *PipelineApi) DeletePipeline(ctx context.Context, id string, userId string, authorization string) (err error) {
@@ -144,19 +152,23 @@ func (p *PipelineApi) do(ctx context.Context, method, path string, body any, use
 }
 
 func decodePipelines(response httpreq.Response, what string) ([]pipe.Pipeline, error) {
+	result, err := decodePipelinesResponse(response, what)
+	return result.Data, err
+}
+
+func decodePipelinesResponse(response httpreq.Response, what string) (result lib.PipelinesResponse, err error) {
 	switch response.StatusCode {
 	case http.StatusNotFound:
-		return nil, lib.NewNotFoundError(fmt.Errorf("could not find %s", what))
+		return result, lib.NewNotFoundError(fmt.Errorf("could not find %s", what))
 	case http.StatusForbidden:
-		return nil, lib.NewForbiddenError(lib.NewNotFoundError(fmt.Errorf("could not access %s", what)))
+		return result, lib.NewForbiddenError(lib.NewNotFoundError(fmt.Errorf("could not access %s", what)))
 	case http.StatusOK:
 	default:
-		return nil, errors.New("pipeline API - could not get " + what + " from pipeline registry: " +
+		return result, errors.New("pipeline API - could not get " + what + " from pipeline registry: " +
 			strconv.Itoa(response.StatusCode) + " " + response.Text())
 	}
-	var pResponse lib.PipelinesResponse
-	if err := response.Decode(&pResponse); err != nil {
-		return nil, errors.New("pipeline API  - could not parse " + what + ": " + err.Error())
+	if err = response.Decode(&result); err != nil {
+		return lib.PipelinesResponse{}, errors.New("pipeline API  - could not parse " + what + ": " + err.Error())
 	}
-	return pResponse.Data, nil
+	return result, nil
 }
