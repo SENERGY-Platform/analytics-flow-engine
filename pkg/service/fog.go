@@ -60,10 +60,13 @@ func (f *FogClient) processMessage(message MQTT.Message) {
 	}
 }
 
+// sendActiveOperators answers a fog agent's sync request. Nothing is sent when the
+// registry cannot be read: an empty answer would make the agent stop every operator.
 func (f *FogClient) sendActiveOperators(ctx context.Context, userID string, token string) {
 	pipelines, err := f.pipelineService.GetPipelines(ctx, userID, token)
 	if err != nil {
-		util.Logger.ErrorContext(ctx, "cannot get pipelines", "error", err)
+		util.Logger.ErrorContext(ctx, "cannot get pipelines, no operator sync answer sent", "error", err)
+		return
 	}
 	var startCommands []operatorLib.StartOperatorControlCommand
 	for _, pipeline := range pipelines {
@@ -79,6 +82,7 @@ func (f *FogClient) sendActiveOperators(ctx context.Context, userID string, toke
 	syncMsgStr, err := json.Marshal(startCommands)
 	if err != nil {
 		util.Logger.ErrorContext(ctx, "cannot marshal operator sync message", "error", err)
+		return
 	}
 	topic := operatorLib.GetOperatorControlSyncResponseTopic(userID)
 	err = publishMessage(topic, string(syncMsgStr))
@@ -87,10 +91,13 @@ func (f *FogClient) sendActiveOperators(ctx context.Context, userID string, toke
 	}
 }
 
+// sendTopicsWithEnabledForward answers a fog agent's upstream sync request; like
+// sendActiveOperators it sends nothing rather than an empty list on a registry error.
 func (f *FogClient) sendTopicsWithEnabledForward(ctx context.Context, userID string, token string) {
 	pipelines, err := f.pipelineService.GetPipelines(ctx, userID, token)
 	if err != nil {
-		util.Logger.ErrorContext(ctx, "cannot get pipelines", "error", err)
+		util.Logger.ErrorContext(ctx, "cannot get pipelines, no upstream sync answer sent", "error", err)
+		return
 	}
 
 	var topics []string
@@ -110,6 +117,7 @@ func (f *FogClient) sendTopicsWithEnabledForward(ctx context.Context, userID str
 	syncMsgStr, err := json.Marshal(syncMsg)
 	if err != nil {
 		util.Logger.ErrorContext(ctx, "cannot marshal upstream sync message", "error", err)
+		return
 	}
 	topic := upstreamLib.GetUpstreamControlSyncResponseTopic(userID)
 	err = publishMessage(topic, string(syncMsgStr))
