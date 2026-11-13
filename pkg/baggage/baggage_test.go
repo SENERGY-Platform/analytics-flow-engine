@@ -132,7 +132,7 @@ func TestHeader(t *testing.T) {
 			"quote":     `a"b`,
 			"backslash": `a\b`,
 			"umlaut":    "grün",
-			"email":     "jonah@bitnify.net",
+			"email":     "jonah@example.org",
 			"empty":     "",
 		}
 		parsed, err := otelbaggage.Parse(Header(entries))
@@ -152,7 +152,7 @@ func TestHeader(t *testing.T) {
 		if got := Header(map[string]string{"a": "a,b"}); got != "a=a%2Cb" {
 			t.Errorf("expected a=a%%2Cb, got %q", got)
 		}
-		if got := Header(map[string]string{"a": "jonah@bitnify.net"}); got != "a=jonah@bitnify.net" {
+		if got := Header(map[string]string{"a": "jonah@example.org"}); got != "a=jonah@example.org" {
 			t.Errorf("expected the value unchanged, got %q", got)
 		}
 	})
@@ -232,7 +232,7 @@ func TestLabels(t *testing.T) {
 		// a username that is an email address is the realistic case: otelx puts the
 		// username into the baggage of every request.
 		cases := map[string]map[string]string{
-			"value with an at sign": {"username": "jonah@bitnify.net"},
+			"value with an at sign": {"username": "jonah@example.org"},
 			"value over 63 chars":   {"note": strings.Repeat("a", 64)},
 			"value with a slash":    {"path": "a/b"},
 			"key with an at sign":   {"we@ird": "1"},
@@ -255,7 +255,7 @@ func TestLabels(t *testing.T) {
 	t.Run("keeps the valid entries of a mixed set", func(t *testing.T) {
 		labels, skipped := Labels(map[string]string{
 			"smart_service_instance_id": "8fbd0e8a",
-			"username":                  "jonah@bitnify.net",
+			"username":                  "jonah@example.org",
 		})
 		want := map[string]string{LabelPrefix + "smart_service_instance_id": "8fbd0e8a"}
 		if !maps.Equal(want, labels) {
@@ -333,7 +333,7 @@ func TestMerge(t *testing.T) {
 		// smart service instance id the pipeline was created with.
 		got := Merge(
 			map[string]string{"smart_service_instance_id": "8fbd0e8a"},
-			map[string]string{"user_id": "jonah", "username": "jonah@bitnify.net"})
+			map[string]string{"user_id": "jonah", "username": "jonah@example.org"})
 		if got["smart_service_instance_id"] != "8fbd0e8a" {
 			t.Errorf("expected the stored instance id to survive, got %v", got)
 		}
