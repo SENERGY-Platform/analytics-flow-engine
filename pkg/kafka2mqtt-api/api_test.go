@@ -35,11 +35,11 @@ func removeAnswering(t *testing.T, status int) error {
 	return NewKafka2MqttApi(srv.URL, nil).RemoveInstance(context.Background(), "instance-1", "pipeline-1", "user", "token")
 }
 
-// An instance a previous, failed delete already removed must not make the pipeline
-// undeletable.
-func TestRemoveInstanceTreatsAMissingInstanceAsRemoved(t *testing.T) {
-	if err := removeAnswering(t, http.StatusNotFound); err != nil {
-		t.Fatalf("err = %v, want none for 404", err)
+// kafka2mqtt-manager answers a missing administrate right with 404, so a 404 must not
+// let the caller drop the registry entry of a still running instance.
+func TestRemoveInstanceReportsNotFound(t *testing.T) {
+	if err := removeAnswering(t, http.StatusNotFound); err == nil {
+		t.Fatal("err = nil for 404, want an error")
 	}
 }
 

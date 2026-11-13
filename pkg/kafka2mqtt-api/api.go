@@ -70,8 +70,8 @@ func (api *Kafka2MqttApi) startInstance(ctx context.Context, instanceConfig Inst
 	return
 }
 
-// RemoveInstance deletes a forwarding instance. One that does not exist counts as
-// removed, so a delete that failed after this step can be retried.
+// RemoveInstance deletes a forwarding instance. A 404 is an error: kafka2mqtt-manager
+// also answers 404 when the user lacks the administrate right on the instance.
 func (api *Kafka2MqttApi) RemoveInstance(ctx context.Context, id, _, userID, token string) error {
 	response, err := httpreq.Do(ctx, httpreq.Request{
 		Method: http.MethodDelete,
@@ -83,9 +83,6 @@ func (api *Kafka2MqttApi) RemoveInstance(ctx context.Context, id, _, userID, tok
 	})
 	if err != nil {
 		return fmt.Errorf("kafka2mqtt API - could not delete instance: %w", err)
-	}
-	if response.StatusCode == http.StatusNotFound {
-		return nil
 	}
 	if response.StatusCode != http.StatusNoContent {
 		return errors.New("kafka2mqtt API - could not delete instance: " +
