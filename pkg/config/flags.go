@@ -24,7 +24,6 @@ import (
 )
 
 var ConfPath string
-var Deploy bool
 
 // KubeconfigPath is the kubeconfig the Kubernetes driver uses in debug mode.
 var KubeconfigPath string
@@ -32,7 +31,6 @@ var KubeconfigPath string
 func ParseFlags() {
 	flag.StringVar(&ConfPath, "config", "", "path to config JSON file")
 	flag.StringVar(&KubeconfigPath, "kubeconfig", DefaultKubeconfigPath(), "kubeconfig used in debug mode")
-	flag.BoolVar(&Deploy, "deploy", false, "deploy certificates and exit")
 	flag.Parse()
 	return
 }

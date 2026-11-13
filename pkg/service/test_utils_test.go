@@ -18,7 +18,7 @@ package service
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 )
 
@@ -32,6 +32,6 @@ func parseJsonFile(path string, _ interface{}) []byte {
 			fmt.Println(err)
 		}
 	}()
-	byteValue, _ := ioutil.ReadAll(jsonFile)
+	byteValue, _ := io.ReadAll(jsonFile)
 	return byteValue
 }

@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"slices"
@@ -116,7 +115,7 @@ func TestParser_createPipeline(t *testing.T) {
 		fmt.Println(expected)
 		fmt.Println(pipeline)
 		file, _ := json.MarshalIndent(pipeline, "", " ")
-		_ = ioutil.WriteFile("./testdata/test.json", file, 0644)
+		_ = os.WriteFile("./testdata/test.json", file, 0644)
 		t.Error("structs do not match")
 	}
 }
