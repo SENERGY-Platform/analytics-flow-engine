@@ -402,8 +402,8 @@ func (k *Kubernetes) operatorEnv(pipelineId string, operator pipe_lib.Operator, 
 			Value: k.r2cfg.KafkaBootstrap,
 		},
 		{
-			Name:  "CONFIG_APPLICATION_ID",
-			Value: "analytics-" + operator.ApplicationId.String(),
+			Name:  ApplicationIdEnvVar,
+			Value: applicationIdPrefix + operator.ApplicationId.String(),
 		},
 		{
 			Name:  "PIPELINE_ID",
