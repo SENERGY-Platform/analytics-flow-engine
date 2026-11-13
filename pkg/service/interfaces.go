@@ -22,6 +22,7 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 	"github.com/SENERGY-Platform/models/go/models"
+	permV2 "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 	"github.com/google/uuid"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
@@ -52,6 +53,9 @@ type ParsingApiService interface {
 
 type PermissionApiService interface {
 	UserHasExecuteAccess(ctx context.Context, resource string, ids []string, authorization string) (bool, error)
+	// UserHasPipelinePermission checks a right on a pipeline the way the pipeline
+	// registry does.
+	UserHasPipelinePermission(ctx context.Context, pipelineId string, permission permV2.Permission, authorization string) (bool, error)
 }
 
 type Kafka2MqttApiService interface {

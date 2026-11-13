@@ -33,6 +33,7 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
+	permV2 "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 	"github.com/google/uuid"
 
 	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
@@ -288,6 +289,9 @@ func (f *FlowEngine) UpdatePipeline(ctx context.Context, pipelineRequest lib.Pip
 	if err != nil {
 		return
 	}
+	if err = f.requirePipelinePermission(ctx, oldPipeline.Id, permV2.Write, token); err != nil {
+		return
+	}
 
 	pipeline, err = f.setupPipeline(ctx, pipelineRequest, userId, token)
 	if err != nil {
@@ -426,6 +430,20 @@ func (f *FlowEngine) checkTopicAccess(ctx context.Context, operators []pipe.Oper
 	return nil
 }
 
+// requirePipelinePermission refuses up front what the registry would refuse only after
+// the operators were stopped. The registry needs write to update and administrate to
+// delete; read, which GetPipeline checks, is not enough for either.
+func (f *FlowEngine) requirePipelinePermission(ctx context.Context, pipelineId string, permission permV2.Permission, token string) error {
+	ok, err := f.permissionService.UserHasPipelinePermission(ctx, pipelineId, permission, token)
+	if err != nil {
+		return fmt.Errorf("check permission %c on pipeline %s: %w", permission, pipelineId, err)
+	}
+	if !ok {
+		return lib.NewForbiddenError(fmt.Errorf("missing permission %c on pipeline %s", permission, pipelineId))
+	}
+	return nil
+}
+
 // DeletePipeline removes the registry entry last: it is what a retry needs to find the
 // operators again, and every step before it treats an already removed object as removed.
 func (f *FlowEngine) DeletePipeline(ctx context.Context, id string, userId string, token string) (err error) {
@@ -434,6 +452,9 @@ func (f *FlowEngine) DeletePipeline(ctx context.Context, id string, userId strin
 	defer f.locks.lock(id)()
 	pipeline, err := f.pipelineService.GetPipeline(ctx, id, userId, token)
 	if err != nil {
+		return
+	}
+	if err = f.requirePipelinePermission(ctx, id, permV2.Administrate, token); err != nil {
 		return
 	}
 	err = f.stopOperators(ctx, pipeline, token, deleteVolumes)

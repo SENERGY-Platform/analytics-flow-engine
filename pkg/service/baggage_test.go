@@ -25,6 +25,7 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
+	permV2 "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 	"github.com/google/uuid"
 	otelbaggage "go.opentelemetry.io/otel/baggage"
 )
@@ -134,6 +135,10 @@ func (s staticParser) GetPipeline(context.Context, string, string, string) (pars
 type allowAll struct{}
 
 func (allowAll) UserHasExecuteAccess(context.Context, string, []string, string) (bool, error) {
+	return true, nil
+}
+
+func (allowAll) UserHasPipelinePermission(context.Context, string, permV2.Permission, string) (bool, error) {
 	return true, nil
 }
 

@@ -27,6 +27,10 @@ type PermissionApi struct {
 	c   client.Client
 }
 
+// PipelineTopic is the permissions-v2 topic under which the pipeline registry checks
+// the rights on a pipeline.
+const PipelineTopic = "analytics-pipelines"
+
 func NewPermissionApi(url string) *PermissionApi {
 	return &PermissionApi{url: url, c: client.New(url)}
 }
@@ -50,4 +54,14 @@ func (a PermissionApi) UserHasExecuteAccess(ctx context.Context, resource string
 		}
 	}
 	return true, nil
+}
+
+// UserHasPipelinePermission reports whether the token holder has permission on the
+// pipeline, under the topic the pipeline registry uses.
+func (a PermissionApi) UserHasPipelinePermission(ctx context.Context, pipelineId string, permission client.Permission, authorization string) (bool, error) {
+	ok, err, _ := a.c.CheckPermissionContext(ctx, authorization, PipelineTopic, pipelineId, permission)
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
 }

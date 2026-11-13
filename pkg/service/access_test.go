@@ -23,6 +23,7 @@ import (
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib/access"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
+	permV2 "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 )
 
 type recordingPermissions struct {
@@ -41,6 +42,10 @@ func newRecordingPermissions(denied ...string) *recordingPermissions {
 func (r *recordingPermissions) UserHasExecuteAccess(_ context.Context, resource string, ids []string, _ string) (bool, error) {
 	r.asked[resource] = append(r.asked[resource], ids...)
 	return !r.denied[resource], nil
+}
+
+func (r *recordingPermissions) UserHasPipelinePermission(context.Context, string, permV2.Permission, string) (bool, error) {
+	return true, nil
 }
 
 func operatorWith(id string, topics ...pipe.InputTopic) pipe.Operator {

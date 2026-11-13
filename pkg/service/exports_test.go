@@ -27,6 +27,7 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib/access"
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib/exports"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
+	permV2 "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 )
 
 type fakeLister struct {
@@ -46,6 +47,10 @@ func (l *fakeLister) ListExports(_ context.Context, authorization string, _, _ i
 type failingPermissions struct{}
 
 func (failingPermissions) UserHasExecuteAccess(context.Context, string, []string, string) (bool, error) {
+	return false, errors.New("permissions down")
+}
+
+func (failingPermissions) UserHasPipelinePermission(context.Context, string, permV2.Permission, string) (bool, error) {
 	return false, errors.New("permissions down")
 }
 
