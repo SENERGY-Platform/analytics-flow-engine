@@ -18,10 +18,13 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
+	"net/http"
 	"testing"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
+	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 )
 
 func TestErrorLevel(t *testing.T) {
@@ -38,5 +41,13 @@ func TestErrorLevel(t *testing.T) {
 		if got := errorLevel(c.err); got != c.want {
 			t.Errorf("%s: errorLevel = %v, want %v", c.name, got, c.want)
 		}
+	}
+}
+
+// A bad request is the caller's fault and answered as such, not as a 500.
+func TestHandleErrorAnswersBadInputWith400(t *testing.T) {
+	err := handleError(fmt.Errorf("export: %w", lib.NewInputError(errors.New("unknown export"))))
+	if got := util.GetStatusCode(err); got != http.StatusBadRequest {
+		t.Fatalf("status = %d for %v, want 400", got, err)
 	}
 }

@@ -33,6 +33,8 @@ func handleError(err error) error {
 		return lib.NewNotFoundError(errors.New(MessageNotFound))
 	case errors.As(err, new(*lib.ForbiddenError)):
 		return lib.NewForbiddenError(errors.New(MessageForbidden))
+	case errors.As(err, new(*lib.InputError)):
+		return lib.NewInputError(errors.New(MessageBadInput))
 	default:
 		return lib.NewInternalError(errors.New(MessageSomethingWrong))
 	}
