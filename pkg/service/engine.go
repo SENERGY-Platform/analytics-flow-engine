@@ -288,7 +288,7 @@ func (f *FlowEngine) removeStarted(ctx context.Context, pipeline pipe.Pipeline, 
 		return
 	}
 	pipeline.Operators = started
-	if stopErr := f.stopOperators(ctx, pipeline, token); stopErr != nil {
+	if stopErr := f.stopOperatorsWith(ctx, pipeline, token, true); stopErr != nil {
 		util.Logger.ErrorContext(ctx, "failed to roll back the started operators", "error", stopErr)
 	}
 }
@@ -621,23 +621,33 @@ func setPipelineModel(pipelineRequest lib.PipelineRequest, parsedPipeline parser
 	return pipeline
 }
 
+// stopOperators removes the cloud-to-fog forwarding before the deployment: kafka2mqtt
+// refuses a caller without administrate on an instance, and that refusal must leave the
+// cluster untouched.
 func (f *FlowEngine) stopOperators(ctx context.Context, pipeline pipe.Pipeline, token string) error {
+	return f.stopOperatorsWith(ctx, pipeline, token, false)
+}
+
+// stopOperatorsWith with rollback set also removes the deployment after a failed
+// forwarding removal, since a rollback undoes what the same request has just created.
+func (f *FlowEngine) stopOperatorsWith(ctx context.Context, pipeline pipe.Pipeline, token string, rollback bool) error {
 	localOperators, cloudOperators := seperateOperators(pipeline)
 	util.Logger.DebugContext(ctx, "engine - stop operators for pipeline: "+pipeline.Id, "localOperators", localOperators, "cloudOperators", redactOperators(cloudOperators))
 
 	if len(cloudOperators) > 0 {
-		err := f.driver.DeleteOperators(ctx, pipeline.Id, cloudOperators)
-		if err != nil {
-			//ignore error if operator was not found
-			var notFoundErr *lib.NotFoundError
-			if ok := errors.As(err, &notFoundErr); !ok {
-				return err
+		forwardingErr := f.disableCloudToFogForwarding(ctx, cloudOperators, pipeline.Id, pipeline.UserId, token)
+		if forwardingErr != nil {
+			util.Logger.ErrorContext(ctx, "cannot disable cloud2fog forwarding", "error", forwardingErr)
+			if !rollback {
+				return forwardingErr
 			}
 		}
-		err = f.disableCloudToFogForwarding(ctx, cloudOperators, pipeline.Id, pipeline.UserId, token)
-		if err != nil {
-			util.Logger.ErrorContext(ctx, "cannot disable cloud2fog forwarding", "error", err)
-			return err
+		// Operators already gone count as removed.
+		if err := f.driver.DeleteOperators(ctx, pipeline.Id, cloudOperators); err != nil && !errors.As(err, new(*lib.NotFoundError)) {
+			return errors.Join(forwardingErr, err)
+		}
+		if forwardingErr != nil {
+			return forwardingErr
 		}
 	}
 

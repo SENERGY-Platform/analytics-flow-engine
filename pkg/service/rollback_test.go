@@ -94,7 +94,8 @@ func TestAFailedDeleteCanBeRetriedToCompletion(t *testing.T) {
 	forwarding := &scriptedKafka2Mqtt{removeErrs: []error{errors.New("kafka2mqtt down")}}
 	pipelines := &recordingPipelines{existing: pipe.Pipeline{Id: "3c1f9b42", UserId: "jonah",
 		Operators: []pipe.Operator{forwardingOperator("op-1", "instance-1")}}}
-	engine := engineWith(&recordingDriver{}, pipelines)
+	driver := &recordingDriver{}
+	engine := engineWith(driver, pipelines)
 	engine.kafak2mqttService = forwarding
 
 	if err := engine.DeletePipeline(context.Background(), "3c1f9b42", "jonah", "token"); err == nil {
@@ -102,6 +103,11 @@ func TestAFailedDeleteCanBeRetriedToCompletion(t *testing.T) {
 	}
 	if pipelines.deleteCalls != 0 {
 		t.Fatal("the registry entry was deleted although the forwarding instance is still there")
+	}
+	// kafka2mqtt also refuses a caller without administrate on the instance; that must
+	// not leave the pipeline without its deployment.
+	if driver.deleteCalls != 0 {
+		t.Fatal("the operators were deleted although the forwarding removal failed")
 	}
 	if err := engine.DeletePipeline(context.Background(), "3c1f9b42", "jonah", "token"); err != nil {
 		t.Fatalf("retry: %v", err)
@@ -247,5 +253,46 @@ func TestAnUpdateWhoseRegistryWriteFailsRestoresTheOldPipeline(t *testing.T) {
 	// Three tries for the new version, one for the restarted old one.
 	if registry.attempts != 4 {
 		t.Errorf("registry updates = %d, want 4", registry.attempts)
+	}
+}
+
+// kafka2mqtt answers a co-administrator of the pipeline with 404, since the instance
+// belongs to its owner; the update must fail before it touches the running version.
+func TestAnUpdateRefusedByKafka2MqttLeavesTheOldVersionRunning(t *testing.T) {
+	refused := errors.New("kafka2mqtt: 404")
+	forwarding := &scriptedKafka2Mqtt{removeErrs: []error{refused}}
+	driver := &recordingDriver{}
+	pipelines := &recordingPipelines{existing: pipe.Pipeline{Id: "3c1f9b42", UserId: "owner",
+		Operators: []pipe.Operator{forwardingOperator("op-1", "old-instance")}}}
+	engine := engineWith(driver, pipelines)
+	engine.parsingService = staticParser{pipeline: downstreamFlow()}
+	engine.kafak2mqttService = forwarding
+
+	_, err := engine.UpdatePipeline(context.Background(), lib.PipelineRequest{Id: "3c1f9b42", FlowId: "flow-1"}, "co-admin", "token")
+	if !errors.Is(err, refused) {
+		t.Fatalf("err = %v, want the kafka2mqtt refusal", err)
+	}
+	if driver.deleteCalls != 0 || driver.createAttempts != 0 || forwarding.starts != 0 || pipelines.stored != nil {
+		t.Errorf("operator deletes %d, creates %d, forwarding starts %d, stored %v; want nothing touched",
+			driver.deleteCalls, driver.createAttempts, forwarding.starts, pipelines.stored)
+	}
+}
+
+// A rollback removes what the same request has just created, so a failed forwarding
+// removal does not keep the new deployment running.
+func TestARollbackRemovesTheDeploymentAlsoWhenForwardingRemovalFails(t *testing.T) {
+	forwarding := &scriptedKafka2Mqtt{removeErrs: []error{errors.New("kafka2mqtt down")}}
+	driver := &recordingDriver{}
+	pipelines := &recordingPipelines{assignedId: uuid.New()}
+	engine := engineWith(driver, pipelines)
+	engine.pipelineService = failingUpdates{recordingPipelines: pipelines, err: errors.New("registry down")}
+	engine.parsingService = staticParser{pipeline: downstreamFlow()}
+	engine.kafak2mqttService = forwarding
+
+	if _, err := engine.StartPipeline(context.Background(), lib.PipelineRequest{FlowId: "flow-1"}, "jonah", "token"); err == nil {
+		t.Fatal("err = nil, want the registry failure")
+	}
+	if driver.deleteCalls != 1 || pipelines.deleteCalls != 1 {
+		t.Errorf("operator deletes %d, registry deletes %d; want 1 and 1", driver.deleteCalls, pipelines.deleteCalls)
 	}
 }
