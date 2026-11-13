@@ -51,32 +51,38 @@ func downstreamFlow() parser.Pipeline {
 
 // The cloud-to-fog forwarding is set up for the user's fog; with an empty user id it
 // went to nobody's.
-func TestStartAndUpdateForwardForTheRequestingUser(t *testing.T) {
-	for name, run := range map[string]func(*FlowEngine) error{
-		"start": func(f *FlowEngine) error {
-			_, err := f.StartPipeline(context.Background(), lib.PipelineRequest{FlowId: "flow-1"}, "jonah", "token")
-			return err
-		},
-		"update": func(f *FlowEngine) error {
-			_, err := f.UpdatePipeline(context.Background(), lib.PipelineRequest{Id: "3c1f9b42", FlowId: "flow-1"}, "jonah", "token")
-			return err
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			pipelines := &recordingPipelines{assignedId: uuid.New(), existing: pipe.Pipeline{Id: "3c1f9b42", UserId: "jonah"}}
-			forwarding := &recordingKafka2Mqtt{}
-			engine := engineWith(&recordingDriver{}, pipelines)
-			engine.parsingService = staticParser{pipeline: downstreamFlow()}
-			engine.kafak2mqttService = forwarding
-			if err := run(engine); err != nil {
-				t.Fatal(err)
-			}
-			if len(forwarding.startedFor) != 1 || forwarding.startedFor[0] != "jonah" {
-				t.Errorf("forwarding started for %q, want once for jonah", forwarding.startedFor)
-			}
-			if pipelines.stored == nil || pipelines.stored.UserId != "jonah" {
-				t.Errorf("stored pipeline = %+v, want user id jonah", pipelines.stored)
-			}
-		})
+func TestStartForwardsForTheRequestingUser(t *testing.T) {
+	pipelines := &recordingPipelines{assignedId: uuid.New()}
+	forwarding := &recordingKafka2Mqtt{}
+	engine := engineWith(&recordingDriver{}, pipelines)
+	engine.parsingService = staticParser{pipeline: downstreamFlow()}
+	engine.kafak2mqttService = forwarding
+	if _, err := engine.StartPipeline(context.Background(), lib.PipelineRequest{FlowId: "flow-1"}, "jonah", "token"); err != nil {
+		t.Fatal(err)
+	}
+	if len(forwarding.startedFor) != 1 || forwarding.startedFor[0] != "jonah" {
+		t.Errorf("forwarding started for %q, want once for jonah", forwarding.startedFor)
+	}
+	if pipelines.stored == nil || pipelines.stored.UserId != "jonah" {
+		t.Errorf("stored pipeline = %+v, want user id jonah", pipelines.stored)
+	}
+}
+
+// An update by someone other than the owner still addresses the owner: the registry keeps
+// the owner, and a later stop removes the forwarding instances and fog operators as the owner.
+func TestUpdateForwardsForTheOwnerNotTheCaller(t *testing.T) {
+	pipelines := &recordingPipelines{existing: pipe.Pipeline{Id: "3c1f9b42", UserId: "owner"}}
+	forwarding := &recordingKafka2Mqtt{}
+	engine := engineWith(&recordingDriver{}, pipelines)
+	engine.parsingService = staticParser{pipeline: downstreamFlow()}
+	engine.kafak2mqttService = forwarding
+	if _, err := engine.UpdatePipeline(context.Background(), lib.PipelineRequest{Id: "3c1f9b42", FlowId: "flow-1"}, "co-admin", "token"); err != nil {
+		t.Fatal(err)
+	}
+	if len(forwarding.startedFor) != 1 || forwarding.startedFor[0] != "owner" {
+		t.Errorf("forwarding started for %q, want once for owner", forwarding.startedFor)
+	}
+	if pipelines.stored == nil || pipelines.stored.UserId != "owner" {
+		t.Errorf("stored pipeline = %+v, want user id owner", pipelines.stored)
 	}
 }

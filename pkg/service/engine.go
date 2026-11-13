@@ -330,7 +330,9 @@ func (f *FlowEngine) UpdatePipeline(ctx context.Context, pipelineRequest lib.Pip
 	}
 
 	pipeline.Id = oldPipeline.Id
-	pipeline.UserId = userId
+	// The owner, not the caller: the registry keeps the owner, and fog commands and
+	// kafka2mqtt instances must belong to whom a later stop addresses.
+	pipeline.UserId = oldPipeline.UserId
 	pipeline.Operators = addPipelineIDToFogTopic(pipeline.Operators, pipeline.Id)
 	pipeConfig := f.createPipelineConfig(*pipeline)
 	pipeConfig.UserId = userId
