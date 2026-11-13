@@ -32,6 +32,16 @@ const (
 	PipelinePath    = "/pipeline"
 )
 
+// The admin cleanup routes, relative to CleanupPath.
+const (
+	CleanupPath          = "/admin/cleanup"
+	CleanupPipelinesPath = "/pipelines"
+	CleanupPipelinePath  = "/pipelines/:id"
+	CleanupTopicsPath    = "/topics"
+	CleanupTopicPath     = "/topics/:topic"
+	CleanupTopicJobPath  = "/topics/job"
+)
+
 const (
 	MessageSomethingWrong = "something went wrong"
 	MessageNotFound       = "not found"

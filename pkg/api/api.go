@@ -26,11 +26,13 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib/exports"
 	analytics_serving_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/analytics-serving-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/config"
 	devicemanager_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/device-manager-api"
+	kafka_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka-api"
 	kafka2mqtt_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kafka2mqtt-api"
 	kubernetes_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kubernetes-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/parsing-api"
@@ -143,6 +145,14 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 	}
 	prefix.Use(AuthMiddleware())
 	setRoutes, err = routesAuth.Set(*flowEngine, prefix)
+	if err != nil {
+		return nil, err
+	}
+	for _, route := range setRoutes {
+		util.Logger.DebugContext(ctx, "http route", attributes.MethodKey, route[0], attributes.PathKey, route[1])
+	}
+	cleanup := service.NewCleanup(flowEngine, driver, kafka_api.New(cfg.Rancher2.KafkaBootstrap), time.Duration(cfg.CleanupMinAge))
+	setRoutes, err = setCleanupRoutes(prefix, cleanup)
 	if err != nil {
 		return nil, err
 	}

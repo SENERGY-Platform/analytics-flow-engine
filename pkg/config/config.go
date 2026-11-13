@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
 
 	sb_config_hdl "github.com/SENERGY-Platform/go-service-base/config-hdl"
@@ -85,7 +86,14 @@ type Config struct {
 	// repository (no tag, no digest); see OperatorResource. Images not named here
 	// keep the defaults.
 	OperatorResources map[string]OperatorResource `json:"operator_resources" env_var:"OPERATOR_RESOURCES"`
+	// CleanupMinAge is how old the newest resource of a pipeline without registry entry
+	// must be before the admin cleanup reports it, so that a pipeline still being set
+	// up is never taken for an orphan.
+	CleanupMinAge sb_config_types.Duration `json:"cleanup_min_age" env_var:"CLEANUP_MIN_AGE"`
 }
+
+// DefaultCleanupMinAge is the default of CleanupMinAge.
+const DefaultCleanupMinAge = 15 * time.Minute
 
 func New(path string) (*Config, error) {
 	cfg := Config{
@@ -101,6 +109,7 @@ func New(path string) (*Config, error) {
 			KafkaBootstrap: "kafka.kafka:9092",
 		},
 		OperatorTimescaleSecretKey: DefaultOperatorTimescaleSecretKey,
+		CleanupMinAge:              sb_config_types.Duration(DefaultCleanupMinAge),
 		// A fresh slice per call: a config file's array is decoded into this one in place.
 		OperatorTimescaleTrustedImagePrefixes: []string{DefaultOperatorTimescaleTrustedImagePrefix},
 	}
@@ -113,6 +122,9 @@ func New(path string) (*Config, error) {
 	}
 	if err == nil {
 		err = validateTrustedImagePrefixes(cfg.OperatorTimescaleTrustedImagePrefixes)
+	}
+	if err == nil && cfg.CleanupMinAge < 0 {
+		err = fmt.Errorf("cleanup_min_age (CLEANUP_MIN_AGE) is negative: %s", time.Duration(cfg.CleanupMinAge))
 	}
 	return &cfg, err
 }

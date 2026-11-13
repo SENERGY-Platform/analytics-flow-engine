@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // withOperatorTimescaleSecret sets the one setting New refuses to start without, so
@@ -271,5 +272,55 @@ func TestAnInvalidTrustedImagePrefixFailsTheStart(t *testing.T) {
 		if _, err := New(""); err == nil {
 			t.Errorf("New accepted operator_timescale_trusted_image_prefixes %s", prefixes)
 		}
+	}
+}
+
+// Fifteen minutes cover a pipeline whose deployment exists before the registry
+// listing shows it.
+func TestCleanupMinAgeDefaultsToFifteenMinutes(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if time.Duration(cfg.CleanupMinAge) != 15*time.Minute {
+		t.Errorf("cleanup_min_age = %s, want 15m", time.Duration(cfg.CleanupMinAge))
+	}
+}
+
+func TestCleanupMinAgeIsReadAsADuration(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+	t.Setenv("CLEANUP_MIN_AGE", "30m")
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if time.Duration(cfg.CleanupMinAge) != 30*time.Minute {
+		t.Errorf("cleanup_min_age from the environment = %s, want 30m", time.Duration(cfg.CleanupMinAge))
+	}
+}
+
+func TestCleanupMinAgeIsReadFromAFile(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"cleanup_min_age": "1h"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := New(path)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if time.Duration(cfg.CleanupMinAge) != time.Hour {
+		t.Errorf("cleanup_min_age from the file = %s, want 1h", time.Duration(cfg.CleanupMinAge))
+	}
+}
+
+// A negative age would report pipelines from the future as old enough.
+func TestANegativeCleanupMinAgeFailsTheStart(t *testing.T) {
+	withOperatorTimescaleSecret(t)
+	t.Setenv("CLEANUP_MIN_AGE", "-1m")
+	if _, err := New(""); err == nil {
+		t.Fatal("New accepted a negative cleanup_min_age")
 	}
 }

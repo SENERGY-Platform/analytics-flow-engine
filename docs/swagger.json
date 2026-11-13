@@ -12,6 +12,352 @@
     },
     "basePath": "/",
     "paths": {
+        "/admin/cleanup/pipelines": {
+            "get": {
+                "description": "Lists pipeline ids with objects in the pipelines namespace and no registry entry, whose newest object is at least cleanup_min_age old. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cleanup"
+                ],
+                "summary": "List orphaned pipelines",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/service.OrphanPipeline"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "registry unavailable or empty",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Deletes the objects of every orphaned pipeline and reports which failed. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cleanup"
+                ],
+                "summary": "Delete all orphaned pipelines",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/service.OrphanPipelinesDeleteResult"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "registry unavailable or empty",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/cleanup/pipelines/{id}": {
+            "delete": {
+                "description": "Deletes the objects of one pipeline after checking again that it is orphaned. Admin only.",
+                "tags": [
+                    "Cleanup"
+                ],
+                "summary": "Delete an orphaned pipeline",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pipeline ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "registry unavailable or empty",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/cleanup/topics": {
+            "get": {
+                "description": "Lists the internal Kafka Streams topics of application ids that no registered pipeline and no deployment uses. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cleanup"
+                ],
+                "summary": "List orphaned Kafka topics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "registry unavailable or empty",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/cleanup/topics/job": {
+            "get": {
+                "description": "The running or the last topic cleanup job. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cleanup"
+                ],
+                "summary": "State of the topic cleanup job",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/service.TopicCleanupJob"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Starts a background job that deletes every orphaned topic, one per second. Admin only.",
+                "tags": [
+                    "Cleanup"
+                ],
+                "summary": "Start deleting all orphaned Kafka topics",
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "a job is already running",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "registry unavailable or empty",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Stops the running job after the delete in progress. Admin only.",
+                "tags": [
+                    "Cleanup"
+                ],
+                "summary": "Stop the topic cleanup job",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "no job is running",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/cleanup/topics/{topic}": {
+            "delete": {
+                "description": "Deletes one topic after checking again that it is orphaned. Admin only.",
+                "tags": [
+                    "Cleanup"
+                ],
+                "summary": "Delete an orphaned Kafka topic",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Topic name",
+                        "name": "topic",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "registry unavailable or empty",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/pipeline": {
             "put": {
                 "description": "Updates a pipeline",
@@ -429,7 +775,14 @@
             "type": "object",
             "properties": {
                 "aspectId": {
+                    "description": "deprecated: please use AspectIds",
                     "type": "string"
+                },
+                "aspectIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "characteristicIds": {
                     "type": "array",
@@ -475,6 +828,83 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "service.OrphanPipeline": {
+            "type": "object",
+            "properties": {
+                "checkpoints": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "created": {
+                    "type": "string"
+                },
+                "deployment": {
+                    "type": "string"
+                },
+                "pipeline_id": {
+                    "type": "string"
+                },
+                "pvcs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "vpa": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.OrphanPipelineFailure": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "pipeline_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.OrphanPipelinesDeleteResult": {
+            "type": "object",
+            "properties": {
+                "deleted": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "failed": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/service.OrphanPipelineFailure"
+                    }
+                }
+            }
+        },
+        "service.TopicCleanupJob": {
+            "type": "object",
+            "properties": {
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "remaining": {
+                    "type": "integer"
+                },
+                "running": {
+                    "type": "boolean"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         }

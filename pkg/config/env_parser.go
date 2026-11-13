@@ -25,4 +25,5 @@ import (
 var envTypeParser = []sb_config_hdl.EnvTypeParser{
 	sb_config_types.SecretEnvTypeParser,
 	sb_config_env_parser.DurationEnvTypeParser,
+	sb_config_types.DurationEnvTypeParser,
 }
