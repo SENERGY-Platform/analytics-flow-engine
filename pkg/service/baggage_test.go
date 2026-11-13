@@ -47,9 +47,11 @@ type recordingDriver struct {
 	createErr           map[string]error
 	keepVolumeDeleteErr map[string]error
 	createAttempts      int
+	// created holds the operators of every successful CreateOperators call.
+	created [][]pipe.Operator
 }
 
-func (d *recordingDriver) CreateOperators(ctx context.Context, pipelineId string, _ []pipe.Operator, pipelineConfig lib.PipelineConfig) error {
+func (d *recordingDriver) CreateOperators(ctx context.Context, pipelineId string, operators []pipe.Operator, pipelineConfig lib.PipelineConfig) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -58,6 +60,7 @@ func (d *recordingDriver) CreateOperators(ctx context.Context, pipelineId string
 		return err
 	}
 	d.configs = append(d.configs, pipelineConfig)
+	d.created = append(d.created, operators)
 	return nil
 }
 func (d *recordingDriver) DeleteOperators(ctx context.Context, _ string, _ []pipe.Operator) error {
