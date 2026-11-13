@@ -52,7 +52,14 @@ type FlowEngine struct {
 	exportLister exports.Lister
 	// locks is shared by every copy of the engine; the router hands each handler one.
 	locks *pipelineLocks
+	// registryRetryInterval is the pause between tries of an update's final registry write.
+	registryRetryInterval time.Duration
 }
+
+const (
+	registryUpdateAttempts       = 3
+	defaultRegistryRetryInterval = 500 * time.Millisecond
+)
 
 func NewFlowEngine(
 	driver Driver,
@@ -63,14 +70,15 @@ func NewFlowEngine(
 	pipelineService PipelineApiService,
 	exportLister exports.Lister) *FlowEngine {
 	f := &FlowEngine{
-		driver:               driver,
-		parsingService:       parsingService,
-		permissionService:    permissionService,
-		kafak2mqttService:    kafak2mqttService,
-		deviceManagerService: deviceManagerService,
-		pipelineService:      pipelineService,
-		exportLister:         exportLister,
-		locks:                newPipelineLocks(),
+		driver:                driver,
+		parsingService:        parsingService,
+		permissionService:     permissionService,
+		kafak2mqttService:     kafak2mqttService,
+		deviceManagerService:  deviceManagerService,
+		pipelineService:       pipelineService,
+		exportLister:          exportLister,
+		locks:                 newPipelineLocks(),
+		registryRetryInterval: defaultRegistryRetryInterval,
 	}
 	err := f.syncPipelines()
 	if err != nil {
@@ -344,7 +352,21 @@ func (f *FlowEngine) UpdatePipeline(ctx context.Context, pipelineRequest lib.Pip
 		return nil, fmt.Errorf("failed to start operators: %w", err)
 	}
 	pipeline.Operators = started
-	err = f.pipelineService.UpdatePipeline(ctx, pipeline, userId, token)
+	// The original error is kept rather than retry's summary, so its type still decides
+	// the HTTP status.
+	var updateErr error
+	_ = retry(ctx, registryUpdateAttempts, f.registryRetryInterval, func() error {
+		updateErr = f.pipelineService.UpdatePipeline(ctx, pipeline, userId, token)
+		return updateErr
+	})
+	if updateErr != nil {
+		// The registry still names the old version, so the new one has to go and the old
+		// one comes back, as after a failed start of the new version.
+		util.Logger.ErrorContext(ctx, "failed to store the updated pipeline, attempting to restart old pipeline", "error", updateErr)
+		f.removeStarted(ctx, *pipeline, started, token)
+		f.restartOldPipeline(ctx, oldPipeline, userId, token)
+		return nil, fmt.Errorf("failed to store the updated pipeline: %w", updateErr)
+	}
 	util.Logger.DebugContext(ctx, "updated pipeline: "+pipeline.Id, "pipeline", redactPipeline(*pipeline))
 	return
 }
@@ -454,7 +476,8 @@ func (f *FlowEngine) requirePipelinePermission(ctx context.Context, pipelineId s
 }
 
 // DeletePipeline removes the registry entry last: it is what a retry needs to find the
-// operators again, and every step before it treats an already removed object as removed.
+// operators again. Cluster objects already gone count as removed; a kafka2mqtt 404 does
+// not, since kafka2mqtt also answers a missing right with 404.
 func (f *FlowEngine) DeletePipeline(ctx context.Context, id string, userId string, token string) (err error) {
 	ctx = withPipelineIdInBaggage(deploymentContext(ctx), id)
 	util.Logger.DebugContext(ctx, "engine - delete pipeline: "+id)

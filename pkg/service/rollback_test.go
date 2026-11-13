@@ -182,3 +182,70 @@ func TestAFailedUpdateRestoresTheOldPipeline(t *testing.T) {
 		t.Errorf("stored = %+v, want the old version with instance-2", pipelines.stored)
 	}
 }
+
+// flakyUpdates is a registry whose first failures updates fail; it counts every update.
+type flakyUpdates struct {
+	*recordingPipelines
+	failures int
+	err      error
+	attempts int
+}
+
+func (p *flakyUpdates) UpdatePipeline(ctx context.Context, pipeline *pipe.Pipeline, userId, token string) error {
+	p.attempts++
+	if p.attempts <= p.failures {
+		return p.err
+	}
+	return p.recordingPipelines.UpdatePipeline(ctx, pipeline, userId, token)
+}
+
+func updateWithFlakyRegistry(t *testing.T, failures int) (*recordingDriver, *recordingPipelines, *flakyUpdates, *scriptedKafka2Mqtt, error) {
+	t.Helper()
+	forwarding := &scriptedKafka2Mqtt{}
+	driver := &recordingDriver{}
+	pipelines := &recordingPipelines{existing: pipe.Pipeline{Id: "3c1f9b42", UserId: "owner",
+		Operators: []pipe.Operator{forwardingOperator("op-1", "old-instance")}}}
+	registry := &flakyUpdates{recordingPipelines: pipelines, failures: failures, err: errors.New("registry down")}
+	engine := engineWith(driver, pipelines)
+	engine.pipelineService = registry
+	engine.parsingService = staticParser{pipeline: downstreamFlow()}
+	engine.kafak2mqttService = forwarding
+	_, err := engine.UpdatePipeline(context.Background(), lib.PipelineRequest{Id: "3c1f9b42", FlowId: "flow-1"}, "jonah", "token")
+	return driver, pipelines, registry, forwarding, err
+}
+
+// A short registry outage after the new version started must not leave the new
+// forwarding instance ids stored nowhere.
+func TestAnUpdateRetriesTheFinalRegistryWrite(t *testing.T) {
+	driver, pipelines, registry, forwarding, err := updateWithFlakyRegistry(t, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if registry.attempts != 3 || driver.deleteCalls != 1 || !slices.Equal(forwarding.removed, []string{"old-instance"}) {
+		t.Errorf("registry updates %d, operator deletes %d, removed instances %v; want 3, 1 and old-instance",
+			registry.attempts, driver.deleteCalls, forwarding.removed)
+	}
+	if pipelines.stored == nil || pipelines.stored.Operators[0].DownstreamConfig.InstanceID != "instance-1" {
+		t.Errorf("stored = %+v, want the new version with instance-1", pipelines.stored)
+	}
+}
+
+// When the registry keeps refusing, it still names the old version, so the new one is
+// removed and the old one restarted, as after a failed start of the new version.
+func TestAnUpdateWhoseRegistryWriteFailsRestoresTheOldPipeline(t *testing.T) {
+	driver, _, registry, forwarding, err := updateWithFlakyRegistry(t, 1000)
+	if !errors.Is(err, registry.err) {
+		t.Fatalf("err = %v, want the registry failure", err)
+	}
+	if driver.deleteCalls != 2 || !slices.Equal(forwarding.removed, []string{"old-instance", "instance-1"}) {
+		t.Errorf("operator deletes %d, removed instances %v; want 2 and old-instance, instance-1",
+			driver.deleteCalls, forwarding.removed)
+	}
+	if len(driver.configs) != 2 || driver.configs[1].UserId != "owner" {
+		t.Errorf("configs = %+v, want the old version restarted for its owner", driver.configs)
+	}
+	// Three tries for the new version, one for the restarted old one.
+	if registry.attempts != 4 {
+		t.Errorf("registry updates = %d, want 4", registry.attempts)
+	}
+}
