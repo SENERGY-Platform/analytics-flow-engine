@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/httpreq"
@@ -35,10 +36,18 @@ type PipelineResponse struct {
 
 type PipelineApi struct {
 	url string
+	// adminListPause is the wait before asking again for an admin list whose total did
+	// not match its length.
+	adminListPause time.Duration
 }
 
+// adminListAttempts is how often the admin list is asked for while its total and its
+// length disagree. The registry counts and lists in two queries, so a pipeline created
+// or deleted in between gives a mismatch that the next attempt does not have.
+const adminListAttempts = 3
+
 func NewPipelineApi(url string) *PipelineApi {
-	return &PipelineApi{url}
+	return &PipelineApi{url: url, adminListPause: 500 * time.Millisecond}
 }
 
 func (p *PipelineApi) RegisterPipeline(ctx context.Context, pipeline *pipe.Pipeline, userId string, authorization string) (id uuid.UUID, err error) {
@@ -101,8 +110,31 @@ func (p *PipelineApi) GetPipelines(ctx context.Context, userId string, authoriza
 // GetPipelinesAdmin reads every pipeline, for the startup sync. It runs outside any
 // request, hence the admin headers rather than a caller's token; ctx carries no
 // baggage there and is only what makes the call cancellable. An answer with fewer or
-// more pipelines than its total is an error: the callers treat the list as complete.
+// more pipelines than its total is asked for again and, still so after
+// adminListAttempts, an error: the callers treat the list as complete.
 func (p *PipelineApi) GetPipelinesAdmin(ctx context.Context) (pipelines []pipe.Pipeline, err error) {
+	for attempt := 1; ; attempt++ {
+		var result lib.PipelinesResponse
+		result, err = p.getPipelinesAdmin(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if result.Total == len(result.Data) {
+			return result.Data, nil
+		}
+		err = fmt.Errorf("pipeline API - pipeline registry returned %d of %d admin pipelines", len(result.Data), result.Total)
+		if attempt == adminListAttempts {
+			return nil, fmt.Errorf("%w, %d attempts", err, attempt)
+		}
+		select {
+		case <-ctx.Done():
+			return nil, errors.Join(err, ctx.Err())
+		case <-time.After(p.adminListPause):
+		}
+	}
+}
+
+func (p *PipelineApi) getPipelinesAdmin(ctx context.Context) (lib.PipelinesResponse, error) {
 	response, err := httpreq.Do(ctx, httpreq.Request{
 		Method: http.MethodGet,
 		URL:    p.url + "/admin/pipeline",
@@ -112,16 +144,9 @@ func (p *PipelineApi) GetPipelinesAdmin(ctx context.Context) (pipelines []pipe.P
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("pipeline API - could not get admin pipelines from pipeline registry: %w", err)
+		return lib.PipelinesResponse{}, fmt.Errorf("pipeline API - could not get admin pipelines from pipeline registry: %w", err)
 	}
-	result, err := decodePipelinesResponse(response, "admin pipelines")
-	if err != nil {
-		return nil, err
-	}
-	if result.Total != len(result.Data) {
-		return nil, fmt.Errorf("pipeline API - pipeline registry returned %d of %d admin pipelines", len(result.Data), result.Total)
-	}
-	return result.Data, nil
+	return decodePipelinesResponse(response, "admin pipelines")
 }
 
 func (p *PipelineApi) DeletePipeline(ctx context.Context, id string, userId string, authorization string) (err error) {

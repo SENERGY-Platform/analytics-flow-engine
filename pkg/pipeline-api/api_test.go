@@ -21,7 +21,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
@@ -49,32 +51,64 @@ func TestDeletePipelineFailure(t *testing.T) {
 	}
 }
 
-func adminListAnswering(t *testing.T, body string) ([]pipe.Pipeline, error) {
+// adminListAnswering serves the bodies in turn, the last one for every further request,
+// and returns the result with the number of requests.
+func adminListAnswering(t *testing.T, bodies ...string) ([]pipe.Pipeline, int, error) {
 	t.Helper()
+	var requests atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/admin/pipeline" {
 			t.Errorf("path %s, want /admin/pipeline", r.URL.Path)
 		}
+		n := int(requests.Add(1))
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(body))
+		_, _ = w.Write([]byte(bodies[min(n, len(bodies))-1]))
 	}))
 	defer srv.Close()
-	return NewPipelineApi(srv.URL).GetPipelinesAdmin(context.Background())
+	api := NewPipelineApi(srv.URL)
+	api.adminListPause = time.Millisecond
+	pipelines, err := api.GetPipelinesAdmin(context.Background())
+	return pipelines, int(requests.Load()), err
 }
 
 // A paged answer would make every pipeline beyond the page look orphaned to the cleanup.
 func TestGetPipelinesAdminRejectsAPartialAnswer(t *testing.T) {
-	if _, err := adminListAnswering(t, `{"data":[{"id":"a"}],"total":2}`); err == nil {
-		t.Fatal("err = nil for 1 of 2 pipelines, want an error")
+	if _, requests, err := adminListAnswering(t, `{"data":[{"id":"a"}],"total":2}`); err == nil || requests != 3 {
+		t.Fatalf("err %v after %d requests for 1 of 2 pipelines, want an error after 3", err, requests)
+	}
+}
+
+// The registry counts and lists in two queries, so a pipeline created in between gives
+// one answer whose total does not match.
+func TestGetPipelinesAdminAsksAgainAfterAMismatch(t *testing.T) {
+	pipelines, requests, err := adminListAnswering(t,
+		`{"data":[{"id":"a"}],"total":2}`, `{"data":[{"id":"a"},{"id":"b"}],"total":3}`, `{"data":[{"id":"a"},{"id":"b"}],"total":2}`)
+	if err != nil || len(pipelines) != 2 || requests != 3 {
+		t.Fatalf("pipelines %v, err %v after %d requests; want 2 and none after 3", pipelines, err, requests)
+	}
+}
+
+func TestGetPipelinesAdminStopsWaitingWhenCancelled(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[],"total":1}`))
+	}))
+	defer srv.Close()
+	api := NewPipelineApi(srv.URL)
+	api.adminListPause = time.Hour
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	if _, err := api.GetPipelinesAdmin(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want the deadline", err)
 	}
 }
 
 func TestGetPipelinesAdminAcceptsAComplete(t *testing.T) {
-	pipelines, err := adminListAnswering(t, `{"data":[{"id":"a"},{"id":"b"}],"total":2}`)
-	if err != nil || len(pipelines) != 2 {
-		t.Fatalf("pipelines %v, err %v; want 2 and none", pipelines, err)
+	pipelines, requests, err := adminListAnswering(t, `{"data":[{"id":"a"},{"id":"b"}],"total":2}`)
+	if err != nil || len(pipelines) != 2 || requests != 1 {
+		t.Fatalf("pipelines %v, err %v after %d requests; want 2 and none after 1", pipelines, err, requests)
 	}
-	if pipelines, err = adminListAnswering(t, `{"data":[],"total":0}`); err != nil || len(pipelines) != 0 {
+	if pipelines, _, err = adminListAnswering(t, `{"data":[],"total":0}`); err != nil || len(pipelines) != 0 {
 		t.Fatalf("empty registry: pipelines %v, err %v; want none and none", pipelines, err)
 	}
 }
