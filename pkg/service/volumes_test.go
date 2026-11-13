@@ -37,13 +37,14 @@ func persistingCloudOperator() pipe.Operator {
 // operators' volumes; deleting them lost the stored state and left the new pod
 // waiting for a claim that was terminating underneath it.
 func TestSyncPipelinesRebuildKeepsVolumes(t *testing.T) {
+	const missing, present = "6b0f3c2e-8d51-4f7a-9c3b-1e2d4a5b6c7d", "a3e9d1f4-2b6c-4e8a-b0d7-5c1f9e3a7b2d"
 	driver := &recordingDriver{
 		// Another pipeline whose deployment is present, which the sync must leave alone.
-		statuses: []lib.PipelineStatus{{Name: "pipeline-present"}},
+		statuses: []lib.PipelineStatus{{Name: "pipeline-" + present}},
 	}
 	pipelines := &recordingPipelines{admin: []pipe.Pipeline{
-		{Id: "missing", Operators: []pipe.Operator{persistingCloudOperator()}},
-		{Id: "present", Operators: []pipe.Operator{persistingCloudOperator()}},
+		{Id: missing, Operators: []pipe.Operator{persistingCloudOperator()}},
+		{Id: present, Operators: []pipe.Operator{persistingCloudOperator()}},
 	}}
 	engine := engineWith(driver, pipelines)
 
@@ -56,7 +57,7 @@ func TestSyncPipelinesRebuildKeepsVolumes(t *testing.T) {
 	if driver.keepVolumeDeleteCalls != 1 {
 		t.Errorf("DeleteOperatorsKeepingVolumes called %d times, want 1 for the leftovers of the missing pipeline", driver.keepVolumeDeleteCalls)
 	}
-	if len(driver.configs) != 1 || driver.configs[0].PipelineId != "missing" {
+	if len(driver.configs) != 1 || driver.configs[0].PipelineId != missing {
 		t.Errorf("expected exactly the missing pipeline to be recreated, got %+v", driver.configs)
 	}
 }

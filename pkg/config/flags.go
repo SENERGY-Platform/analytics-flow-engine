@@ -18,14 +18,29 @@ package config
 
 import (
 	"flag"
+	"path/filepath"
+
+	"k8s.io/client-go/util/homedir"
 )
 
 var ConfPath string
 var Deploy bool
 
+// KubeconfigPath is the kubeconfig the Kubernetes driver uses in debug mode.
+var KubeconfigPath string
+
 func ParseFlags() {
 	flag.StringVar(&ConfPath, "config", "", "path to config JSON file")
+	flag.StringVar(&KubeconfigPath, "kubeconfig", DefaultKubeconfigPath(), "kubeconfig used in debug mode")
 	flag.BoolVar(&Deploy, "deploy", false, "deploy certificates and exit")
 	flag.Parse()
 	return
+}
+
+// DefaultKubeconfigPath is ~/.kube/config, or empty without a home directory.
+func DefaultKubeconfigPath() string {
+	if home := homedir.HomeDir(); home != "" {
+		return filepath.Join(home, ".kube", "config")
+	}
+	return ""
 }

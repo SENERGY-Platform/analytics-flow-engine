@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	"encoding/json"
@@ -30,11 +29,11 @@ import (
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib/access"
 	"github.com/SENERGY-Platform/analytics-flow-engine/lib/exports"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/baggage"
+	kubernetes_api "github.com/SENERGY-Platform/analytics-flow-engine/pkg/kubernetes-api"
 	"github.com/SENERGY-Platform/analytics-flow-engine/pkg/util"
 	parser "github.com/SENERGY-Platform/analytics-parser/lib"
 	pipe "github.com/SENERGY-Platform/analytics-pipeline/lib"
 	"github.com/google/uuid"
-	k8apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	deploymentLocationLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/location"
 	upstreamLib "github.com/SENERGY-Platform/analytics-fog-lib/lib/upstream"
@@ -139,18 +138,30 @@ func (f *FlowEngine) syncPipelines() (err error) {
 		return err
 	}
 
-	missing, extra := CompareSlicesWithKey(
-		pipelines,
-		statusTemp,
-		func(a pipe.Pipeline) string { return a.Id },
-		func(b lib.PipelineStatus) string { return strings.Replace(b.Name, "pipeline-", "", -1) },
-	)
+	registered := make([]string, 0, len(pipelines))
+	byId := make(map[string]pipe.Pipeline, len(pipelines))
+	for _, pipeline := range pipelines {
+		registered = append(registered, pipeline.Id)
+		if _, seen := byId[pipeline.Id]; !seen {
+			byId[pipeline.Id] = pipeline
+		}
+	}
+	var inCluster, foreign []string
+	for _, status := range statusTemp {
+		if id, ok := kubernetes_api.PipelineIdFromDeploymentName(status.Name); ok {
+			inCluster = append(inCluster, id)
+		} else {
+			foreign = append(foreign, status.Name)
+		}
+	}
+	missing, extra := diffPipelineIds(registered, inCluster)
 	// A failed rebuild is logged and the next pipeline still gets its turn; otherwise
 	// one broken pipeline would keep all later ones down until the next restart.
 	var failed []error
 	if len(missing) > 0 {
 		util.Logger.WarnContext(startupCtx, "found missing pipelines")
-		for _, item := range missing {
+		for _, id := range missing {
+			item := byId[id]
 			item.Image = ""
 			// The pipeline's own stored baggage, so these lines carry the same context
 			// as the ones the original request wrote. This is the case they are read in.
@@ -173,10 +184,13 @@ func (f *FlowEngine) syncPipelines() (err error) {
 		}
 	}
 
-	if len(extra) > 0 {
+	if len(extra) > 0 || len(foreign) > 0 {
 		util.Logger.WarnContext(startupCtx, "found extra pipelines")
-		for _, item := range extra {
-			util.Logger.WarnContext(startupCtx, "extra deployment", "deployment", item)
+		for _, id := range extra {
+			util.Logger.WarnContext(startupCtx, "extra deployment", "deployment", kubernetes_api.DeploymentName(id))
+		}
+		for _, name := range foreign {
+			util.Logger.WarnContext(startupCtx, "extra deployment", "deployment", name)
 		}
 	}
 	return errors.Join(failed...)
@@ -382,17 +396,10 @@ func (f *FlowEngine) DeletePipeline(ctx context.Context, id string, userId strin
 	}
 	err = f.stopOperators(ctx, pipeline, token, deleteVolumes)
 	if err != nil {
-		if !k8apierrors.IsNotFound(err) {
-			return
-		}
-	} else {
-		util.Logger.DebugContext(ctx, "removed all operators for pipeline: "+id)
-	}
-	err = f.pipelineService.DeletePipeline(ctx, id, userId, token)
-	if err != nil {
 		return
 	}
-	return
+	util.Logger.DebugContext(ctx, "removed all operators for pipeline: "+id)
+	return f.pipelineService.DeletePipeline(ctx, id, userId, token)
 }
 
 func (f *FlowEngine) GetPipelineStatus(ctx context.Context, id, userId, token string) (status lib.PipelineStatus, err error) {
@@ -412,9 +419,9 @@ func (f *FlowEngine) GetPipelinesStatus(ctx context.Context, ids []string, userI
 		return
 	}
 	for _, stat := range statusTemp {
-		idx := slices.IndexFunc(pipes, func(p pipe.Pipeline) bool { return "pipeline-"+p.Id == stat.Name })
+		idx := slices.IndexFunc(pipes, func(p pipe.Pipeline) bool { return kubernetes_api.DeploymentName(p.Id) == stat.Name })
 		if idx != -1 {
-			stat.Name = strings.Replace(stat.Name, "pipeline-", "", -1)
+			stat.Name = pipes[idx].Id
 			status = append(status, stat)
 		}
 	}

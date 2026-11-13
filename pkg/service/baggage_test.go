@@ -59,7 +59,6 @@ func (d *recordingDriver) CreateOperators(ctx context.Context, pipelineId string
 	d.configs = append(d.configs, pipelineConfig)
 	return nil
 }
-func (d *recordingDriver) DeleteOperator(context.Context, string, pipe.Operator) error { return nil }
 func (d *recordingDriver) DeleteOperators(ctx context.Context, _ string, _ []pipe.Operator) error {
 	if err := ctx.Err(); err != nil {
 		return err

@@ -63,11 +63,17 @@ func CreateServer(ctx context.Context, cfg *config.Config, pipelineService servi
 		return nil, fmt.Errorf("failed to set up OpenTelemetry: %w", err)
 	}
 
-	driver, err := kubernetes_api.NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, kubernetes_api.TimescaleSecret{
+	// Outside the cluster, which is what debug mode means here, the kubeconfig flag
+	// names the cluster; inside it the service account does.
+	kubeconfig := ""
+	if cfg.Debug {
+		kubeconfig = config.KubeconfigPath
+	}
+	driver, err := kubernetes_api.NewKubernetes(ctx, kubeconfig, &cfg.Rancher2, cfg.OperatorResources, kubernetes_api.TimescaleSecret{
 		Name:                 cfg.OperatorTimescaleSecretName,
 		Key:                  cfg.OperatorTimescaleSecretKey,
 		TrustedImagePrefixes: cfg.OperatorTimescaleTrustedImagePrefixes,
-	}, cfg.Debug)
+	})
 	if err != nil {
 		util.Logger.ErrorContext(ctx, "Error creating driver", "error", err)
 		return

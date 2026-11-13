@@ -37,15 +37,11 @@ import (
 // FlowEngine.deploymentContext.
 type Driver interface {
 	CreateOperators(ctx context.Context, pipelineId string, input []pipe.Operator, pipelineConfig lib.PipelineConfig) error
-	/*
-		DeleteOperator deletes an operator in the given pipeline
-		Deprecated: Use DeleteOperators instead.
-	*/
-	DeleteOperator(ctx context.Context, pipelineId string, input pipe.Operator) error
 	DeleteOperators(ctx context.Context, pipelineId string, inputs []pipe.Operator) error
 	// DeleteOperatorsKeepingVolumes is DeleteOperators without deleting the
 	// operators' volumes, for rebuilding a pipeline whose stored state must survive.
 	DeleteOperatorsKeepingVolumes(ctx context.Context, pipelineId string, inputs []pipe.Operator) error
+	// GetPipelineStatus returns a lib.NotFoundError when the pipeline has no deployment.
 	GetPipelineStatus(ctx context.Context, pipelineId string) (lib.PipelineStatus, error)
 	GetPipelinesStatus(ctx context.Context) ([]lib.PipelineStatus, error)
 }

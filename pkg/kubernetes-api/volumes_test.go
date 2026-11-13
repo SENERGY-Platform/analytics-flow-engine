@@ -64,7 +64,15 @@ func fakeOperator(persist bool) pipe.Operator {
 }
 
 func fakeVolumeName() string {
-	return getOperatorName(fakePipelineId, fakeOperator(true))[0]
+	return mustPVCName(fakePipelineId, fakeOperator(true))
+}
+
+func mustPVCName(pipelineId string, operator pipe.Operator) string {
+	name, err := PVCName(pipelineId, operator)
+	if err != nil {
+		panic(err)
+	}
+	return name
 }
 
 // existingPVC is a claim already in the cluster, marked so a test can tell it from
@@ -260,7 +268,7 @@ func TestCreateOperatorsSharesOneWaitAcrossItsVolumes(t *testing.T) {
 	second := fakeOperator(true)
 	second.Id = "op-87654321"
 	secondClaim := existingPVC(true)
-	secondClaim.Name = getOperatorName(fakePipelineId, second)[0]
+	secondClaim.Name = mustPVCName(fakePipelineId, second)
 	k, clientset := fakeDriver(existingPVC(true), secondClaim)
 	const budget = 600 * time.Millisecond
 	k.pvcWait = pvcWait{timeout: budget, interval: 5 * time.Millisecond}

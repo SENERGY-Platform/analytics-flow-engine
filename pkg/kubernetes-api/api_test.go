@@ -25,7 +25,7 @@ func getClient() (client *Kubernetes, err error) {
 		return
 	}
 	util.InitStructLogger("debug")
-	client, err = NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, TimescaleSecret{Name: cfg.OperatorTimescaleSecretName, Key: cfg.OperatorTimescaleSecretKey}, true)
+	client, err = NewKubernetes(context.Background(), config.DefaultKubeconfigPath(), &cfg.Rancher2, cfg.OperatorResources, TimescaleSecret{Name: cfg.OperatorTimescaleSecretName, Key: cfg.OperatorTimescaleSecretKey})
 	if err != nil {
 		return
 	}
@@ -39,7 +39,7 @@ func TestKubernetes_createClient(t *testing.T) {
 		return
 	}
 	util.InitStructLogger("debug")
-	_, err = NewKubernetes(&cfg.Rancher2, cfg.OperatorResources, TimescaleSecret{Name: cfg.OperatorTimescaleSecretName, Key: cfg.OperatorTimescaleSecretKey}, true)
+	_, err = NewKubernetes(context.Background(), config.DefaultKubeconfigPath(), &cfg.Rancher2, cfg.OperatorResources, TimescaleSecret{Name: cfg.OperatorTimescaleSecretName, Key: cfg.OperatorTimescaleSecretKey})
 	if err != nil {
 		t.Error(err.Error())
 		return
@@ -175,7 +175,7 @@ func TestContainerResourcesRejectsAnUnparsableQuantity(t *testing.T) {
 }
 
 func TestNewVPALetsTheUpdaterEvictASinglePod(t *testing.T) {
-	vpa := newVPA("pipeline-x")
+	vpa := newVPA("x")
 	if vpa.Name != "pipeline-x-vpa" || vpa.Spec.TargetRef.Name != "pipeline-x" {
 		t.Fatalf("names: %s targets %s", vpa.Name, vpa.Spec.TargetRef.Name)
 	}
