@@ -93,13 +93,14 @@ func ConnectMQTTBroker(ctx context.Context, config config.MqttConfig, pipelineSe
 		util.Logger.InfoContext(ctx, "Subscribed to topics: "+fmt.Sprintf("%v", topics))
 	}
 
+	// Set before connecting: OnConnect subscribes, and a message can arrive before
+	// Connect returns.
+	fogClient = NewFogClient(pipelineService)
 	client = MQTT.NewClient(connOpts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return fmt.Errorf("Cant connect to broker %s: %s\n", hostname, token.Error())
-	} else {
-		util.Logger.InfoContext(ctx, "Connected to broker "+*server)
-		fogClient = NewFogClient(pipelineService)
 	}
+	util.Logger.InfoContext(ctx, "Connected to broker "+*server)
 	return nil
 }
 
